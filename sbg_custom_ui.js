@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.5
+// @version      1.0.6
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
-// @updateURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
+// @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://3d.sytes.net/
