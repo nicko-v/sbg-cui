@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://3d.sytes.net/
