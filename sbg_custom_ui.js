@@ -568,11 +568,26 @@ window.addEventListener('load', async function () {
     for (let key in mapFilters) {
       let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
       root.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
-      document.querySelector(`input[name="mapFilters_${key}"]`).value = mapFilters[key];
     }
+    
+    if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
     document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
     document.querySelectorAll('.sbgcui_settings > details').forEach(e => { e.open = false; });
+
+    document.querySelectorAll('.sbgcui_settings input:not([type="hidden"])').forEach(e => {
+      let path = e.name.split('_');
+      let value = path.reduce((obj, prop) => obj[prop], config);
+
+      if (e.type.match(/checkbox|number/)) {
+        e.value = +value;
+        e.checked = +value;
+      } else if (e.type == 'radio') {
+        e.checked = e.value == value;
+      } else if (e.type == 'range') {
+        e.value = +value;
+      }
+    });
   }
 
   function chooseCore(romanCurrentLvl) {
@@ -1035,6 +1050,7 @@ window.addEventListener('load', async function () {
         left: initial;
 	      right: 0.5em;
         top: initial;
+        bottom: 5px;
         transform: initial;
       }
 
@@ -1268,6 +1284,7 @@ window.addEventListener('load', async function () {
 
         .ol-zoom {
           top: 0.5em;
+          bottom: initial;
           transform: translateY(0);
         }
 
