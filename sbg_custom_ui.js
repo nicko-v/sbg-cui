@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.6
+// @version      1.0.7
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -46,18 +46,46 @@ window.addEventListener('load', async function () {
       grayscale: IS_DARK ? 1 : 0,
       blur: 0,
     },
+    tinting: {
+      map: 1,
+      point: 'level', // level || team || off
+      profile: 1,
+    },
   };
 
 
+  let config;
+  if (localStorage.getItem('sbgcui_config')) {
+    config = JSON.parse(localStorage.getItem('sbgcui_config'));
+    for (let key in DEFAULT_CONFIG) {
+      if (!(key in config)) {
+        config[key] = DEFAULT_CONFIG[key];
+      }
+      localStorage.setItem('sbgcui_config', JSON.stringify(config));
+    }
+  } else {
+    config = DEFAULT_CONFIG;
+    localStorage.setItem('sbgcui_config', JSON.stringify(config));
+  }
+
+
+  let attackButton = document.querySelector('#attack-menu');
   let attackSlider = document.querySelector('.attack-slider-wrp');
   let deployButton = document.querySelector('#deploy');
   let discoverButton = document.querySelector('#discover');
   let invTotalSpan = document.querySelector('#self-info__inv');
-  let portalCores = document.querySelector('.i-stat__cores');
-  let portalPopup = document.querySelector('.info.popup');
-  let profileNickname = document.querySelector('#pr-name');
+  let pointCores = document.querySelector('.i-stat__cores');
+  let pointLevelSpan = document.querySelector('#i-level');
+  let pointOwnerSpan = document.querySelector('#i-stat__owner');
+  let pointPopup = document.querySelector('.info.popup');
+  let profileNameSpan = document.querySelector('#pr-name');
   let profilePopup = document.querySelector('.profile.popup');
+  let selfExpSpan = document.querySelector('#self-info__exp');
   let selfLvlSpan = document.querySelector('#self-info__explv');
+  let selfNameSpan = document.querySelector('#self-info__name');
+
+  let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
+  let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 
 
   let numbersConverter = {
@@ -93,7 +121,7 @@ window.addEventListener('load', async function () {
   }
 
   async function clearInventory(event, forceClear = false) {
-    let maxAmount = JSON.parse(localStorage.getItem('sbgcui_config')).maxAmountInBag;
+    let maxAmount = config.maxAmountInBag;
 
     getInventory()
       .then(inventory => {
@@ -157,6 +185,7 @@ window.addEventListener('load', async function () {
             let cachedItem = cache.find(f => f.g == e.guid);
             if (cachedItem) { cachedItem.a -= e.amount; }
           });
+          cache = cache.filter(e => e.a > 0);
           localStorage.setItem('inventory-cache', JSON.stringify(cache));
         }
 
@@ -237,6 +266,56 @@ window.addEventListener('load', async function () {
       return section;
     }
 
+    function createInput(type, name, checked, text, value) {
+      let isCheckbox = type == 'checkbox';
+      let wrapper = document.createElement('div');
+      let label = document.createElement('label');
+      let input = document.createElement('input');
+
+      wrapper.classList.add('sbgcui_settings-input_wrp');
+
+      input.id = isCheckbox ? name : name + Math.random().toString().slice(2);
+      input.name = name;
+      input.type = type;
+      input.value = isCheckbox ? 1 : value;
+      input.checked = checked;
+
+      label.htmlFor = input.id;
+      label.innerText = text;
+
+      if (isCheckbox) {
+        let hiddenInput = document.createElement('input');
+
+        hiddenInput.name = name;
+        hiddenInput.type = 'hidden';
+        hiddenInput.value = 0;
+
+        wrapper.appendChild(hiddenInput);
+      }
+
+      wrapper.append(input, label);
+
+      return wrapper;
+    }
+
+    function createRadioGroup(title, inputs = []) {
+      let header = document.createElement('h5');
+      let inputsWrp = document.createElement('div');
+      let radioGroup = document.createElement('div');
+
+      header.classList.add('sbgcui_settings-radio_group-title');
+      inputsWrp.classList.add('sbgcui_settings-inputs_group');
+      radioGroup.classList.add('sbgcui_settings-radio_group');
+
+      header.innerText = title;
+
+      inputs.forEach(e => { inputsWrp.appendChild(e); });
+
+      radioGroup.append(header, inputsWrp);
+
+      return radioGroup;
+    }
+
     function createAutoDeleteSection(maxAmountInBag) {
       let section = createSection(
         'Автоудаление',
@@ -247,14 +326,14 @@ window.addEventListener('load', async function () {
 
       for (let key in maxAmountInBag) {
         let subSection = document.createElement('section');
-        let subsectionTitle = document.createElement('h4');
+        let subSectionTitle = document.createElement('h4');
         let maxAmounts = document.createElement('div');
 
         subSection.classList.add('sbgcui_settings-subsection');
-        subsectionTitle.classList.add('sbgcui_settings-title');
+        subSectionTitle.classList.add('sbgcui_settings-title');
         maxAmounts.classList.add('sbgcui_settings-maxamounts');
 
-        subsectionTitle.innerText = (key == 'cores') ? 'Ядра' : (key == 'catalysers') ? 'Катализаторы' : (key == 'refs') ? 'Рефы' : 'N/D';
+        subSectionTitle.innerText = (key == 'cores') ? 'Ядра' : (key == 'catalysers') ? 'Катализаторы' : (key == 'refs') ? 'Рефы' : 'N/D';
 
         for (let type in maxAmountInBag[key]) {
           let wrapper = document.createElement('div');
@@ -283,7 +362,7 @@ window.addEventListener('load', async function () {
           maxAmounts.appendChild(wrapper);
         }
 
-        subSection.append(subsectionTitle, maxAmounts);
+        subSection.append(subSectionTitle, maxAmounts);
 
         section.appendChild(subSection);
       }
@@ -303,31 +382,6 @@ window.addEventListener('load', async function () {
     }
 
     function createAutoSelectSection(autoSelect) {
-      function createInput(type, name, checked, text) {
-        let wrapper = document.createElement('div');
-        let label = document.createElement('label');
-        let input = document.createElement('input');
-        let hiddenInput = document.createElement('input');
-
-        wrapper.classList.add('sbgcui_settings-autoselect_input_wrp');
-
-        hiddenInput.name = name;
-        hiddenInput.type = 'hidden';
-        hiddenInput.value = 0;
-
-        input.id = name;
-        input.name = name;
-        input.type = type;
-        input.value = 1;
-        input.checked = checked;
-
-        label.htmlFor = name;
-        label.innerText = text;
-
-        wrapper.append(hiddenInput, input, label);
-
-        return wrapper;
-      }
       let section = createSection(
         'Автовыбор',
         'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде.'
@@ -398,21 +452,38 @@ window.addEventListener('load', async function () {
       return section;
     }
 
+    function createTintingSection(tinting) {
+      let section = createSection(
+        'Тонирование',
+        'Интерфейс браузера будет окрашиваться в зависимости от того, что происходит на экране.'
+      );
+      let subSection = document.createElement('section');
 
-    let config;
+      let mapTinting = createInput('checkbox', 'tinting_map', +tinting.map, 'При просмотре карты');
+      let profileTinting = createInput('checkbox', 'tinting_profile', +tinting.profile, 'При просмотре профиля');
+      let pointTintingLvl = createInput('radio', 'tinting_point', (tinting.point == 'level'), 'Цвет уровня', 'level');
+      let pointTintingTeam = createInput('radio', 'tinting_point', (tinting.point == 'team'), 'Цвет команды', 'team');
+      let pointTintingOff = createInput('radio', 'tinting_point', (tinting.point == 'off'), 'Нет', 'off');
 
-    if (localStorage.getItem('sbgcui_config')) {
-      config = JSON.parse(localStorage.getItem('sbgcui_config'));
-      for (let key in DEFAULT_CONFIG) {
-        if (!(key in config)) {
-          config[key] = DEFAULT_CONFIG[key];
+      mapTinting.addEventListener('change', e => {
+        if (e.target.checked) {
+          addTinting('map');
+        } else {
+          addTinting('');
         }
-        localStorage.setItem('sbgcui_config', JSON.stringify(config));
-      }
-    } else {
-      config = DEFAULT_CONFIG;
-      localStorage.setItem('sbgcui_config', JSON.stringify(config));
+      });
+
+      let pointTintingGroup = createRadioGroup('При просмотре точки:', [pointTintingLvl, pointTintingTeam, pointTintingOff]);
+
+      subSection.classList.add('sbgcui_settings-subsection');
+
+      subSection.append(mapTinting, profileTinting, pointTintingGroup);
+
+      section.appendChild(subSection);
+
+      return section;
     }
+
 
     let form = document.createElement('form');
     form.classList.add('sbgcui_settings', 'sbgcui_hidden');
@@ -444,6 +515,7 @@ window.addEventListener('load', async function () {
       createAutoDeleteSection(config.maxAmountInBag),
       createAutoSelectSection(config.autoSelect),
       createColorSchemeSection(config.mapFilters),
+      createTintingSection(config.tinting),
     ];
 
     sections.forEach(e => {
@@ -467,7 +539,7 @@ window.addEventListener('load', async function () {
           let path = key.split('_');
           if (path[0] == 'maxAmountInBag') {
             config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-          } else if (path[0] == 'autoSelect' || path[0] == 'mapFilters') {
+          } else if (path[0].match(/autoSelect|mapFilters|tinting/)) {
             config[path[0]][path[1]] = formEntries[key];
           }
         }
@@ -490,7 +562,7 @@ window.addEventListener('load', async function () {
   }
 
   function closeSettingsMenu() {
-    let mapFilters = JSON.parse(localStorage.getItem('sbgcui_config')).mapFilters;
+    let mapFilters = config.mapFilters;
     let root = document.querySelector(':root');
 
     for (let key in mapFilters) {
@@ -568,6 +640,52 @@ window.addEventListener('load', async function () {
     return toast;
   }
 
+  function updateExpBar(playerExp) {
+    let formatter = new Intl.NumberFormat('en-GB');
+    let totalLvlExp = 0;
+
+    for (let i = 0; i < LEVEL_TARGETS.length; i += 1) {
+      totalLvlExp += LEVEL_TARGETS[i];
+
+      if (totalLvlExp > playerExp) {
+        selfExpSpan.innerText = totalLvlExp != Infinity ?
+          `${formatter.format(playerExp - (totalLvlExp - LEVEL_TARGETS[i]))} / ${formatter.format(LEVEL_TARGETS[i])}` :
+          formatter.format(playerExp);
+
+        selfLvlSpan.innerText = i + 1;
+
+        return;
+      }
+    }
+  }
+
+  function addTinting(type) {
+    let color;
+
+    switch (type) {
+      case 'map':
+        color = getComputedStyle(selfNameSpan).color;
+        break;
+      case 'profile':
+        color = getComputedStyle(profileNameSpan).color;
+        profilePopup.style.borderColor = color;
+        break;
+      case 'point_level':
+        color = getComputedStyle(pointLevelSpan).color;
+        pointPopup.style.borderColor = color;
+        break;
+      case 'point_team':
+        color = getComputedStyle(pointOwnerSpan).color;
+        pointPopup.style.borderColor = color;
+        break;
+      default:
+        color = '';
+        break;
+    }
+
+    theme.content = color;
+  }
+
 
   /* Данные о себе и версии игры */
   {
@@ -606,6 +724,20 @@ window.addEventListener('load', async function () {
 
   /* Мутации */
   {
+    let pointLevelObserver = new MutationObserver(records => {
+      let event = new Event('pointLevelChanged', { bubbles: true });
+      pointLevelSpan.dispatchEvent(event);
+    });
+    pointLevelObserver.observe(pointLevelSpan, { childList: true });
+
+
+    let pointOwnerObserver = new MutationObserver(records => {
+      let event = new Event('pointOwnerChanged', { bubbles: true });
+      pointOwnerSpan.dispatchEvent(event);
+    });
+    pointOwnerObserver.observe(pointOwnerSpan, { childList: true });
+
+
     let lvlObserver = new MutationObserver((_, observer) => {
       observer.disconnect();
 
@@ -617,17 +749,17 @@ window.addEventListener('load', async function () {
     lvlObserver.observe(selfLvlSpan, { childList: true });
 
 
-    let portalPopupObserver = new MutationObserver(records => {
-      let isHidden = records[0].target.classList.contains('hidden');
-      let event = new Event(isHidden ? 'portalPopupClosed' : 'portalPopupOpened', { bubbles: true });
+    let pointPopupObserver = new MutationObserver(records => {
+      isPointPopupOpened = !records[0].target.classList.contains('hidden');
+      let event = new Event(isPointPopupOpened ? 'pointPopupOpened' : 'pointPopupClosed', { bubbles: true });
       records[0].target.dispatchEvent(event);
     });
-    portalPopupObserver.observe(portalPopup, { attributes: true, attributeFilter: ["class"] });
+    pointPopupObserver.observe(pointPopup, { attributes: true, attributeFilter: ["class"] });
 
 
     let profilePopupObserver = new MutationObserver(records => {
-      let isHidden = records[0].target.classList.contains('hidden');
-      let event = new Event(isHidden ? 'profilePopupClosed' : 'profilePopupOpened', { bubbles: true });
+      isProfilePopupOpened = !records[0].target.classList.contains('hidden');
+      let event = new Event(isProfilePopupOpened ? 'profilePopupOpened' : 'profilePopupClosed', { bubbles: true });
       records[0].target.dispatchEvent(event);
     });
     profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
@@ -641,57 +773,21 @@ window.addEventListener('load', async function () {
     attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
   }
 
-  /* События */
+  /* Прочие события */
   {
-    attackSlider.addEventListener('attackSliderOpened', _ => {
-      let config = JSON.parse(localStorage.getItem('sbgcui_config'));
-      if (+config.autoSelect.attack) { click(chooseCatalyser()); }
-    });
-
-
-    profilePopup.addEventListener('profilePopupOpened', _ => {
-      if (profileNickname.innerText == player.name) {
-        $('#logout').show();
-      } else {
-        $('#logout').hide();
-      }
-    });
-
-
-    portalPopup.addEventListener('portalPopupOpened', _ => {
-      let config = JSON.parse(localStorage.getItem('sbgcui_config'));
-      if (+config.autoSelect.deploy) { click(chooseCore()); }
-    });
-
-
-    portalCores.addEventListener('click', event => {
-      let config = JSON.parse(localStorage.getItem('sbgcui_config'));
-      if (+config.autoSelect.upgrade && event.target.classList.contains('selected')) {
-        click(chooseCore(event.target.innerText));
-      }
-    });
-
-
-    deployButton.addEventListener('click', event => {
-      let config = JSON.parse(localStorage.getItem('sbgcui_config'));
-      if (+config.autoSelect.upgrade && event.currentTarget.dataset.state == 'upgrade') {
-        let nextCoreArrow = document.querySelector('.deploy-slider-wrp .splide__arrow.splide__arrow--next');
-        click(nextCoreArrow);
-      }
-    });
-
-
     discoverButton.addEventListener('click', clearInventory);
+
+    attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
   }
 
 
   /* Стили */
   {
+    let mapFilters = config.mapFilters;
     let style = this.document.createElement('style');
-    let config = localStorage.getItem('sbgcui_config');
-    let mapFilters = config ? JSON.parse(config).mapFilters : DEFAULT_CONFIG.mapFilters;
 
     document.head.appendChild(style);
+
     style.innerHTML = (`
       :root {
         --sbgcui-invert: ${mapFilters.invert};
@@ -710,8 +806,10 @@ window.addEventListener('load', async function () {
         -webkit-user-select: none;
       }
 
-      .toastify:nth-child(n+${MAX_TOASTS + 1}) {
-        display: none;
+      body {
+        display: flex;
+	      flex-direction: column;
+	      position: relative;
       }
 
       #attack-slider-fire {
@@ -725,7 +823,6 @@ window.addEventListener('load', async function () {
         border-top-style: dotted;
         width: 6em;
         height: 6em;
-        margin: auto;
         padding: 0;
         border-width: 8px;
         border-radius: 50%;
@@ -741,13 +838,13 @@ window.addEventListener('load', async function () {
         height: 50%;
         background-color: var(--team-${player.team});
         border-radius: 30%;
-        transform: rotate(45deg);
         margin: auto;
+        transition: transform 0.5s ease, border-radius 0.5s ease 0.2s;
       }
 
       #inventory__close {
         top: initial;
-        bottom: 60px;
+        bottom: 120px;
         right: 50%;
         transform: translateX(50%);
         font-size: 1.5em;
@@ -766,6 +863,13 @@ window.addEventListener('load', async function () {
         margin-top: 15px;
       }
 
+      #map {
+        position: absolute;
+	      top: 0;
+	      left: 0;
+	      z-index: 1;
+      }
+
       #self-info__exp {
         font-size: 1em;
         padding: 0 1em;
@@ -774,6 +878,10 @@ window.addEventListener('load', async function () {
       #self-info__explv {
         font-size: 2.2em;
         text-shadow: 3px 3px 2px black;
+      }
+
+      #self-info__inv::after {
+        content: " / ${INVENTORY_LIMIT}";
       }
       
       #self-info__name {
@@ -785,31 +893,65 @@ window.addEventListener('load', async function () {
         pointer-events: auto;
       }
 
-      #toggle-follow, #ops {
+      #toggle-follow {
+        font-size: 1.5em;
+        transform: rotate(-90deg);
+      }
+      
+      #ops {
+        position: absolute;
+        left: 0;
+        bottom: -10px;
         font-size: inherit;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .attack-slider-highlevel {
+        height: unset;
+        padding-bottom: 5px;
       }
 
       .attack-slider-wrp {
-        top: 70%;
+        z-index: 2;
+        position: initial;
+        top: initial;
+        left: initial;
+        transform: initial;
+        order: 2;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
       }
 
       .bottomleft-container {
-        width: 100%;
-        bottom: 1em;
-        left: 0;
         pointer-events: none;
+        z-index: 2;
+        position: relative;
+        bottom: initial;
+        left: initial;
+        order: 3;
+        margin: 0 5px 15px;
+        justify-content: center;
       }
 
       .bottomleft-container button {
         pointer-events: auto;
       }
 
+      .catalysers-list__amount, .cores-list__amount {
+        width: 100%;
+        text-align: center;
+      }
+
       .game-menu button {
         pointer-events: auto;
       }
 
-      .inventory__manage-amount {
-        z-index: 1;
+      .inventory__content {
+        order: 1;
+	      margin-bottom: 0;
       }
 
       .inventory__content[data-type="3"] {
@@ -837,11 +979,16 @@ window.addEventListener('load', async function () {
         top: 0;
       }
 
+      .inventory__manage-amount {
+        z-index: 1;
+      }
+
       .inventory__item-controls {
         overflow: visible;
       }
 
       .inventory__controls {
+        order: 3;
         height: 40px;
       }
 
@@ -849,10 +996,30 @@ window.addEventListener('load', async function () {
         position: relative;
       }
 
+      .inventory__tabs {
+        order: 2;
+	      margin-bottom: 10px;
+        padding: 0;
+        gap: 0;
+      }
+
       .inventory__tab {
         display: flex;
         align-items: center;
         height: 35px;
+        border-bottom: 2px #0000 solid;
+        border-top: none;
+        flex-grow: 1;
+        justify-content: center;
+      }
+
+      .inventory__tab.active {
+        color: var(--selection);
+      }
+
+      .ol-control button:hover, .ol-control button:focus {
+        outline: unset;
+        color: var(--team-3);
       }
 
       .ol-layer__osm {
@@ -860,8 +1027,19 @@ window.addEventListener('load', async function () {
       }
 
       .ol-rotate {
-        top: unset;
-        bottom: 2.5em;
+        position: initial;
+        margin-top: 10px;
+      }
+
+      .ol-zoom {
+        left: initial;
+	      right: 0.5em;
+        top: initial;
+        transform: initial;
+      }
+
+      .ol-zoom button {
+        color: var(--team-${player.team});
       }
 
       .profile {
@@ -886,27 +1064,25 @@ window.addEventListener('load', async function () {
         padding-right: 0.5em;
       }
 
+      .splide__slide {
+        height: initial !important;
+      }
+
+      .toastify:nth-child(n+${MAX_TOASTS + 1}) {
+        display: none;
+      }
+
       .topleft-container {
         max-width: unset;
-        top: 0;
-        left: 0;
         width: 100%;
         box-sizing: border-box;
         background: linear-gradient(180deg, var(--team-${player.team}) -170%, rgba(255,255,255,0) 100%);
         pointer-events: none;
-      }
-      
-      .sbgcui_bottomleft_wrp {
-        position: absolute;
-        font-size: 1.1em;
-        display: flex;
-        width: 100%;
-        justify-content: space-between;
-        left: 0;
-        bottom: 0;
-        padding: 0 0.5em;
-        box-sizing: border-box;
-        pointer-events: none;
+        position: initial;
+        top: initial;
+        left: initial;
+	      z-index: 2;
+	      margin-bottom: auto;
       }
 
       .sbgcui_settings {
@@ -990,14 +1166,30 @@ window.addEventListener('load', async function () {
         width: 4em;
       }
 
-      .sbgcui_settings-autoselect_input_wrp, .sbgcui_settings-mapfilters_input_wrp {
+      .sbgcui_settings-input_wrp, .sbgcui_settings-mapfilters_input_wrp {
         font-size: 0.8em;
         display: flex;
         margin-top: 10px;
       }
 
-      .sbgcui_settings-autoselect_input_wrp > label {
+      .sbgcui_settings-input_wrp > label {
         margin-left: 5px;
+      }
+      
+      .sbgcui_settings-input_wrp > input[type="checkbox"] {
+        margin-left: 0;
+      }
+
+      .sbgcui_settings-inputs_group {
+        padding-left: 15px;
+      }
+
+      .sbgcui_settings-radio_group-title {
+        margin: 0;
+      }
+
+      .sbgcui_settings-radio_group {
+        margin-top: 10px;
       }
 
       .sbgcui_settings-mapfilters_input_wrp {
@@ -1044,8 +1236,44 @@ window.addEventListener('load', async function () {
         transition: width 0.5s ease;
       }
 
+      .sbgcui_attack-menu-rotate::after {
+        transform: rotate(135deg);
+	      border-bottom-left-radius: 0 !important;
+      }
+
       .sbgcui_hidden {
         display: none;
+      }
+
+      @media (orientation: landscape) {
+        #attack-slider-fire {
+          height: initial;
+        }
+
+        .attack-slider-wrp {
+          position: absolute;
+          right: 0;
+          bottom: 0;
+          width: 40%;
+          white-space: nowrap;
+        }
+
+        .catalysers-list__level {
+          font-size: 1.2em;
+        }
+
+        .catalysers-list__amount, .attack-slider-highlevel {
+          font-size: 0.8em;
+        }
+
+        .ol-zoom {
+          top: 0.5em;
+          transform: translateY(0);
+        }
+
+        .sbgcui_attack-menu-rotate::after {
+          transform: rotate(-135deg);
+        }
       }
   `);
   }
@@ -1053,6 +1281,16 @@ window.addEventListener('load', async function () {
 
   /* Удаление ненужного, переносы, переименования */
   {
+    let ops = document.querySelector('#ops');
+    let fw = document.querySelector('#toggle-follow');
+    let blContainer = document.querySelector('.bottomleft-container');
+    let zoomContainer = document.querySelector('.ol-zoom');
+    let rotateArrow = document.querySelector('.ol-rotate');
+    let invCloseButton = document.querySelector('#inventory__close');
+    let profileCloseButton = document.querySelector('.profile.popup .popup-close');
+    let logout = document.querySelector('#logout');
+
+
     $(`
     .ol-attribution,
     #attack-slider-close,
@@ -1063,11 +1301,27 @@ window.addEventListener('load', async function () {
 
     $('.self-info__entry, #attack-menu').contents().filter((_, a) => a.nodeType === 3).remove();
 
-    $('#logout').insertBefore($('.profile .popup-close'));
+    profilePopup.insertBefore(logout, profileCloseButton);
 
-    $('#inventory__close').text('[x]');
+    invCloseButton.innerText = '[x]';
+
+    zoomContainer.append(rotateArrow, fw);
+
+    fw.innerText = String.fromCharCode(10148);
+
+    blContainer.appendChild(ops);
+
+    ops.replaceChildren('INVENTORY', invTotalSpan);
 
     selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+
+    profilePopup.addEventListener('profilePopupOpened', _ => {
+      if (profileNameSpan.innerText == player.name) {
+        logout.classList.remove('sbgcui_hidden')
+      } else {
+        logout.classList.add('sbgcui_hidden')
+      }
+    });
   }
 
 
@@ -1090,19 +1344,31 @@ window.addEventListener('load', async function () {
     xpProgressBar.append(selfExpSpan, xpProgressBarFiller);
   }
 
-
-  /* Нижнее меню: атака, инвентарь, FW */
+  /* Автовыбор */
   {
-    let bottomLeftButtons = document.createElement('div');
-    let blContainer = document.querySelector('.bottomleft-container');
-    let ops = document.querySelector('#ops');
+    attackSlider.addEventListener('attackSliderOpened', _ => {
+      if (+config.autoSelect.attack) { click(chooseCatalyser()); }
+    });
 
-    bottomLeftButtons.classList.add('sbgcui_bottomleft_wrp');
-    bottomLeftButtons.append(document.querySelector('#toggle-follow'), ops);
 
-    blContainer.append(bottomLeftButtons, document.querySelector('.ol-rotate'));
+    pointPopup.addEventListener('pointPopupOpened', _ => {
+      if (+config.autoSelect.deploy) { click(chooseCore()); }
+    });
 
-    ops.replaceChildren('INV: ', invTotalSpan);
+
+    pointCores.addEventListener('click', event => {
+      if (+config.autoSelect.upgrade && event.target.classList.contains('selected')) {
+        click(chooseCore(event.target.innerText));
+      }
+    });
+
+
+    deployButton.addEventListener('click', event => {
+      if (+config.autoSelect.upgrade && event.currentTarget.dataset.state == 'upgrade') {
+        let nextCoreArrow = document.querySelector('.deploy-slider-wrp .splide__arrow.splide__arrow--next');
+        click(nextCoreArrow);
+      }
+    });
   }
 
 
@@ -1132,7 +1398,9 @@ window.addEventListener('load', async function () {
               if (!refInfoDiv.contains(progressBarFiller)) { refInfoDiv.appendChild(progressBarFiller); }
 
               progressBarFiller.style.width = percentage + '%';
-              refInfoEnergy.nodeValue = percentage;
+              if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
+
+              updateExpBar(r.xp.cur);
             }
           })
           .catch(err => {
@@ -1163,6 +1431,61 @@ window.addEventListener('load', async function () {
 
     document.body.addEventListener('click', event => {
       if (!settingsMenu.classList.contains('sbgcui_hidden') && !event.target.closest('.sbgcui_settings')) { closeSettingsMenu(); }
+    });
+  }
+
+
+  /* Тонирование интерфейса браузера */
+  {
+    var theme = document.createElement('meta');
+
+    theme.name = 'theme-color';
+    document.head.appendChild(theme);
+
+    let tinting = config.tinting;
+
+    if (+tinting.map) { addTinting('map'); }
+
+    profilePopup.addEventListener('profilePopupOpened', _ => {
+      if (+tinting.profile) {
+        addTinting('profile');
+      } else {
+        addTinting('');
+      }
+    });
+
+    pointPopup.addEventListener('pointPopupOpened', _ => {
+      if (tinting.point != 'off') {
+        addTinting(`point_${tinting.point}`);
+      } else {
+        addTinting('');
+      }
+    });
+
+    pointLevelSpan.addEventListener('pointLevelChanged', _ => {
+      if (tinting.point == 'level') { addTinting('point_level'); }
+    });
+
+    pointOwnerSpan.addEventListener('pointOwnerChanged', _ => {
+      if (tinting.point == 'team') { addTinting('point_team'); }
+    });
+
+    pointPopup.addEventListener('pointPopupClosed', _ => {
+      if (isProfilePopupOpened) {
+        if (+tinting.profile) { addTinting('profile'); }
+      } else {
+        if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
+      }
+      pointPopup.style.borderColor = '';
+    });
+
+    profilePopup.addEventListener('profilePopupClosed', _ => {
+      if (isPointPopupOpened) {
+        if (tinting.point != 'off') { addTinting(`point_${tinting.point}`); }
+      } else {
+        if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
+      }
+      profilePopup.style.borderColor = '';
     });
   }
 
