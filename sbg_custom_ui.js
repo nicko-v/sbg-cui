@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.7
+// @version      1.0.8
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -22,6 +22,7 @@ window.addEventListener('load', async function () {
   const MAX_TOASTS = 3;
   const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
   const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
+  const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
   const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
   const ITEMS_TYPES = {
     1: { eng: 'cores', rus: 'ядра' },
@@ -35,7 +36,7 @@ window.addEventListener('load', async function () {
       refs: { allied: -1, hostile: -1 },
     },
     autoSelect: {
-      deploy: 1,
+      deploy: 'min', // min || max || off
       upgrade: 1,
       attack: 1,
     },
@@ -56,11 +57,12 @@ window.addEventListener('load', async function () {
 
   let config;
   if (localStorage.getItem('sbgcui_config')) {
-    config = JSON.parse(localStorage.getItem('sbgcui_config'));
+    config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
     for (let key in DEFAULT_CONFIG) {
       if (!(key in config)) {
         config[key] = DEFAULT_CONFIG[key];
       }
+      updateConfigStructure(config, DEFAULT_CONFIG);
       localStorage.setItem('sbgcui_config', JSON.stringify(config));
     }
   } else {
@@ -73,6 +75,7 @@ window.addEventListener('load', async function () {
   let attackSlider = document.querySelector('.attack-slider-wrp');
   let deployButton = document.querySelector('#deploy');
   let discoverButton = document.querySelector('#discover');
+  let inventoryButton = document.querySelector('#ops');
   let invTotalSpan = document.querySelector('#self-info__inv');
   let pointCores = document.querySelector('.i-stat__cores');
   let pointLevelSpan = document.querySelector('#i-level');
@@ -177,6 +180,8 @@ window.addEventListener('load', async function () {
 
         let invTotal = responses.reduce((total, e) => e.count.total < total ? e.count.total : total, Infinity);
         if (isFinite(invTotal)) { invTotalSpan.innerText = invTotal; }
+
+        if (inventoryButton.style.color.match('accent')) { inventoryButton.style.color = ''; }
 
         /* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
         {
@@ -389,12 +394,16 @@ window.addEventListener('load', async function () {
       let subSection = document.createElement('section');
 
       let attack = createInput('checkbox', 'autoSelect_attack', +autoSelect.attack, 'Наибольший катализатор при атаке');
-      let deploy = createInput('checkbox', 'autoSelect_deploy', +autoSelect.deploy, 'Наименьшее ядро при деплое');
       let upgrade = createInput('checkbox', 'autoSelect_upgrade', +autoSelect.upgrade, 'Следующее ядро при апгрейде');
+      let deployMin = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'min'), 'Наименьшее', 'min');
+      let deployMax = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'max'), 'Наибольшее', 'max');
+      let deployOff = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'off'), 'Нет', 'off');
+
+      let deployGroup = createRadioGroup('Ядро при деплое:', [deployMin, deployMax, deployOff]);
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(attack, deploy, upgrade);
+      subSection.append(attack, upgrade, deployGroup);
 
       section.appendChild(subSection);
 
@@ -590,25 +599,67 @@ window.addEventListener('load', async function () {
     });
   }
 
-  function chooseCore(romanCurrentLvl) {
+  function chooseCore(level = 'min', romanCurrentLvl) { // level == min || max || next
     let coresList = document.querySelectorAll('.cores-list__level');
-    let lowestAvailableCore = document.querySelector('#cores-list').firstChild || document.body;
-    let arabicCurrentLvl = numbersConverter.toDecimal(romanCurrentLvl) || 0;
+    let core;
 
-    if (!Object.keys(numbersConverter).includes(romanCurrentLvl)) { return lowestAvailableCore; }
+    switch (level) {
+      case 'min':
+        core = document.querySelector('#cores-list')?.firstChild;
+        break;
+      case 'max':
+        let isEmptySlots = [...pointCores.querySelectorAll('.i-stat__core')].some(e => e.innerText.length == 0);
 
-    [...coresList].reduce((minCoreLvl, i) => {
-      let coreLvl = numbersConverter.toDecimal(i.innerText.slice(3));
+        if (isEmptySlots) {
+          let playerCores = {}; // { level: [guid, guid] }
 
-      if (coreLvl > arabicCurrentLvl && coreLvl < minCoreLvl && coreLvl <= player.level) {
-        minCoreLvl = coreLvl;
-        lowestAvailableCore = i;
-      }
+          pointCores.querySelectorAll(`.profile-link[data-name="${player.name}"]`).forEach(e => {
+            let guid = e.parentElement.dataset.guid;
+            let level = numbersConverter.toDecimal(pointCores.querySelector(`.i-stat__core[data-guid="${guid}"]`).innerText);
 
-      return minCoreLvl;
-    }, Infinity);
+            if (!playerCores[level]) { playerCores[level] = []; }
+            playerCores[level].push(guid);
+          });
 
-    return lowestAvailableCore;
+          let maxAvailableCore = [...coresList].reduce((maxCore, e) => {
+            let coreLvl = numbersConverter.toDecimal(e.innerText.slice(3));
+
+            if (
+              coreLvl > maxCore.level &&
+              (!playerCores.hasOwnProperty(coreLvl) || playerCores[coreLvl].length < CORES_LIMITS[coreLvl]) &&
+              coreLvl <= player.level
+            ) {
+              return { level: coreLvl, element: e };
+            } else {
+              return maxCore;
+            }
+          }, { level: 0, element: undefined });
+
+          core = maxAvailableCore.element;
+        }
+
+        break;
+      case 'next':
+        let arabicCurrentLvl = numbersConverter.toDecimal(romanCurrentLvl) || 0;
+
+        [...coresList].reduce((minCoreLvl, e) => {
+          let coreLvl = numbersConverter.toDecimal(e.innerText.slice(3));
+
+          if (coreLvl > arabicCurrentLvl && coreLvl < minCoreLvl && coreLvl <= player.level) {
+            minCoreLvl = coreLvl;
+            core = e;
+          }
+
+          return minCoreLvl;
+        }, Infinity);
+
+        break;
+      default:
+        core = document.querySelector('#cores-list')?.firstChild;
+        break;
+    }
+
+    return core;
   }
 
   function chooseCatalyser() {
@@ -634,9 +685,9 @@ window.addEventListener('load', async function () {
     let mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
     let clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
 
-    element.dispatchEvent(mouseDownEvent);
-    element.dispatchEvent(mouseUpEvent);
-    element.dispatchEvent(clickEvent);
+    element?.dispatchEvent(mouseDownEvent);
+    element?.dispatchEvent(mouseUpEvent);
+    element?.dispatchEvent(clickEvent);
   }
 
   function createToast(text = '', position = 'top left', container = null) {
@@ -675,7 +726,13 @@ window.addEventListener('load', async function () {
   }
 
   function addTinting(type) {
+    function rgb2hex(rgb) {
+      if (!rgb) { return ''; }
+      return `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
+    }
+
     let color;
+    let yaRegexp = /ya-title=.*?,\sya-dock=.*?(?=,|$)/;
 
     switch (type) {
       case 'map':
@@ -697,8 +754,25 @@ window.addEventListener('load', async function () {
         color = '';
         break;
     }
-
+    
+    color = rgb2hex(color);
+    
     theme.content = color;
+    if (!viewport.content.match(yaRegexp)) {
+      viewport.content += `, ya-title=${color}, ya-dock=${color}`;
+    } else {
+      viewport.content = viewport.content.replace(yaRegexp, `ya-title=${color}, ya-dock=${color}`);
+    }
+  }
+
+  function updateConfigStructure(obj1, obj2) {
+    for (let key in obj1) {
+      if (typeof obj1[key] != typeof obj2[key]) {
+        obj1[key] = obj2[key];
+      } else if (typeof obj1[key] == 'object') {
+        updateConfigStructure(obj1[key], obj2[key]);
+      }
+    }
   }
 
 
@@ -739,6 +813,17 @@ window.addEventListener('load', async function () {
 
   /* Мутации */
   {
+    let lvlObserver = new MutationObserver((_, observer) => {
+      observer.disconnect();
+
+      player.level = selfLvlSpan.textContent;
+      selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+
+      observer.observe(selfLvlSpan, { childList: true });
+    });
+    lvlObserver.observe(selfLvlSpan, { childList: true });
+
+
     let pointLevelObserver = new MutationObserver(records => {
       let event = new Event('pointLevelChanged', { bubbles: true });
       pointLevelSpan.dispatchEvent(event);
@@ -753,15 +838,11 @@ window.addEventListener('load', async function () {
     pointOwnerObserver.observe(pointOwnerSpan, { childList: true });
 
 
-    let lvlObserver = new MutationObserver((_, observer) => {
-      observer.disconnect();
-
-      player.level = selfLvlSpan.textContent;
-      selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
-
-      observer.observe(selfLvlSpan, { childList: true });
+    let pointCoresObserver = new MutationObserver(records => {
+      let event = new Event('pointCoresUpdated', { bubbles: true });
+      pointCores.dispatchEvent(event);
     });
-    lvlObserver.observe(selfLvlSpan, { childList: true });
+    pointCoresObserver.observe(pointCores, { childList: true });
 
 
     let pointPopupObserver = new MutationObserver(records => {
@@ -796,7 +877,9 @@ window.addEventListener('load', async function () {
 
           if (isAllied) {
             e.target.style.setProperty('--sbgcui-energy', `${energy}%`);
-            e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
+            if (energy < 100) {
+              e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
+            }
           }
         }
       });
@@ -925,7 +1008,6 @@ window.addEventListener('load', async function () {
       }
 
       #toggle-follow {
-        font-size: 1.5em;
         transform: rotate(-90deg);
       }
       
@@ -937,6 +1019,13 @@ window.addEventListener('load', async function () {
         display: flex;
         flex-direction: column;
         align-items: center;
+      }
+
+      #ops, .game-menu > button {
+        color: var(--team-${player.team});
+	      background-color: var(--ol-background-color);
+	      border: 1px solid var(--ol-subtle-background-color);
+	      border-radius: 4px;
       }
 
       .attack-slider-highlevel {
@@ -994,11 +1083,12 @@ window.addEventListener('load', async function () {
       .inventory__content[data-type="3"] .inventory__item {
         --sbgcui-energy: 0%;
         --sbgcui-display-r-button: none;
-        padding-left: 35px;
+        padding-right: 35px;
         position: relative;
+        grid-template-columns: auto 1fr;
       }
 
-      .inventory__content[data-type="3"] .inventory__item-controls::before {
+      .inventory__content[data-type="3"] .inventory__item-controls::after {
         content: "R";
         background: #666;
         display: var(--sbgcui-display-r-button);
@@ -1008,11 +1098,11 @@ window.addEventListener('load', async function () {
         height: 100%;
         justify-content: center;
         width: 30px;
-        left: 0;
+        right: 0;
         top: 0;
       }
 
-      .inventory__content[data-type="3"] .inventory__item.loaded .inventory__item-left::after {
+      .inventory__content[data-type="3"] .inventory__item.loaded .inventory__item-left::before {
         content: "";
         position: absolute;
         top: 0;
@@ -1029,7 +1119,12 @@ window.addEventListener('load', async function () {
       }
 
       .inventory__item-controls {
+        order: 1;
         overflow: visible;
+        display: flex;
+	      flex-direction: column;
+	      height: 100%;
+	      justify-content: space-between;
       }
 
       .inventory__controls {
@@ -1038,7 +1133,9 @@ window.addEventListener('load', async function () {
       }
 
       .inventory__item-left {
+        order: 2;
         position: relative;
+        margin-right: 5px;
       }
 
       .inventory__tabs {
@@ -1062,6 +1159,19 @@ window.addEventListener('load', async function () {
         color: var(--selection);
       }
 
+      .ol-control {
+        left: initial;
+	      right: 0.5em;
+        top: initial;
+        bottom: 5px;
+        transform: initial;
+      }
+
+      .ol-control button {
+        color: var(--team-${player.team});
+        font-size: 1.7em !important;
+      }
+
       .ol-control button:hover, .ol-control button:focus {
         outline: unset;
         color: var(--team-${player.team});
@@ -1074,18 +1184,6 @@ window.addEventListener('load', async function () {
       .ol-rotate {
         position: initial;
         margin-top: 10px;
-      }
-
-      .ol-zoom {
-        left: initial;
-	      right: 0.5em;
-        top: initial;
-        bottom: 5px;
-        transform: initial;
-      }
-
-      .ol-zoom button {
-        color: var(--team-${player.team});
       }
 
       .profile {
@@ -1387,14 +1485,16 @@ window.addEventListener('load', async function () {
     });
 
 
-    pointPopup.addEventListener('pointPopupOpened', _ => {
-      if (+config.autoSelect.deploy) { click(chooseCore()); }
+    pointCores.addEventListener('pointCoresUpdated', _ => {
+      if (config.autoSelect.deploy != 'off' && deployButton.dataset.state == 'deploy') {
+        click(chooseCore(config.autoSelect.deploy));
+      }
     });
 
 
     pointCores.addEventListener('click', event => {
       if (+config.autoSelect.upgrade && event.target.classList.contains('selected')) {
-        click(chooseCore(event.target.innerText));
+        click(chooseCore('next', event.target.innerText));
       }
     });
 
@@ -1417,35 +1517,41 @@ window.addEventListener('load', async function () {
       if (!event.target.closest('.inventory__item-controls')) { return; }
       if (!event.target.closest('.inventory__item.loaded')) { return; }
 
-      if (event.offsetX < 0) {
-        let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
+      // Ширина блока кнопок "V M" около 30 px.
+      // Правее них находится кнопка-псевдоэлемент "R".
+      // Если нажато дальше 30px (50 – с запасом на возможное изменение стиля), значит нажата псевдокнопка, если нет – одна из кнопок V/M.
+      // Приходится указывать конкретное число (50), потому что кнопка V при нажатии получает display: none и не имеет offsetWidth.
+      if (event.offsetX < 50) { return; }
 
-        repairPoint(pointGuid)
-          .then(r => {
-            if (r.error) {
-              throw new Error(r.error);
-            } else if (r.data) {
-              let [pointEnergy, maxEnergy] = r.data.co.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
-              let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
-              let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
-              let percentage = Math.floor(pointEnergy / maxEnergy * 100);
+      let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
 
-              event.target.closest('.inventory__item').style.setProperty('--sbgcui-energy', `${percentage}%`);
+      repairPoint(pointGuid)
+        .then(r => {
+          if (r.error) {
+            throw new Error(r.error);
+          } else if (r.data) {
+            let [pointEnergy, maxEnergy] = r.data.co.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
+            let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
+            let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
+            let percentage = Math.floor(pointEnergy / maxEnergy * 100);
+            let inventoryItem = event.target.closest('.inventory__item');
 
-              if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
+            inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
+            inventoryItem.style.setProperty('--sbgcui-display-r-button', (percentage == 100 ? 'none' : 'flex'));
 
-              updateExpBar(r.xp.cur);
-            }
-          })
-          .catch(err => {
-            let toast = createToast(`Ошибка при зарядке. <br>${err.message}`);
+            if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
 
-            toast.options.className = 'error-toast';
-            toast.showToast();
+            updateExpBar(r.xp.cur);
+          }
+        })
+        .catch(err => {
+          let toast = createToast(`Ошибка при зарядке. <br>${err.message}`);
 
-            console.log('Ошибка при зарядке.', err);
-          });
-      }
+          toast.options.className = 'error-toast';
+          toast.showToast();
+
+          console.log('Ошибка при зарядке.', err);
+        });
     });
   }
 
@@ -1472,6 +1578,7 @@ window.addEventListener('load', async function () {
   /* Тонирование интерфейса браузера */
   {
     var theme = document.createElement('meta');
+    var viewport = document.querySelector('meta[name="viewport"]')
 
     theme.name = 'theme-color';
     document.head.appendChild(theme);
