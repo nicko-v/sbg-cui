@@ -569,7 +569,7 @@ window.addEventListener('load', async function () {
       let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
       root.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
     }
-    
+
     if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
     document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
@@ -786,6 +786,22 @@ window.addEventListener('load', async function () {
       records[0].target.dispatchEvent(event);
     });
     attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
+
+
+    let inventoryContentObserver = new MutationObserver(records => {
+      records.forEach(e => {
+        if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
+          let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
+          let isAllied = e.target.querySelector('.inventory__item-title').style.color.indexOf(`team-${player.team}`) > -1;
+
+          if (isAllied) {
+            e.target.style.setProperty('--sbgcui-energy', `${energy}%`);
+            e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
+          }
+        }
+      });
+    });
+    inventoryContentObserver.observe(document.querySelector('.inventory__content'), { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
   }
 
   /* Прочие события */
@@ -976,6 +992,8 @@ window.addEventListener('load', async function () {
       }
       
       .inventory__content[data-type="3"] .inventory__item {
+        --sbgcui-energy: 0%;
+        --sbgcui-display-r-button: none;
         padding-left: 35px;
         position: relative;
       }
@@ -983,7 +1001,7 @@ window.addEventListener('load', async function () {
       .inventory__content[data-type="3"] .inventory__item-controls::before {
         content: "R";
         background: #666;
-        display: flex;
+        display: var(--sbgcui-display-r-button);
         align-items: center;
         border-radius: 3px;
         position: absolute;
@@ -992,6 +1010,18 @@ window.addEventListener('load', async function () {
         width: 30px;
         left: 0;
         top: 0;
+      }
+
+      .inventory__content[data-type="3"] .inventory__item.loaded .inventory__item-left::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: var(--sbgcui-energy);
+        opacity: 0.3;
+        background-color: var(--team-${player.team});
+        transition: width 0.5s ease;
       }
 
       .inventory__manage-amount {
@@ -1034,7 +1064,7 @@ window.addEventListener('load', async function () {
 
       .ol-control button:hover, .ol-control button:focus {
         outline: unset;
-        color: var(--team-3);
+        color: var(--team-${player.team});
       }
 
       .ol-layer__osm {
@@ -1241,17 +1271,6 @@ window.addEventListener('load', async function () {
         opacity: 0.3;
       }
 
-      .sbgcui_repairProgressFiller {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 0;
-        opacity: 0.3;
-        background-color: var(--team-3);
-        transition: width 0.5s ease;
-      }
-
       .sbgcui_attack-menu-rotate::after {
         transform: rotate(135deg);
 	      border-bottom-left-radius: 0 !important;
@@ -1392,13 +1411,12 @@ window.addEventListener('load', async function () {
   /* Добавление зарядки из инвентаря */
   {
     let refsList = document.querySelector('.inventory__content');
-    let progressBarFiller = document.createElement('span');
-
-    progressBarFiller.classList.add('sbgcui_repairProgressFiller');
 
     refsList.addEventListener('click', event => {
       if (!event.currentTarget.matches('.inventory__content[data-type="3"]')) { return; }
       if (!event.target.closest('.inventory__item-controls')) { return; }
+      if (!event.target.closest('.inventory__item.loaded')) { return; }
+
       if (event.offsetX < 0) {
         let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
 
@@ -1412,9 +1430,8 @@ window.addEventListener('load', async function () {
               let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
               let percentage = Math.floor(pointEnergy / maxEnergy * 100);
 
-              if (!refInfoDiv.contains(progressBarFiller)) { refInfoDiv.appendChild(progressBarFiller); }
+              event.target.closest('.inventory__item').style.setProperty('--sbgcui-energy', `${percentage}%`);
 
-              progressBarFiller.style.width = percentage + '%';
               if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
 
               updateExpBar(r.xp.cur);
