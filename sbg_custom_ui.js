@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.8
+// @version      1.0.9
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -86,6 +86,7 @@ window.addEventListener('load', async function () {
   let selfExpSpan = document.querySelector('#self-info__exp');
   let selfLvlSpan = document.querySelector('#self-info__explv');
   let selfNameSpan = document.querySelector('#self-info__name');
+  let xpDiffSpan = document.querySelector('.xp-diff');
 
   let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
   let isPointPopupOpened = !pointPopup.classList.contains('hidden');
@@ -599,7 +600,7 @@ window.addEventListener('load', async function () {
     });
   }
 
-  function chooseCore(level = 'min', romanCurrentLvl) { // level == min || max || next
+  function chooseCore(level, romanCurrentLvl) { // level == min || max || next
     let coresList = document.querySelectorAll('.cores-list__level');
     let core;
 
@@ -754,9 +755,9 @@ window.addEventListener('load', async function () {
         color = '';
         break;
     }
-    
+
     color = rgb2hex(color);
-    
+
     theme.content = color;
     if (!viewport.content.match(yaRegexp)) {
       viewport.content += `, ya-title=${color}, ya-dock=${color}`;
@@ -773,6 +774,17 @@ window.addEventListener('load', async function () {
         updateConfigStructure(obj1[key], obj2[key]);
       }
     }
+  }
+
+  function showXp(amount) {
+    let xpSpan = document.createElement('span');
+    xpSpan.classList.add('sbgcui_xpdiff');
+
+    xpSpan.innerText = `+${amount}xp`;
+    xpContainer.appendChild(xpSpan);
+
+    setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
+    setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
   }
 
 
@@ -885,6 +897,13 @@ window.addEventListener('load', async function () {
       });
     });
     inventoryContentObserver.observe(document.querySelector('.inventory__content'), { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+
+
+    let xpDiffSpanObserver = new MutationObserver(records => {
+      let xp = records.find(e => e.addedNodes.length).addedNodes[0].data.match(/\d+/)[0];
+      showXp(xp);
+    });
+    xpDiffSpanObserver.observe(xpDiffSpan, { childList: true });
   }
 
   /* Прочие события */
@@ -1229,6 +1248,10 @@ window.addEventListener('load', async function () {
 	      margin-bottom: auto;
       }
 
+      .xp-diff {
+        display: none;
+      }
+
       .sbgcui_settings {
         display: flex;
         flex-direction: column;
@@ -1372,6 +1395,36 @@ window.addEventListener('load', async function () {
       .sbgcui_attack-menu-rotate::after {
         transform: rotate(135deg);
 	      border-bottom-left-radius: 0 !important;
+      }
+
+      .sbgcui_xpdiff-wrapper {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        left: 50%;
+        top: 20%;
+        z-index: 99;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+
+      .sbgcui_xpdiff {
+        display: block;
+        color: var(--selection);
+        transition: 2.5s ease-out;
+        white-space: nowrap;
+        font-size: 1em;
+        width: 100%;
+        text-align: center;
+        position: absolute;
+        bottom: 0;
+        text-shadow: 0px 0px 5px black;
+      }
+
+      .sbgcui_xpdiff-out {
+        opacity: 0;
+        transform: scale(2);
+        bottom: 100% !important;
       }
 
       .sbgcui_hidden {
@@ -1542,6 +1595,7 @@ window.addEventListener('load', async function () {
             if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
 
             updateExpBar(r.xp.cur);
+            showXp(r.xp.diff);
           }
         })
         .catch(err => {
@@ -1628,6 +1682,14 @@ window.addEventListener('load', async function () {
       }
       profilePopup.style.borderColor = '';
     });
+  }
+
+
+  /* Всплывающий опыт */
+  {
+    var xpContainer = document.createElement('div');
+    xpContainer.classList.add('sbgcui_xpdiff-wrapper');
+    document.body.appendChild(xpContainer);
   }
 
 
