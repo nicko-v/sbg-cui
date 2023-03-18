@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.9
+// @version      1.0.10
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -975,6 +975,10 @@ window.addEventListener('load', async function () {
         transition: transform 0.5s ease, border-radius 0.5s ease 0.2s;
       }
 
+      #catalysers-list > .splide__slide {
+        height: initial !important;
+      }
+
       #inventory__close {
         top: initial;
         bottom: 120px;
@@ -1227,10 +1231,6 @@ window.addEventListener('load', async function () {
         padding-right: 0.5em;
       }
 
-      .splide__slide {
-        height: initial !important;
-      }
-
       .toastify:nth-child(n+${MAX_TOASTS + 1}) {
         display: none;
       }
@@ -1419,6 +1419,7 @@ window.addEventListener('load', async function () {
         position: absolute;
         bottom: 0;
         text-shadow: 0px 0px 5px black;
+        font-weight: bold;
       }
 
       .sbgcui_xpdiff-out {
