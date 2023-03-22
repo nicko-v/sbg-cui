@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.11
+// @version      1.0.12
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -1717,11 +1717,11 @@ window.addEventListener('load', async function () {
     class newXHR extends window.XMLHttpRequest {
       get responseText() {
         let response = this.response;
-        if (typeof response != 'string' || !response.match(/lines/)) {
+        if (typeof response != 'string' || !response.match(/data.+lines/)) {
           return this.response;
         } else {
           response = JSON.parse(this.response);
-          response.data.lines = [];
+          if (response.data) { response.data.lines = []; }
           return JSON.stringify(response);
         }
       }
