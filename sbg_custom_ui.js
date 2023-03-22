@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.10
+// @version      1.0.11
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -16,7 +16,7 @@ window.addEventListener('load', async function () {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const USERSCRIPT_VERSION = '0.2.5';
+  const LATEST_KNOWN_VERSION = '0.2.6';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
   const MAX_TOASTS = 3;
@@ -70,6 +70,8 @@ window.addEventListener('load', async function () {
     localStorage.setItem('sbgcui_config', JSON.stringify(config));
   }
 
+  let originalXHR = window.XMLHttpRequest;
+
 
   let attackButton = document.querySelector('#attack-menu');
   let attackSlider = document.querySelector('.attack-slider-wrp');
@@ -87,6 +89,7 @@ window.addEventListener('load', async function () {
   let selfLvlSpan = document.querySelector('#self-info__explv');
   let selfNameSpan = document.querySelector('#self-info__name');
   let xpDiffSpan = document.querySelector('.xp-diff');
+  let zoomContainer = document.querySelector('.ol-zoom');
 
   let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
   let isPointPopupOpened = !pointPopup.classList.contains('hidden');
@@ -792,11 +795,11 @@ window.addEventListener('load', async function () {
   {
     var selfData = await getSelfData();
 
-    if (USERSCRIPT_VERSION != selfData.version) {
+    if (LATEST_KNOWN_VERSION != selfData.version) {
       let warns = +localStorage.getItem('sbgcui_version_warns');
 
       if (warns < 2) {
-        let toast = createToast(`Версия SBG-CUI (${USERSCRIPT_VERSION}) не соответствует текущей версии игры (${selfData.version}). Возможна некорректная работа.`);
+        let toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
         toast.options.className = 'error-toast';
         toast.showToast();
         localStorage.setItem('sbgcui_version_warns', warns + 1);
@@ -1213,6 +1216,13 @@ window.addEventListener('load', async function () {
         overflow: auto;
       }
 
+      .profile .popup-close {
+        position: absolute;
+        left: 50%;
+        bottom: 15px;
+        transform: translateX(-50%);
+      }
+
       .self-info {
         color: var(--team-${player.team});
         font-weight: bold;
@@ -1250,6 +1260,10 @@ window.addEventListener('load', async function () {
 
       .xp-diff {
         display: none;
+      }
+
+      #sbgcui_toggle_links:not([sbgcui-show]) {
+        opacity: 0.5;
       }
 
       .sbgcui_settings {
@@ -1428,6 +1442,11 @@ window.addEventListener('load', async function () {
         bottom: 100% !important;
       }
 
+      .sbgcui_pr-stat-header {
+        margin: 15px 0 0;
+        color: var(--selection);
+      }
+
       .sbgcui_hidden {
         display: none;
       }
@@ -1472,7 +1491,6 @@ window.addEventListener('load', async function () {
     let ops = document.querySelector('#ops');
     let fw = document.querySelector('#toggle-follow');
     let blContainer = document.querySelector('.bottomleft-container');
-    let zoomContainer = document.querySelector('.ol-zoom');
     let rotateArrow = document.querySelector('.ol-rotate');
     let invCloseButton = document.querySelector('#inventory__close');
     let profileCloseButton = document.querySelector('.profile.popup .popup-close');
@@ -1693,5 +1711,39 @@ window.addEventListener('load', async function () {
     document.body.appendChild(xpContainer);
   }
 
+
+  /* Отключение показа линков */
+  {
+    class newXHR extends window.XMLHttpRequest {
+      get responseText() {
+        let response = this.response;
+        if (typeof response != 'string' || !response.match(/lines/)) {
+          return this.response;
+        } else {
+          response = JSON.parse(this.response);
+          response.data.lines = [];
+          return JSON.stringify(response);
+        }
+      }
+    }
+
+    let toggleLinksButton = document.createElement('button');
+
+    toggleLinksButton.innerText = String.fromCharCode(10019);
+    toggleLinksButton.id = 'sbgcui_toggle_links';
+    toggleLinksButton.toggleAttribute('sbgcui-show');
+
+    toggleLinksButton.addEventListener('click', _ => {
+      if (toggleLinksButton.hasAttribute('sbgcui-show')) {
+        window.XMLHttpRequest = newXHR;
+      } else {
+        window.XMLHttpRequest = originalXHR;
+      }
+      
+      toggleLinksButton.toggleAttribute('sbgcui-show');
+    });
+
+    zoomContainer.appendChild(toggleLinksButton);
+  }
 
 }, false);
