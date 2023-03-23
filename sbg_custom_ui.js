@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.12
+// @version      1.0.13
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -70,8 +70,6 @@ window.addEventListener('load', async function () {
     localStorage.setItem('sbgcui_config', JSON.stringify(config));
   }
 
-  let originalXHR = window.XMLHttpRequest;
-
 
   let attackButton = document.querySelector('#attack-menu');
   let attackSlider = document.querySelector('.attack-slider-wrp');
@@ -94,12 +92,51 @@ window.addEventListener('load', async function () {
   let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
   let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 
+  let isLinesHidden = false;
+
 
   let numbersConverter = {
     I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
     toDecimal(roman) { return this[roman]; },
     toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
   };
+
+
+  let originalXHR = window.XMLHttpRequest;
+
+  class customXHR extends window.XMLHttpRequest {
+    get responseText() {
+      let response = this.response;
+      let path = this.responseURL.match(/\/api\/(discover|inview)/);
+
+      if (!path) { return response; }
+
+      try {
+        response = JSON.parse(response);
+
+        switch (path[1]) {
+          case 'discover':
+            if ('error' in response) {
+              response.error = response.error.replace(/in\s(\d+)\sseconds/, (m, p1) => `in ${+p1 > 60 ? (Math.round(+p1 / 60) + ' minutes') : (+p1 + ' seconds')}`);
+            }
+            break;
+          case 'inview':
+            if ('data' in response) {
+              if (isLinesHidden) { response.data.lines = []; }
+            }
+            break;
+        }
+
+        response = JSON.stringify(response);
+      } catch (error) {
+        console.log(`Ошибка при обработке ответа сервера. ${error}`);
+      }
+
+      return response;
+    }
+  }
+
+  window.XMLHttpRequest = customXHR;
 
 
   async function getSelfData() {
@@ -1712,21 +1749,25 @@ window.addEventListener('load', async function () {
   }
 
 
+  /* Группировка статы и место в топе */
+  {
+    profilePopup.addEventListener('profilePopupOpened', _ => {
+      function createStatsGroup(name, stats = []) {
+        let title = document.createElement('h3');
+        let group = document.createElement('div');
+
+        group.append(title, ...stats);
+
+        return group;
+      }
+
+      let stats = document.querySelector('.pr-stats');
+      let buildGroup = createStatsGroup('Build',);
+    });
+  }
+
   /* Отключение показа линков */
   {
-    class newXHR extends window.XMLHttpRequest {
-      get responseText() {
-        let response = this.response;
-        if (typeof response != 'string' || !response.match(/data.+lines/)) {
-          return this.response;
-        } else {
-          response = JSON.parse(this.response);
-          if (response.data) { response.data.lines = []; }
-          return JSON.stringify(response);
-        }
-      }
-    }
-
     let toggleLinksButton = document.createElement('button');
 
     toggleLinksButton.innerText = String.fromCharCode(10019);
@@ -1734,12 +1775,7 @@ window.addEventListener('load', async function () {
     toggleLinksButton.toggleAttribute('sbgcui-show');
 
     toggleLinksButton.addEventListener('click', _ => {
-      if (toggleLinksButton.hasAttribute('sbgcui-show')) {
-        window.XMLHttpRequest = newXHR;
-      } else {
-        window.XMLHttpRequest = originalXHR;
-      }
-      
+      isLinesHidden = !isLinesHidden;
       toggleLinksButton.toggleAttribute('sbgcui-show');
     });
 
