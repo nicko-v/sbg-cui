@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.13
+// @version      1.0.14
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -37,7 +37,7 @@ window.addEventListener('load', async function () {
     },
     autoSelect: {
       deploy: 'min', // min || max || off
-      upgrade: 1,
+      upgrade: 'min', // min || max || off
       attack: 1,
     },
     mapFilters: {
@@ -73,6 +73,7 @@ window.addEventListener('load', async function () {
 
   let attackButton = document.querySelector('#attack-menu');
   let attackSlider = document.querySelector('.attack-slider-wrp');
+  let coresList = document.querySelector('#cores-list');
   let deployButton = document.querySelector('#deploy');
   let discoverButton = document.querySelector('#discover');
   let inventoryButton = document.querySelector('#ops');
@@ -93,6 +94,7 @@ window.addEventListener('load', async function () {
   let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 
   let isLinesHidden = false;
+  let lastOpenedPoint = {};
 
 
   let numbersConverter = {
@@ -102,14 +104,12 @@ window.addEventListener('load', async function () {
   };
 
 
-  let originalXHR = window.XMLHttpRequest;
-
   class customXHR extends window.XMLHttpRequest {
     get responseText() {
       let response = this.response;
       let path = this.responseURL.match(/\/api\/(discover|inview)/);
 
-      if (!path) { return response; }
+      if (!path) { return super.responseText; }
 
       try {
         response = JSON.parse(response);
@@ -117,7 +117,7 @@ window.addEventListener('load', async function () {
         switch (path[1]) {
           case 'discover':
             if ('error' in response) {
-              response.error = response.error.replace(/in\s(\d+)\sseconds/, (m, p1) => `in ${+p1 > 60 ? (Math.round(+p1 / 60) + ' minutes') : (+p1 + ' seconds')}`);
+              response.error = response.error.replace(/in\s(\d+)\sseconds/, (m, p1) => `in ${+p1 > 90 ? (Math.round(+p1 / 60) + ' minutes') : (+p1 + ' seconds')}`);
             }
             break;
           case 'inview':
@@ -129,14 +129,113 @@ window.addEventListener('load', async function () {
 
         response = JSON.stringify(response);
       } catch (error) {
-        console.log(`Ошибка при обработке ответа сервера. ${error}`);
+        console.log('Ошибка при обработке ответа сервера.', error);
       }
 
       return response;
     }
+
+    send(body) {
+      this.addEventListener('load', _ => {
+        let path = this.responseURL.match(/\/api\/(point|deploy)/);
+        let response = this.response;
+
+        if (!path) { return; }
+
+        try {
+          response = JSON.parse(response);
+  
+          switch (path[1]) {
+            case 'point':
+              if ('data' in response) {
+                lastOpenedPoint = new Point(response.data);
+              }
+              break;
+            case 'deploy':
+              if ('data' in response) { // Есди деплой, то массив объектов с ядрами.
+                lastOpenedPoint.update(response.data.co, response.data.l);
+                lastOpenedPoint.selectCore(config.autoSelect.deploy);
+              } else if ('c' in response) { // Если апгрейд, то один объект с ядром.
+                lastOpenedPoint.update([response.c], response.l);
+                lastOpenedPoint.selectCore(config.autoSelect.upgrade, response.c.l);
+              }
+              break;
+          }
+  
+          response = JSON.stringify(response);
+        } catch (error) {
+          console.log('Ошибка при обработке ответа сервера.', error);
+        }
+      });
+
+      super.send(body);
+    }
   }
 
-  window.XMLHttpRequest = customXHR;
+  class Point {
+    constructor(pointData) {
+      this.guid = pointData.g;
+      this.level = pointData.l;
+      this.team = pointData.te;
+      this.lines = {
+        in: pointData.li.i,
+        out: pointData.li.o,
+      };
+      this.cores = {};
+
+      this.update(pointData.co);
+    }
+
+    get emptySlots() {
+      return 6 - Object.keys(this.cores);
+    }
+
+    get isEmptySlots() {
+      return this.emptySlots > 0;
+    }
+
+    get playerCores() {
+      let playerCores = {};
+
+      for (let key in this.cores) {
+        let coreLevel = this.cores[key].level;
+        if (coreLevel in playerCores) { playerCores[coreLevel] += 1 } else { playerCores[coreLevel] = 1; }
+      }
+      
+      return playerCores; // { level: amount }
+    }
+
+    update(cores, level) {
+      cores.forEach(e => {
+        this.cores[e.g] = {
+          level: e.l,
+          owner: e.o,
+        }
+      });
+      this.level = level;
+    }
+
+    selectCore(type, currentLevel) {
+      let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1);
+      let playerCores = this.playerCores;
+      let core;
+
+      switch (type) {
+        case 'min':
+          if (currentLevel) { // Если передан уровень ядра - ищем ядро для апгрейда не ниже этого уровня.
+            core = cachedCores.find(e => (e.l > currentLevel) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
+          } else { // Иначе ищем ядро минимального уровня.
+            core = cachedCores.find(e => ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
+          }
+          break;
+        case 'max':
+          core = cachedCores.findLast(e => (e.l <= player.level) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]));
+          break;
+      }
+      
+      click(coresList.querySelector(`[data-guid="${core?.g}"]`));
+    }
+  }
 
 
   async function getSelfData() {
@@ -254,7 +353,7 @@ window.addEventListener('load', async function () {
       .catch(err => {
         if (err.silent) { return; }
 
-        let toast = createToast(`Ошибка при удалении предметов. <br>${err.message}`);
+        let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${err.message}`);
 
         toast.options.className = 'error-toast';
         toast.showToast();
@@ -369,6 +468,16 @@ window.addEventListener('load', async function () {
       );
       let forceClearButton = document.createElement('button');
 
+      forceClearButton.classList.add('sbgcui_settings-forceclear');
+      forceClearButton.innerText = 'Очистить сейчас';
+      forceClearButton.addEventListener('click', function (event) {
+        event.preventDefault();
+
+        let result = confirm('Произвести очистку инвентаря согласно настройкам?');
+
+        if (result) { clearInventory(undefined, true); }
+      });
+      section.appendChild(forceClearButton);
 
       for (let key in maxAmountInBag) {
         let subSection = document.createElement('section');
@@ -413,17 +522,6 @@ window.addEventListener('load', async function () {
         section.appendChild(subSection);
       }
 
-      forceClearButton.classList.add('sbgcui_settings-forceclear');
-      forceClearButton.innerText = 'Очистить сейчас';
-      forceClearButton.addEventListener('click', function (event) {
-        event.preventDefault();
-
-        let result = confirm('Произвести очистку инвентаря согласно настройкам?');
-
-        if (result) { clearInventory(undefined, true); }
-      });
-      section.appendChild(forceClearButton);
-
       return section;
     }
 
@@ -435,16 +533,21 @@ window.addEventListener('load', async function () {
       let subSection = document.createElement('section');
 
       let attack = createInput('checkbox', 'autoSelect_attack', +autoSelect.attack, 'Наибольший катализатор при атаке');
-      let upgrade = createInput('checkbox', 'autoSelect_upgrade', +autoSelect.upgrade, 'Следующее ядро при апгрейде');
+      
       let deployMin = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'min'), 'Наименьшее', 'min');
       let deployMax = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'max'), 'Наибольшее', 'max');
-      let deployOff = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'off'), 'Нет', 'off');
+      let deployOff = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'off'), 'Вручную', 'off');
+      
+      let upgradeMin = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'min'), 'Наименьшее', 'min');
+      let upgradeMax = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'max'), 'Наибольшее', 'max');
+      let upgradeOff = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'off'), 'Вручную', 'off');
 
       let deployGroup = createRadioGroup('Ядро при деплое:', [deployMin, deployMax, deployOff]);
+      let upgradeGroup = createRadioGroup('Ядро при апгрейде:', [upgradeMin, upgradeMax, upgradeOff]);
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(attack, upgrade, deployGroup);
+      subSection.append(attack, deployGroup, upgradeGroup);
 
       section.appendChild(subSection);
 
@@ -640,69 +743,6 @@ window.addEventListener('load', async function () {
     });
   }
 
-  function chooseCore(level, romanCurrentLvl) { // level == min || max || next
-    let coresList = document.querySelectorAll('.cores-list__level');
-    let core;
-
-    switch (level) {
-      case 'min':
-        core = document.querySelector('#cores-list')?.firstChild;
-        break;
-      case 'max':
-        let isEmptySlots = [...pointCores.querySelectorAll('.i-stat__core')].some(e => e.innerText.length == 0);
-
-        if (isEmptySlots) {
-          let playerCores = {}; // { level: [guid, guid] }
-
-          pointCores.querySelectorAll(`.profile-link[data-name="${player.name}"]`).forEach(e => {
-            let guid = e.parentElement.dataset.guid;
-            let level = numbersConverter.toDecimal(pointCores.querySelector(`.i-stat__core[data-guid="${guid}"]`).innerText);
-
-            if (!playerCores[level]) { playerCores[level] = []; }
-            playerCores[level].push(guid);
-          });
-
-          let maxAvailableCore = [...coresList].reduce((maxCore, e) => {
-            let coreLvl = numbersConverter.toDecimal(e.innerText.slice(3));
-
-            if (
-              coreLvl > maxCore.level &&
-              (!playerCores.hasOwnProperty(coreLvl) || playerCores[coreLvl].length < CORES_LIMITS[coreLvl]) &&
-              coreLvl <= player.level
-            ) {
-              return { level: coreLvl, element: e };
-            } else {
-              return maxCore;
-            }
-          }, { level: 0, element: undefined });
-
-          core = maxAvailableCore.element;
-        }
-
-        break;
-      case 'next':
-        let arabicCurrentLvl = numbersConverter.toDecimal(romanCurrentLvl) || 0;
-
-        [...coresList].reduce((minCoreLvl, e) => {
-          let coreLvl = numbersConverter.toDecimal(e.innerText.slice(3));
-
-          if (coreLvl > arabicCurrentLvl && coreLvl < minCoreLvl && coreLvl <= player.level) {
-            minCoreLvl = coreLvl;
-            core = e;
-          }
-
-          return minCoreLvl;
-        }, Infinity);
-
-        break;
-      default:
-        core = document.querySelector('#cores-list')?.firstChild;
-        break;
-    }
-
-    return core;
-  }
-
   function chooseCatalyser() {
     let catsList = document.querySelectorAll('.catalysers-list__level');
     let maxAvailableCat = document.querySelector('#catalysers-list').lastChild || document.body;
@@ -725,7 +765,7 @@ window.addEventListener('load', async function () {
     let mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     let mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
     let clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-
+    
     element?.dispatchEvent(mouseDownEvent);
     element?.dispatchEvent(mouseUpEvent);
     element?.dispatchEvent(clickEvent);
@@ -826,6 +866,9 @@ window.addEventListener('load', async function () {
     setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
     setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
   }
+
+  
+  window.XMLHttpRequest = customXHR;
 
 
   /* Данные о себе и версии игры */
@@ -1091,6 +1134,10 @@ window.addEventListener('load', async function () {
 	      border-radius: 4px;
       }
 
+      .attack-slider-buttons {
+        margin-top: 5px;
+      }
+
       .attack-slider-highlevel {
         height: unset;
         padding-bottom: 5px;
@@ -1105,7 +1152,7 @@ window.addEventListener('load', async function () {
         order: 2;
         display: flex;
         flex-direction: column;
-        margin-bottom: 15px;
+        margin-bottom: 5px;
       }
 
       .bottomleft-container {
@@ -1121,6 +1168,14 @@ window.addEventListener('load', async function () {
 
       .bottomleft-container button {
         pointer-events: auto;
+      }
+
+      .catalysers-list__level {
+        font-size: 1.5em;
+      }
+
+      .catalysers-list__amount, .attack-slider-highlevel {
+        font-size: 1em;
       }
 
       .catalysers-list__amount, .cores-list__amount {
@@ -1425,7 +1480,7 @@ window.addEventListener('load', async function () {
 
       .sbgcui_settings-forceclear {
         display: block;
-        margin: 20px 0 0 auto;
+        margin-top: 15px;
       }
 
       .sbgcui_xpProgressBar {
@@ -1534,15 +1589,12 @@ window.addEventListener('load', async function () {
     let logout = document.querySelector('#logout');
 
 
-    $(`
-    .ol-attribution,
-    #attack-slider-close,
-    #link-tg,
-    button[data-href="https://t.me/sbg_game"],
-    .game-menu > a[href="/tasks/"]
-    `).remove();
-
-    $('.self-info__entry, #attack-menu').contents().filter((_, a) => a.nodeType === 3).remove();
+    document.querySelectorAll('.ol-attribution, #attack-slider-close, #link-tg, button[data-href="https://t.me/sbg_game"], .game-menu > a[href="/tasks/"]').forEach(e => { e.remove(); });
+    document.querySelectorAll('.self-info__entry, #attack-menu').forEach(e => {
+      e.childNodes.forEach(e => {
+        if (e.nodeType == 3) { e.remove(); }
+      })
+    });
 
     profilePopup.insertBefore(logout, profileCloseButton);
 
@@ -1593,25 +1645,13 @@ window.addEventListener('load', async function () {
       if (+config.autoSelect.attack) { click(chooseCatalyser()); }
     });
 
-
-    pointCores.addEventListener('pointCoresUpdated', _ => {
-      if (config.autoSelect.deploy != 'off' && deployButton.dataset.state == 'deploy') {
-        click(chooseCore(config.autoSelect.deploy));
-      }
+    pointPopup.addEventListener('pointPopupOpened', _ => {
+      lastOpenedPoint.selectCore(config.autoSelect.deploy);
     });
-
 
     pointCores.addEventListener('click', event => {
-      if (+config.autoSelect.upgrade && event.target.classList.contains('selected')) {
-        click(chooseCore('next', event.target.innerText));
-      }
-    });
-
-
-    deployButton.addEventListener('click', event => {
-      if (+config.autoSelect.upgrade && event.currentTarget.dataset.state == 'upgrade') {
-        let nextCoreArrow = document.querySelector('.deploy-slider-wrp .splide__arrow.splide__arrow--next');
-        click(nextCoreArrow);
+      if (event.target.classList.contains('selected')) {
+        lastOpenedPoint.selectCore(config.autoSelect.upgrade, numbersConverter.toDecimal(event.target.innerText));
       }
     });
   }
@@ -1748,23 +1788,6 @@ window.addEventListener('load', async function () {
     document.body.appendChild(xpContainer);
   }
 
-
-  /* Группировка статы и место в топе */
-  {
-    profilePopup.addEventListener('profilePopupOpened', _ => {
-      function createStatsGroup(name, stats = []) {
-        let title = document.createElement('h3');
-        let group = document.createElement('div');
-
-        group.append(title, ...stats);
-
-        return group;
-      }
-
-      let stats = document.querySelector('.pr-stats');
-      let buildGroup = createStatsGroup('Build',);
-    });
-  }
 
   /* Отключение показа линков */
   {
