@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.16
+// @version      1.0.17
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -36,9 +36,9 @@ window.addEventListener('load', async function () {
       refs: { allied: -1, hostile: -1 },
     },
     autoSelect: {
-      deploy: 'min', // min || max || off
+      deploy: 'min',  // min || max || off
       upgrade: 'min', // min || max || off
-      attack: 1,
+      attack: 'max',  // max || latest
     },
     mapFilters: {
       invert: IS_DARK ? 1 : 0,
@@ -95,6 +95,7 @@ window.addEventListener('load', async function () {
 
   let isLinesHidden = false;
   let lastOpenedPoint = {};
+  let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
 
 
   let numbersConverter = {
@@ -137,7 +138,7 @@ window.addEventListener('load', async function () {
 
     send(body) {
       this.addEventListener('load', _ => {
-        let path = this.responseURL.match(/\/api\/(point|deploy)(?:.*?&(status=1))?/);
+        let path = this.responseURL.match(/\/api\/(point|deploy|attack2)(?:.*?&(status=1))?/);
         let response = this.response;
 
         if (!path) { return; }
@@ -159,6 +160,10 @@ window.addEventListener('load', async function () {
                 lastOpenedPoint.update([response.c], response.l);
                 lastOpenedPoint.selectCore(config.autoSelect.upgrade, response.c.l);
               }
+              break;
+            case 'attack2':
+              lastUsedCatalyser = JSON.parse(body).guid;
+              localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
               break;
           }
   
@@ -199,7 +204,7 @@ window.addEventListener('load', async function () {
 
       for (let key in this.cores) {
         let core = this.cores[key];
-        
+
         if (core.owner == player.name) {
           if (core.level in playerCores) {
             playerCores[core.level] += 1
@@ -538,8 +543,9 @@ window.addEventListener('load', async function () {
         'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде.'
       );
       let subSection = document.createElement('section');
-
-      let attack = createInput('checkbox', 'autoSelect_attack', +autoSelect.attack, 'Наибольший катализатор при атаке');
+      
+      let attackMax = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'max'), 'Самый мощный', 'max');
+      let attackLatest = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'latest'), 'Последний использованный', 'latest');
       
       let deployMin = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'min'), 'Наименьшее', 'min');
       let deployMax = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'max'), 'Наибольшее', 'max');
@@ -549,12 +555,13 @@ window.addEventListener('load', async function () {
       let upgradeMax = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'max'), 'Наибольшее', 'max');
       let upgradeOff = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'off'), 'Вручную', 'off');
 
+      let attackGroup = createRadioGroup('Катализатор при атаке:', [attackMax, attackLatest]);
       let deployGroup = createRadioGroup('Ядро при деплое:', [deployMin, deployMax, deployOff]);
       let upgradeGroup = createRadioGroup('Ядро при апгрейде:', [upgradeMin, upgradeMax, upgradeOff]);
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(attack, deployGroup, upgradeGroup);
+      subSection.append(attackGroup, deployGroup, upgradeGroup);
 
       section.appendChild(subSection);
 
@@ -750,22 +757,20 @@ window.addEventListener('load', async function () {
     });
   }
 
-  function chooseCatalyser() {
-    let catsList = document.querySelectorAll('.catalysers-list__level');
-    let maxAvailableCat = document.querySelector('#catalysers-list').lastChild || document.body;
+  function chooseCatalyser(type) {
+    let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level);
+    let catalyser;
 
-    [...catsList].reduce((maxCatLvl, e) => {
-      let catLvl = numbersConverter.toDecimal(e.innerText.slice(3));
+    switch (type) {
+      case 'latest':
+        catalyser = attackSlider.querySelector(`[data-guid="${lastUsedCatalyser}"]`);
+        if (catalyser) { break; } // Если последний использованный кат не найден - проваливаемся ниже и выбираем максимальный.
+      case 'max':
+        catalyser = attackSlider.querySelector(`[data-guid="${cachedCatalysers[cachedCatalysers.length - 1].g}"]`);
+        break;
+    }
 
-      if (catLvl > maxCatLvl && catLvl <= player.level) {
-        maxCatLvl = catLvl;
-        maxAvailableCat = e;
-      }
-
-      return maxCatLvl;
-    }, 0);
-
-    return maxAvailableCat;
+    return catalyser;
   }
 
   function click(element) {
@@ -1649,7 +1654,7 @@ window.addEventListener('load', async function () {
   /* Автовыбор */
   {
     attackSlider.addEventListener('attackSliderOpened', _ => {
-      if (+config.autoSelect.attack) { click(chooseCatalyser()); }
+      click(chooseCatalyser(config.autoSelect.attack));
     });
 
     pointPopup.addEventListener('pointPopupOpened', _ => {
