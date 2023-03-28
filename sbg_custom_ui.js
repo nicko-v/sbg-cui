@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.15
+// @version      1.0.16
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -137,7 +137,7 @@ window.addEventListener('load', async function () {
 
     send(body) {
       this.addEventListener('load', _ => {
-        let path = this.responseURL.match(/\/api\/(point|deploy)/);
+        let path = this.responseURL.match(/\/api\/(point|deploy)(?:.*?&(status=1))?/);
         let response = this.response;
 
         if (!path) { return; }
@@ -147,7 +147,7 @@ window.addEventListener('load', async function () {
   
           switch (path[1]) {
             case 'point':
-              if ('data' in response) {
+              if ('data' in response && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
                 lastOpenedPoint = new Point(response.data);
               }
               break;
