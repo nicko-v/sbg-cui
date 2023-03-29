@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.18
+// @version      1.0.19
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -228,7 +228,7 @@ window.addEventListener('load', async function () {
     }
 
     selectCore(type, currentLevel) {
-      let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1);
+      let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1).sort((a, b) => a.l - b.l);
       let playerCores = this.playerCores;
       let core;
 
@@ -758,7 +758,7 @@ window.addEventListener('load', async function () {
   }
 
   function chooseCatalyser(type) {
-    let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level);
+    let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level).sort((a, b) => a.l - b.l);
     let catalyser;
 
     switch (type) {
