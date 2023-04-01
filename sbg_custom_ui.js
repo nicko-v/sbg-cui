@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.19
+// @version      1.0.20
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -16,7 +16,7 @@ window.addEventListener('load', async function () {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const LATEST_KNOWN_VERSION = '0.2.6';
+  const LATEST_KNOWN_VERSION = '0.2.7';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
   const MAX_TOASTS = 3;
@@ -68,6 +68,10 @@ window.addEventListener('load', async function () {
   } else {
     config = DEFAULT_CONFIG;
     localStorage.setItem('sbgcui_config', JSON.stringify(config));
+
+    let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
+    toast.options.className = 'error-toast';
+    toast.showToast();
   }
 
 
@@ -93,7 +97,6 @@ window.addEventListener('load', async function () {
   let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
   let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 
-  let isLinesHidden = false;
   let lastOpenedPoint = {};
   let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
 
@@ -121,11 +124,6 @@ window.addEventListener('load', async function () {
               response.error = response.error.replace(/in\s(\d+)\sseconds/, (m, p1) => `in ${+p1 > 90 ? (Math.round(+p1 / 60) + ' minutes') : (+p1 + ' seconds')}`);
             }
             break;
-          case 'inview':
-            if ('data' in response) {
-              if (isLinesHidden) { response.data.lines = []; }
-            }
-            break;
         }
 
         response = JSON.stringify(response);
@@ -145,7 +143,7 @@ window.addEventListener('load', async function () {
 
         try {
           response = JSON.parse(response);
-  
+
           switch (path[1]) {
             case 'point':
               if ('data' in response && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
@@ -166,7 +164,7 @@ window.addEventListener('load', async function () {
               localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
               break;
           }
-  
+
           response = JSON.stringify(response);
         } catch (error) {
           console.log('Ошибка при обработке ответа сервера.', error);
@@ -213,7 +211,7 @@ window.addEventListener('load', async function () {
           }
         }
       }
-      
+
       return playerCores; // { level: amount }
     }
 
@@ -244,7 +242,7 @@ window.addEventListener('load', async function () {
           core = cachedCores.findLast(e => (e.l <= player.level) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]));
           break;
       }
-      
+
       click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
     }
   }
@@ -543,14 +541,14 @@ window.addEventListener('load', async function () {
         'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде.'
       );
       let subSection = document.createElement('section');
-      
+
       let attackMax = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'max'), 'Самый мощный', 'max');
       let attackLatest = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'latest'), 'Последний использованный', 'latest');
-      
+
       let deployMin = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'min'), 'Наименьшее', 'min');
       let deployMax = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'max'), 'Наибольшее', 'max');
       let deployOff = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'off'), 'Вручную', 'off');
-      
+
       let upgradeMin = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'min'), 'Наименьшее', 'min');
       let upgradeMax = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'max'), 'Наибольшее', 'max');
       let upgradeOff = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'off'), 'Вручную', 'off');
@@ -777,7 +775,7 @@ window.addEventListener('load', async function () {
     let mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     let mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
     let clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-    
+
     element?.dispatchEvent(mouseDownEvent);
     element?.dispatchEvent(mouseUpEvent);
     element?.dispatchEvent(clickEvent);
@@ -879,7 +877,7 @@ window.addEventListener('load', async function () {
     setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
   }
 
-  
+
   window.XMLHttpRequest = customXHR;
 
 
@@ -1086,6 +1084,10 @@ window.addEventListener('load', async function () {
 
       #inventory-delete-section {
         margin-right: auto;
+      }
+
+      #layers {
+        position: initial;
       }
 
       #logout {
@@ -1314,6 +1316,7 @@ window.addEventListener('load', async function () {
       .ol-rotate {
         position: initial;
         margin-top: 10px;
+        transform: none !important;
       }
 
       .profile {
@@ -1364,10 +1367,6 @@ window.addEventListener('load', async function () {
 
       .xp-diff {
         display: none;
-      }
-
-      #sbgcui_toggle_links:not([sbgcui-show]) {
-        opacity: 0.5;
       }
 
       .sbgcui_settings {
@@ -1598,6 +1597,7 @@ window.addEventListener('load', async function () {
     let rotateArrow = document.querySelector('.ol-rotate');
     let invCloseButton = document.querySelector('#inventory__close');
     let profileCloseButton = document.querySelector('.profile.popup .popup-close');
+    let layersButton = document.querySelector('#layers');
     let logout = document.querySelector('#logout');
 
 
@@ -1612,7 +1612,9 @@ window.addEventListener('load', async function () {
 
     invCloseButton.innerText = '[x]';
 
-    zoomContainer.append(rotateArrow, fw);
+    layersButton.innerText = String.fromCharCode(10019);
+
+    zoomContainer.append(rotateArrow, fw, layersButton);
 
     fw.innerText = String.fromCharCode(10148);
 
@@ -1798,23 +1800,6 @@ window.addEventListener('load', async function () {
     var xpContainer = document.createElement('div');
     xpContainer.classList.add('sbgcui_xpdiff-wrapper');
     document.body.appendChild(xpContainer);
-  }
-
-
-  /* Отключение показа линков */
-  {
-    let toggleLinksButton = document.createElement('button');
-
-    toggleLinksButton.innerText = String.fromCharCode(10019);
-    toggleLinksButton.id = 'sbgcui_toggle_links';
-    toggleLinksButton.toggleAttribute('sbgcui-show');
-
-    toggleLinksButton.addEventListener('click', _ => {
-      isLinesHidden = !isLinesHidden;
-      toggleLinksButton.toggleAttribute('sbgcui-show');
-    });
-
-    zoomContainer.appendChild(toggleLinksButton);
   }
 
 }, false);
