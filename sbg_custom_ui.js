@@ -1319,6 +1319,11 @@ window.addEventListener('load', async function () {
         transform: none !important;
       }
 
+      .ol-rotate.ol-hidden {
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+
       .profile {
         overflow: auto;
       }
