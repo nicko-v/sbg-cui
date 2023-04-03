@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.20
+// @version      1.0.21
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -255,8 +255,18 @@ window.addEventListener('load', async function () {
     })
       .then(r => { return Promise.all([r.headers.get('SBG-Version'), r]); })
       .then(r => Promise.all([r[0], r[1].json()]))
-      .then(([version, data]) => { return { name: data.n, team: data.t, exp: data.x, lvl: data.l, version }; })
+      .then(([version, data]) => { return { name: data.n, team: data.t, exp: data.x, lvl: data.l, guid: data.g, version }; })
       .catch(err => { console.log(`Ошибка при получении данных игрока. ${err}`); });
+  }
+
+  async function getPlayerData(guid) {
+    return fetch(`/api/profile?guid=${guid}`, {
+      headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+      method: "GET",
+    })
+      .then(r => r.json())
+      .then(r => r.data)
+      .catch(err => { console.log('Ошибка при получении данных игрока.', err); });
   }
 
   async function getPointData(guid) {
@@ -909,6 +919,7 @@ window.addEventListener('load', async function () {
         set string(str) { [this.current, this.goal] = str.replaceAll(',', '').split(' / '); }
       },
       auth: localStorage.getItem('auth'),
+      guid: selfData.guid,
       get level() { return this._level; },
       set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
       _level: selfData.lvl,
@@ -1374,6 +1385,32 @@ window.addEventListener('load', async function () {
         display: none;
       }
 
+      .sbgcui_record_stats {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px var(--border-transp) solid;
+        border-top: 1px var(--border-transp) solid;
+      }
+
+      .sbgcui_record_stats-timestamp {
+        font-size: 0.8em;
+        color: var(--text-disabled);
+        display: inline;
+        margin-left: auto;
+        text-align: end;
+      }
+
+      .sbgcui_stats_diff {
+        width: 100vw;
+        height: 100vh;
+        position: absolute;
+        z-index: 4;
+        background: var(--background);
+        border: 2px var(--team-${player.team}) solid;
+        box-sizing: border-box;
+      }
+
       .sbgcui_settings {
         display: flex;
         flex-direction: column;
@@ -1805,6 +1842,85 @@ window.addEventListener('load', async function () {
     var xpContainer = document.createElement('div');
     xpContainer.classList.add('sbgcui_xpdiff-wrapper');
     document.body.appendChild(xpContainer);
+  }
+
+
+  /* Запись статы */
+  {
+    let buttonsWrp = document.createElement('div');
+    let recordButton = document.createElement('button');
+    let compareButton = document.createElement('button');
+    let timestamp = document.createElement('span');
+    let diffPopup = document.createElement('div');
+    let prStatsDiv = document.querySelector('.pr-stats');
+
+    let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+    recordButton.innerText = 'Записать';
+    compareButton.innerText = 'Сравнить';
+
+    recordButton.addEventListener('click', _ => {
+      if (confirm('Сохранить вашу статистику на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.')) {
+        getPlayerData(player.guid).then(stats => {
+          let date = new Date();
+          localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
+          timestamp.innerText = `Последнее сохранение: \n${date.toLocaleString()}`;
+        });
+      }
+    });
+
+    compareButton.addEventListener('click', _ => {
+      let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+      if (!previousStats) {
+        let toast = createToast('Вы ещё не сохраняли свою статистику.');
+
+        toast.options.className = 'error-toast';
+        toast.showToast();
+
+        return;
+      }
+
+      getPlayerData(player.guid).then(currentStats => {
+        let header = document.createElement('h3');
+
+        header.innerText = `Получено с ${previousStats.date.toLocaleString()}\n${new Date() - previousStats.date} ms`;
+
+        diffPopup.innerHTML = '';
+        diffPopup.appendChild(header);
+
+        for (let key in currentStats) {
+          let diff = currentStats[key] - previousStats.stats[key];
+
+          if (diff) {
+            let wrp = document.createElement('p');
+            let statName = document.createElement('span');
+            let statValue = document.createElement('span');
+
+            statName.innerText = key;
+            statValue = diff;
+
+            wrp.append(statName, statValue);
+            diffPopup.appendChild(wrp);
+          }
+        }
+
+        document.body.appendChild(diffPopup);
+      });
+    });
+
+    if (previousStats) {
+      timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
+    }
+
+    diffPopup.classList.add('sbgcui_stats_diff');
+
+    timestamp.classList.add('sbgcui_record_stats-timestamp');
+
+    buttonsWrp.classList.add('sbgcui_record_stats');
+    buttonsWrp.append(recordButton, compareButton, timestamp);
+
+    profilePopup.insertBefore(buttonsWrp, prStatsDiv);
   }
 
 }, false);
