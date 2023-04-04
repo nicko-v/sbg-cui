@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.21
+// @version      1.0.22
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -1385,7 +1385,7 @@ window.addEventListener('load', async function () {
         display: none;
       }
 
-      .sbgcui_record_stats {
+      .sbgcui_compare_stats {
         display: flex;
         gap: 10px;
         padding: 10px 0;
@@ -1393,32 +1393,33 @@ window.addEventListener('load', async function () {
         border-top: 1px var(--border-transp) solid;
       }
 
-      .sbgcui_record_stats-timestamp {
+      .sbgcui_compare_stats-timestamp {
         font-size: 0.8em;
         color: var(--text-disabled);
         display: inline;
         margin-right: auto;
       }
 
-      .sbgcui_stats-toast {
+      .sbgcui_compare_stats-toast {
         border: 1px var(--team-${player.team}) solid;
         border-color: var(--team-${player.team});
 	      box-shadow: 0 0 15px var(--team-${player.team});
         text-align: center;
         background: var(--background);
+        color: var(--text);
       }
 
-      .sbgcui_stats-diff-wrp {
+      .sbgcui_compare_stats-diff-wrp {
         display: flex;
         justify-content: space-between;
         margin: 0;
       }
 
-      .sbgcui_stats-diff-valuePos {
+      .sbgcui_compare_stats-diff-valuePos {
         color: green;
       }
 
-      .sbgcui_stats-diff-valueNeg {
+      .sbgcui_compare_stats-diff-valueNeg {
         color: red;
       }
 
@@ -1858,7 +1859,7 @@ window.addEventListener('load', async function () {
 
   /* Запись статы */
   {
-    let buttonsWrp = document.createElement('div');
+    let compareStatsWrp = document.createElement('div');
     let recordButton = document.createElement('button');
     let compareButton = document.createElement('button');
     let timestamp = document.createElement('span');
@@ -1950,9 +1951,9 @@ window.addEventListener('load', async function () {
 
             if (statName) {
               diffs += `
-                <p class="sbgcui_stats-diff-wrp">
+                <p class="sbgcui_compare_stats-diff-wrp">
                   <span>${statName}:</span>
-                  <span class="sbgcui_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
+                  <span class="sbgcui_compare_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
                     ${isPositive ? '+' : ''}${diff}
                   </span>
                 </p>
@@ -1964,7 +1965,7 @@ window.addEventListener('load', async function () {
         let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
         let toast = createToast(toastText, 'bottom center', 20000);
 
-        toast.options.className = 'sbgcui_stats-toast';
+        toast.options.className = 'sbgcui_compare_stats-toast';
         toast.showToast();
       });
     });
@@ -1973,12 +1974,20 @@ window.addEventListener('load', async function () {
       timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
     }
 
-    timestamp.classList.add('sbgcui_record_stats-timestamp');
+    timestamp.classList.add('sbgcui_compare_stats-timestamp');
 
-    buttonsWrp.classList.add('sbgcui_record_stats');
-    buttonsWrp.append(timestamp, recordButton, compareButton);
+    compareStatsWrp.classList.add('sbgcui_compare_stats');
+    compareStatsWrp.append(timestamp, recordButton, compareButton);
 
-    profilePopup.insertBefore(buttonsWrp, prStatsDiv);
+    profilePopup.insertBefore(compareStatsWrp, prStatsDiv);
+
+    profilePopup.addEventListener('profilePopupOpened', _ => {
+      if (profileNameSpan.innerText == player.name) {
+        compareStatsWrp.classList.remove('sbgcui_hidden')
+      } else {
+        compareStatsWrp.classList.add('sbgcui_hidden')
+      }
+    });
   }
 
 }, false);
