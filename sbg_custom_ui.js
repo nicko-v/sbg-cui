@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.20
+// @version      1.0.21
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -255,8 +255,18 @@ window.addEventListener('load', async function () {
     })
       .then(r => { return Promise.all([r.headers.get('SBG-Version'), r]); })
       .then(r => Promise.all([r[0], r[1].json()]))
-      .then(([version, data]) => { return { name: data.n, team: data.t, exp: data.x, lvl: data.l, version }; })
+      .then(([version, data]) => { return { name: data.n, team: data.t, exp: data.x, lvl: data.l, guid: data.g, version }; })
       .catch(err => { console.log(`Ошибка при получении данных игрока. ${err}`); });
+  }
+
+  async function getPlayerData(guid) {
+    return fetch(`/api/profile?guid=${guid}`, {
+      headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+      method: "GET",
+    })
+      .then(r => r.json())
+      .then(r => r.data)
+      .catch(err => { console.log('Ошибка при получении данных игрока.', err); });
   }
 
   async function getPointData(guid) {
@@ -781,11 +791,11 @@ window.addEventListener('load', async function () {
     element?.dispatchEvent(clickEvent);
   }
 
-  function createToast(text = '', position = 'top left', container = null) {
+  function createToast(text = '', position = 'top left', duration = 6000, container = null) {
     let parts = position.split(/\s+/);
     let toast = Toastify({
       text,
-      duration: 6000,
+      duration,
       gravity: parts[0],
       position: parts[1],
       escapeMarkup: false,
@@ -909,6 +919,7 @@ window.addEventListener('load', async function () {
         set string(str) { [this.current, this.goal] = str.replaceAll(',', '').split(' / '); }
       },
       auth: localStorage.getItem('auth'),
+      guid: selfData.guid,
       get level() { return this._level; },
       set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
       _level: selfData.lvl,
@@ -1374,6 +1385,43 @@ window.addEventListener('load', async function () {
         display: none;
       }
 
+      .sbgcui_record_stats {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px var(--border-transp) solid;
+        border-top: 1px var(--border-transp) solid;
+      }
+
+      .sbgcui_record_stats-timestamp {
+        font-size: 0.8em;
+        color: var(--text-disabled);
+        display: inline;
+        margin-right: auto;
+      }
+
+      .sbgcui_stats-toast {
+        border: 1px var(--team-${player.team}) solid;
+        border-color: var(--team-${player.team});
+	      box-shadow: 0 0 15px var(--team-${player.team});
+        text-align: center;
+        background: var(--background);
+      }
+
+      .sbgcui_stats-diff-wrp {
+        display: flex;
+        justify-content: space-between;
+        margin: 0;
+      }
+
+      .sbgcui_stats-diff-valuePos {
+        color: green;
+      }
+
+      .sbgcui_stats-diff-valueNeg {
+        color: red;
+      }
+
       .sbgcui_settings {
         display: flex;
         flex-direction: column;
@@ -1805,6 +1853,132 @@ window.addEventListener('load', async function () {
     var xpContainer = document.createElement('div');
     xpContainer.classList.add('sbgcui_xpdiff-wrapper');
     document.body.appendChild(xpContainer);
+  }
+
+
+  /* Запись статы */
+  {
+    let buttonsWrp = document.createElement('div');
+    let recordButton = document.createElement('button');
+    let compareButton = document.createElement('button');
+    let timestamp = document.createElement('span');
+    let prStatsDiv = document.querySelector('.pr-stats');
+
+    let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+    recordButton.innerText = 'Записать';
+    compareButton.innerText = 'Сравнить';
+
+    recordButton.addEventListener('click', _ => {
+      if (confirm('Сохранить вашу статистику на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.')) {
+        getPlayerData(player.guid).then(stats => {
+          let date = new Date();
+          localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
+          timestamp.innerText = `Последняя запись: \n${date.toLocaleString()}`;
+        });
+      }
+    });
+
+    compareButton.addEventListener('click', _ => {
+      let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+      if (!previousStats) {
+        let toast = createToast('Вы ещё не сохраняли свою статистику.');
+
+        toast.options.className = 'error-toast';
+        toast.showToast();
+
+        return;
+      }
+
+      getPlayerData(player.guid).then(currentStats => {
+        let ms = new Date() - previousStats.date;
+        let dhms1 = [86400000, 3600000, 60000, 1000];
+        let dhms2 = ['day', 'hr', 'min', 'sec'];
+        let since = '';
+        let diffs = '';
+
+        dhms1.forEach((e, i) => {
+          let amount = Math.trunc(ms / e);
+
+          if (!amount) { return; }
+
+          since += `${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}${i == dhms1.length - 1 ? '' : ', '}`;
+          ms -= amount * e;
+        });
+
+        for (let key in currentStats) {
+          let diff = currentStats[key] - previousStats.stats[key];
+
+          if (diff) {
+            let isPositive = diff > 0;
+            let statName;
+            
+            switch (key) {
+              case 'discoveries':
+              case 'captures':
+              case 'level':
+              case 'cores_deployed':
+              case 'cores_destroyed':
+              case 'lines_destroyed':
+              case 'unique_captures':
+              case 'unique_visits':
+              case 'owned_points':
+                statName = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
+                break;
+              case 'xp':
+                statName = 'XP';
+                break;
+              case 'guard_line':
+                statName = 'Longest line ownership';
+                break;
+              case 'guard_point':
+                statName = 'Longest point ownership';
+                break;
+              case 'lines':
+                statName = 'Lines drawn';
+                break;
+              case 'max_line':
+                statName = 'Longest drawn line (m)';
+                break;
+              case 'neutralizes':
+                statName = 'Points neutralized';
+                break;
+              default:
+                if (!key.match(/created_at|name|player|team/)) { statName = key; }
+            }
+
+            if (statName) {
+              diffs += `
+                <p class="sbgcui_stats-diff-wrp">
+                  <span>${statName}:</span>
+                  <span class="sbgcui_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
+                    ${isPositive ? '+' : ''}${diff}
+                  </span>
+                </p>
+              `;
+            }
+          }
+        }
+
+        let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
+        let toast = createToast(toastText, 'bottom center', 20000);
+
+        toast.options.className = 'sbgcui_stats-toast';
+        toast.showToast();
+      });
+    });
+
+    if (previousStats) {
+      timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
+    }
+
+    timestamp.classList.add('sbgcui_record_stats-timestamp');
+
+    buttonsWrp.classList.add('sbgcui_record_stats');
+    buttonsWrp.append(timestamp, recordButton, compareButton);
+
+    profilePopup.insertBefore(buttonsWrp, prStatsDiv);
   }
 
 }, false);
