@@ -791,11 +791,11 @@ window.addEventListener('load', async function () {
     element?.dispatchEvent(clickEvent);
   }
 
-  function createToast(text = '', position = 'top left', container = null) {
+  function createToast(text = '', position = 'top left', duration = 6000, container = null) {
     let parts = position.split(/\s+/);
     let toast = Toastify({
       text,
-      duration: 6000,
+      duration,
       gravity: parts[0],
       position: parts[1],
       escapeMarkup: false,
@@ -1397,18 +1397,29 @@ window.addEventListener('load', async function () {
         font-size: 0.8em;
         color: var(--text-disabled);
         display: inline;
-        margin-left: auto;
-        text-align: end;
+        margin-right: auto;
       }
 
-      .sbgcui_stats_diff {
-        width: 100vw;
-        height: 100vh;
-        position: absolute;
-        z-index: 4;
+      .sbgcui_stats-toast {
+        border: 1px var(--team-${player.team}) solid;
+        border-color: var(--team-${player.team});
+	      box-shadow: 0 0 15px var(--team-${player.team});
+        text-align: center;
         background: var(--background);
-        border: 2px var(--team-${player.team}) solid;
-        box-sizing: border-box;
+      }
+
+      .sbgcui_stats-diff-wrp {
+        display: flex;
+        justify-content: space-between;
+        margin: 0;
+      }
+
+      .sbgcui_stats-diff-valuePos {
+        color: green;
+      }
+
+      .sbgcui_stats-diff-valueNeg {
+        color: red;
       }
 
       .sbgcui_settings {
@@ -1851,7 +1862,6 @@ window.addEventListener('load', async function () {
     let recordButton = document.createElement('button');
     let compareButton = document.createElement('button');
     let timestamp = document.createElement('span');
-    let diffPopup = document.createElement('div');
     let prStatsDiv = document.querySelector('.pr-stats');
 
     let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
@@ -1864,7 +1874,7 @@ window.addEventListener('load', async function () {
         getPlayerData(player.guid).then(stats => {
           let date = new Date();
           localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
-          timestamp.innerText = `Последнее сохранение: \n${date.toLocaleString()}`;
+          timestamp.innerText = `Последняя запись: \n${date.toLocaleString()}`;
         });
       }
     });
@@ -1882,30 +1892,80 @@ window.addEventListener('load', async function () {
       }
 
       getPlayerData(player.guid).then(currentStats => {
-        let header = document.createElement('h3');
+        let ms = new Date() - previousStats.date;
+        let dhms1 = [86400000, 3600000, 60000, 1000];
+        let dhms2 = ['day', 'hr', 'min', 'sec'];
+        let since = '';
+        let diffs = '';
 
-        header.innerText = `Получено с ${previousStats.date.toLocaleString()}\n${new Date() - previousStats.date} ms`;
+        dhms1.forEach((e, i) => {
+          let amount = Math.trunc(ms / e);
 
-        diffPopup.innerHTML = '';
-        diffPopup.appendChild(header);
+          if (!amount) { return; }
+
+          since += `${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}${i == dhms1.length - 1 ? '' : ', '}`;
+          ms -= amount * e;
+        });
 
         for (let key in currentStats) {
           let diff = currentStats[key] - previousStats.stats[key];
 
           if (diff) {
-            let wrp = document.createElement('p');
-            let statName = document.createElement('span');
-            let statValue = document.createElement('span');
+            let isPositive = diff > 0;
+            let statName;
+            
+            switch (key) {
+              case 'discoveries':
+              case 'captures':
+              case 'level':
+              case 'cores_deployed':
+              case 'cores_destroyed':
+              case 'lines_destroyed':
+              case 'unique_captures':
+              case 'unique_visits':
+              case 'owned_points':
+                statName = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
+                break;
+              case 'xp':
+                statName = 'XP';
+                break;
+              case 'guard_line':
+                statName = 'Longest line ownership';
+                break;
+              case 'guard_point':
+                statName = 'Longest point ownership';
+                break;
+              case 'lines':
+                statName = 'Lines drawn';
+                break;
+              case 'max_line':
+                statName = 'Longest drawn line (m)';
+                break;
+              case 'neutralizes':
+                statName = 'Points neutralized';
+                break;
+              default:
+                if (!key.match(/created_at|name|player|team/)) { statName = key; }
+            }
 
-            statName.innerText = key;
-            statValue = diff;
-
-            wrp.append(statName, statValue);
-            diffPopup.appendChild(wrp);
+            if (statName) {
+              diffs += `
+                <p class="sbgcui_stats-diff-wrp">
+                  <span>${statName}:</span>
+                  <span class="sbgcui_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
+                    ${isPositive ? '+' : ''}${diff}
+                  </span>
+                </p>
+              `;
+            }
           }
         }
 
-        document.body.appendChild(diffPopup);
+        let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
+        let toast = createToast(toastText, 'bottom center', 20000);
+
+        toast.options.className = 'sbgcui_stats-toast';
+        toast.showToast();
       });
     });
 
@@ -1913,12 +1973,10 @@ window.addEventListener('load', async function () {
       timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
     }
 
-    diffPopup.classList.add('sbgcui_stats_diff');
-
     timestamp.classList.add('sbgcui_record_stats-timestamp');
 
     buttonsWrp.classList.add('sbgcui_record_stats');
-    buttonsWrp.append(recordButton, compareButton, timestamp);
+    buttonsWrp.append(timestamp, recordButton, compareButton);
 
     profilePopup.insertBefore(buttonsWrp, prStatsDiv);
   }
