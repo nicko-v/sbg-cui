@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.22
+// @version      1.0.23
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -15,8 +15,8 @@ window.addEventListener('load', async function () {
 
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-
-  const LATEST_KNOWN_VERSION = '0.2.7';
+  const USERSCRIPT_VERSION = '1.0.23';
+  const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
   const MAX_TOASTS = 3;
@@ -78,7 +78,6 @@ window.addEventListener('load', async function () {
   let attackButton = document.querySelector('#attack-menu');
   let attackSlider = document.querySelector('.attack-slider-wrp');
   let coresList = document.querySelector('#cores-list');
-  let deployButton = document.querySelector('#deploy');
   let discoverButton = document.querySelector('#discover');
   let inventoryButton = document.querySelector('#ops');
   let invTotalSpan = document.querySelector('#self-info__inv');
@@ -109,31 +108,6 @@ window.addEventListener('load', async function () {
 
 
   class customXHR extends window.XMLHttpRequest {
-    get responseText() {
-      let response = this.response;
-      let path = this.responseURL.match(/\/api\/(discover|inview)/);
-
-      if (!path) { return super.responseText; }
-
-      try {
-        response = JSON.parse(response);
-
-        switch (path[1]) {
-          case 'discover':
-            if ('error' in response) {
-              response.error = response.error.replace(/in\s(\d+)\sseconds/, (m, p1) => `in ${+p1 > 90 ? (Math.round(+p1 / 60) + ' minutes') : (+p1 + ' seconds')}`);
-            }
-            break;
-        }
-
-        response = JSON.stringify(response);
-      } catch (error) {
-        console.log('Ошибка при обработке ответа сервера.', error);
-      }
-
-      return response;
-    }
-
     send(body) {
       this.addEventListener('load', _ => {
         let path = this.responseURL.match(/\/api\/(point|deploy|attack2)(?:.*?&(status=1))?/);
@@ -663,6 +637,10 @@ window.addEventListener('load', async function () {
     let form = document.createElement('form');
     form.classList.add('sbgcui_settings', 'sbgcui_hidden');
 
+    let version = document.createElement('span');
+    version.classList.add('sbgcui_settings-version');
+    version.innerText = `v${USERSCRIPT_VERSION}`;
+
     let formHeader = document.createElement('h3');
     formHeader.classList.add('sbgcui_settings-header');
     formHeader.innerText = 'Настройки';
@@ -701,7 +679,7 @@ window.addEventListener('load', async function () {
       });
     });
 
-    form.append(formHeader, ...sections, buttonsWrp);
+    form.append(version, formHeader, ...sections, buttonsWrp);
 
     form.addEventListener('submit', e => {
       e.preventDefault();
@@ -1101,13 +1079,6 @@ window.addEventListener('load', async function () {
         position: initial;
       }
 
-      #logout {
-        width: 10em;
-        align-self: flex-start;
-        margin-left: auto;
-        margin-top: 15px;
-      }
-
       #map {
         position: absolute;
 	      top: 0;
@@ -1334,6 +1305,11 @@ window.addEventListener('load', async function () {
         opacity: 0 !important;
         visibility: hidden !important;
       }
+      
+      .pr-stats__section-header,
+      .settings-section__header {
+        color: var(--selection);
+      }
 
       .profile {
         overflow: auto;
@@ -1352,6 +1328,7 @@ window.addEventListener('load', async function () {
         border: none;
         background-color: unset;
         flex-direction: row;
+        flex-wrap: wrap;
         gap: unset;
         text-shadow: 2px 2px 1px black;
         pointer-events: none;
@@ -1362,6 +1339,10 @@ window.addEventListener('load', async function () {
         align-items: flex-end;
         position: relative;
         padding-right: 0.5em;
+      }
+
+      .self-info__entry:has(#self-info__coord) {
+        width: 100%;
       }
 
       .toastify:nth-child(n+${MAX_TOASTS + 1}) {
@@ -1423,6 +1404,12 @@ window.addEventListener('load', async function () {
         color: red;
       }
 
+      .sbgcui_settings_button {
+        width: 50%;
+        margin-left: auto;
+        margin-top: 10px;
+      }
+
       .sbgcui_settings {
         display: flex;
         flex-direction: column;
@@ -1450,6 +1437,13 @@ window.addEventListener('load', async function () {
       .sbgcui_settings-buttons_wrp > button {
         width: 35%;
         margin: 0 auto;
+      }
+
+      .sbgcui_settings-version {
+        position: absolute;
+        top: 2px;
+        right: 5px;
+        color: var(--text-disabled);
       }
       
       .sbgcui_settings-header {
@@ -1650,19 +1644,15 @@ window.addEventListener('load', async function () {
     let blContainer = document.querySelector('.bottomleft-container');
     let rotateArrow = document.querySelector('.ol-rotate');
     let invCloseButton = document.querySelector('#inventory__close');
-    let profileCloseButton = document.querySelector('.profile.popup .popup-close');
     let layersButton = document.querySelector('#layers');
-    let logout = document.querySelector('#logout');
 
 
-    document.querySelectorAll('.ol-attribution, #attack-slider-close, #link-tg, button[data-href="https://t.me/sbg_game"], .game-menu > a[href="/tasks/"]').forEach(e => { e.remove(); });
+    document.querySelectorAll('#attack-slider-close').forEach(e => { e.remove(); });
     document.querySelectorAll('.self-info__entry, #attack-menu').forEach(e => {
       e.childNodes.forEach(e => {
         if (e.nodeType == 3) { e.remove(); }
       })
     });
-
-    profilePopup.insertBefore(logout, profileCloseButton);
 
     invCloseButton.innerText = '[x]';
 
@@ -1677,14 +1667,6 @@ window.addEventListener('load', async function () {
     ops.replaceChildren('INVENTORY', invTotalSpan);
 
     selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
-
-    profilePopup.addEventListener('profilePopupOpened', _ => {
-      if (profileNameSpan.innerText == player.name) {
-        logout.classList.remove('sbgcui_hidden')
-      } else {
-        logout.classList.add('sbgcui_hidden')
-      }
-    });
   }
 
 
@@ -1776,19 +1758,23 @@ window.addEventListener('load', async function () {
 
   /* Добавление меню настроек и кнопки */
   {
-    let settingsMenu = createSettingsMenu();
-    document.querySelector('.topleft-container').appendChild(settingsMenu);
+    let gameSettingsPopup = document.querySelector('.settings.popup');
+    let gameSettingsContent = document.querySelector('.settings-content');
+    let userscriptSettingsMenu = createSettingsMenu();
+    document.querySelector('.topleft-container').appendChild(userscriptSettingsMenu);
 
     let settingsButton = document.createElement('button');
-    settingsButton.innerText = 'Настройки';
+    settingsButton.classList.add('sbgcui_settings_button');
+    settingsButton.innerText = 'Настройки SBG CUI';
     settingsButton.addEventListener('click', event => {
       event.stopPropagation();
-      settingsMenu.classList.remove('sbgcui_hidden');
+      gameSettingsPopup.classList.add('hidden');
+      userscriptSettingsMenu.classList.remove('sbgcui_hidden');
     });
-    document.querySelector('.game-menu').appendChild(settingsButton);
+    gameSettingsContent.appendChild(settingsButton);
 
     document.body.addEventListener('click', event => {
-      if (!settingsMenu.classList.contains('sbgcui_hidden') && !event.target.closest('.sbgcui_settings')) { closeSettingsMenu(); }
+      if (!userscriptSettingsMenu.classList.contains('sbgcui_hidden') && !event.target.closest('.sbgcui_settings')) { closeSettingsMenu(); }
     });
   }
 
@@ -1914,7 +1900,7 @@ window.addEventListener('load', async function () {
           if (diff) {
             let isPositive = diff > 0;
             let statName;
-            
+
             switch (key) {
               case 'discoveries':
               case 'captures':
