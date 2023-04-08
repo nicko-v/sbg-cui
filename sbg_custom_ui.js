@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.23
+// @version      1.0.24
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -10,12 +10,14 @@
 // @grant        none
 // ==/UserScript==
 
-window.addEventListener('load', async function () {
+window.addEventListener('load', () => setTimeout(main, 1000), false);
+
+async function main() {
   'use strict';
 
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-  const USERSCRIPT_VERSION = '1.0.23';
+  const USERSCRIPT_VERSION = '1.0.24';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -98,6 +100,8 @@ window.addEventListener('load', async function () {
 
   let lastOpenedPoint = {};
   let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
+
+  let userAgent = window.navigator.userAgent.toLowerCase();
 
 
   let numbersConverter = {
@@ -988,6 +992,7 @@ window.addEventListener('load', async function () {
     xpDiffSpanObserver.observe(xpDiffSpan, { childList: true });
   }
 
+
   /* Прочие события */
   {
     discoverButton.addEventListener('click', clearInventory);
@@ -1689,6 +1694,7 @@ window.addEventListener('load', async function () {
     xpProgressBar.append(selfExpSpan, xpProgressBarFiller);
   }
 
+
   /* Автовыбор */
   {
     attackSlider.addEventListener('attackSliderOpened', _ => {
@@ -1976,4 +1982,55 @@ window.addEventListener('load', async function () {
     });
   }
 
-}, false);
+
+  /* Кнопка обновления страницы */
+  {
+    if (userAgent.includes('wv')) {
+      let gameMenu = document.querySelector('.game-menu');
+      let reloadButton = document.createElement('button');
+
+      reloadButton.innerText = 'Reload';
+      reloadButton.addEventListener('click', _ => { window.location.reload(); });
+      gameMenu.appendChild(reloadButton);
+    }
+  }
+
+
+  /* Показ гуида точки */
+  {
+    let image = document.querySelector('#i-image');
+
+    image.addEventListener('click', _ => {
+      if (!image.hasAttribute('sbgcui_clicks')) {
+        image.setAttribute('sbgcui_clicks', 1);
+      } else {
+        let clicks = +image.getAttribute('sbgcui_clicks');
+
+        if (clicks + 1 == 5) {
+          let iStat = document.querySelector('.i-stat');
+          let guid = document.querySelector('.info.popup').dataset.guid;
+          let guidSpan = document.createElement('span');
+
+          guidSpan.innerText = `GUID: ${guid}`;
+
+          guidSpan.addEventListener('click', _ => {
+            navigator.clipboard.writeText(guid);
+
+            let toast = createToast('GUID точки скопирован в буфер обмена.');
+            toast.showToast();
+          });
+
+          iStat.prepend(guidSpan);
+
+          pointPopup.addEventListener('pointPopupClosed', _ => {
+            guidSpan.remove();
+            image.setAttribute('sbgcui_clicks', 0);
+          });
+        }
+
+        image.setAttribute('sbgcui_clicks', clicks + 1);
+      }
+    });
+  }
+
+}
