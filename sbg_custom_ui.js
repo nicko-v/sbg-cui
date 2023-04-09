@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.26
+// @version      1.0.27
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -17,7 +17,7 @@ async function main() {
 
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-  const USERSCRIPT_VERSION = '1.0.26';
+  const USERSCRIPT_VERSION = '1.0.27';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -53,6 +53,9 @@ async function main() {
       map: 1,
       point: 'level', // level || team || off
       profile: 1,
+    },
+    vibration: {
+      buttons: 1,
     },
   };
 
@@ -637,6 +640,26 @@ async function main() {
       return section;
     }
 
+    function createVibrationSection(vibration) {
+      let section = createSection(
+        'Вибрация',
+        'Устройство будет откликаться на ваши действия.'
+      );
+      let subSection = document.createElement('section');
+
+      let buttonsVibration = createInput('checkbox', 'vibration_buttons', +vibration.buttons, 'При нажатии кнопок');
+
+      subSection.classList.add('sbgcui_settings-subsection');
+
+      subSection.append(buttonsVibration);
+
+      section.appendChild(subSection);
+
+      if (!('vibrate' in window.navigator)) { section.classList.add('sbgcui_hidden'); }
+
+      return section;
+    }
+
 
     let form = document.createElement('form');
     form.classList.add('sbgcui_settings', 'sbgcui_hidden');
@@ -673,6 +696,7 @@ async function main() {
       createAutoSelectSection(config.autoSelect),
       createColorSchemeSection(config.mapFilters),
       createTintingSection(config.tinting),
+      createVibrationSection(config.vibration),
     ];
 
     sections.forEach(e => {
@@ -696,8 +720,9 @@ async function main() {
           let path = key.split('_');
           if (path[0] == 'maxAmountInBag') {
             config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-          } else if (path[0].match(/autoSelect|mapFilters|tinting/)) {
-            config[path[0]][path[1]] = formEntries[key];
+          } else if (path[0].match(/autoSelect|mapFilters|tinting|vibration/)) {
+            let value = formEntries[key];
+            config[path[0]][path[1]] = isNaN(+value) ? value : +value;
           }
         }
 
@@ -2032,6 +2057,19 @@ async function main() {
         image.setAttribute('sbgcui_clicks', clicks + 1);
       }
     });
+  }
+
+
+  /* Вибрация */
+  {
+    if ('vibrate' in window.navigator) {
+      document.body.addEventListener('click', event => {
+        if (config.vibration.buttons && event.target.nodeName == 'BUTTON') {
+          window.navigator.vibrate(0);
+          window.navigator.vibrate(50);
+        }
+      });
+    }
   }
 
 }
