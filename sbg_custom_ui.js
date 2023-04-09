@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.25
+// @version      1.0.26
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -17,7 +17,7 @@ async function main() {
 
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-  const USERSCRIPT_VERSION = '1.0.25';
+  const USERSCRIPT_VERSION = '1.0.26';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -1707,7 +1707,8 @@ async function main() {
 
     pointCores.addEventListener('click', event => {
       if (event.target.classList.contains('selected')) {
-        lastOpenedPoint.selectCore(config.autoSelect.upgrade, numbersConverter.toDecimal(event.target.innerText));
+        let currentLvl = event.target.innerText.match(/^[0-9]{1,2}$/) ? +event.target.innerText : numbersConverter.toDecimal(event.target.innerText);
+        lastOpenedPoint.selectCore(config.autoSelect.upgrade, currentLvl);
       }
     });
   }
