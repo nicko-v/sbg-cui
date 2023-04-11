@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.27
+// @version      1.0.28
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
 // @author       NV
-// @match        https://3d.sytes.net/
+// @match        https://3d.sytes.net/*
 // @grant        none
 // ==/UserScript==
 
@@ -17,7 +17,17 @@ async function main() {
 
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-  const USERSCRIPT_VERSION = '1.0.27';
+
+  /* FontAwesome */
+  {
+    let fa = document.createElement('script');
+    fa.setAttribute('src', 'https://kit.fontawesome.com/babc27ae2f.js');
+    fa.setAttribute('crossorigin', 'anonymous');
+    document.head.appendChild(fa);
+  }
+
+
+  const USERSCRIPT_VERSION = '1.0.28';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -1686,11 +1696,13 @@ async function main() {
 
     invCloseButton.innerText = '[x]';
 
-    layersButton.innerText = String.fromCharCode(10019);
+    layersButton.innerText = '';
+    layersButton.classList.add('fa-solid', 'fa-layer-group');
 
     zoomContainer.append(rotateArrow, fw, layersButton);
 
-    fw.innerText = String.fromCharCode(10148);
+    fw.innerText = '';
+    fw.classList.add('fa-solid', 'fa-location-crosshairs');
 
     blContainer.appendChild(ops);
 
@@ -2040,10 +2052,10 @@ async function main() {
           guidSpan.innerText = `GUID: ${guid}`;
 
           guidSpan.addEventListener('click', _ => {
-            navigator.clipboard.writeText(guid);
-
-            let toast = createToast('GUID точки скопирован в буфер обмена.');
-            toast.showToast();
+            window.navigator.clipboard.writeText(`https://3d.sytes.net/?point=${guid}`).then(_ => {
+              let toast = createToast('Ссылка на точку скопирована в буфер обмена.');
+              toast.showToast();
+            });
           });
 
           iStat.prepend(guidSpan);
