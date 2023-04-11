@@ -643,7 +643,7 @@ async function main() {
     function createVibrationSection(vibration) {
       let section = createSection(
         'Вибрация',
-        'Устройство будет откликаться на ваши действия.'
+        'Устройство будет откликаться на ваши действия. Может потребоваться выдача соответствующего разрешения в браузере или системе.'
       );
       let subSection = document.createElement('section');
 
@@ -1739,7 +1739,7 @@ async function main() {
   }
 
 
-  /* Добавление зарядки из инвентаря */
+  /* Зарядка из инвентаря */
   {
     let refsList = document.querySelector('.inventory__content');
 
@@ -1788,7 +1788,7 @@ async function main() {
   }
 
 
-  /* Добавление меню настроек и кнопки */
+  /* Меню настроек */
   {
     let gameSettingsPopup = document.querySelector('.settings.popup');
     let gameSettingsContent = document.querySelector('.settings-content');
