@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.28
+// @version      1.0.29
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,11 +27,12 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.28';
+  const USERSCRIPT_VERSION = '1.0.29';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
   const MAX_TOASTS = 3;
+  const DISCOVERY_COOLDOWN = 90;
   const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
   const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
   const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
@@ -66,6 +67,7 @@ async function main() {
     },
     vibration: {
       buttons: 1,
+      notifications: 1,
     },
   };
 
@@ -114,8 +116,6 @@ async function main() {
   let lastOpenedPoint = {};
   let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
 
-  let userAgent = window.navigator.userAgent.toLowerCase();
-
 
   let numbersConverter = {
     I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -127,7 +127,7 @@ async function main() {
   class customXHR extends window.XMLHttpRequest {
     send(body) {
       this.addEventListener('load', _ => {
-        let path = this.responseURL.match(/\/api\/(point|deploy|attack2)(?:.*?&(status=1))?/);
+        let path = this.responseURL.match(/\/api\/(point|deploy|attack2|discover)(?:.*?&(status=1))?/);
         let response = this.response;
 
         if (!path) { return; }
@@ -153,6 +153,32 @@ async function main() {
             case 'attack2':
               lastUsedCatalyser = JSON.parse(body).guid;
               localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
+              break;
+            case 'discover':
+              if ('burnout' in response || 'cooldown' in response) {
+                if (response.cooldown <= DISCOVERY_COOLDOWN) { return; }
+
+                let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
+                try {
+                  guid = JSON.parse(body).guid;
+                } catch {
+                  guid = new URLSearchParams(body).get('guid');
+                }
+                let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
+
+                if (subscriptions.has(guid)) {
+                  let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders')) || {};
+                  let timeout = reminders[guid] - Date.now();
+
+                  if (timeout > 0) { return; }
+
+                  reminders[guid] = response.burnout || (Date.now() + response.cooldown * 1000);
+                  setTimeout(() => { notify('discover', { guid }); }, reminders[guid] - Date.now());
+
+                  localStorage.setItem('sbgcui_reminders', JSON.stringify(reminders));
+                }
+              }
+
               break;
           }
 
@@ -401,6 +427,60 @@ async function main() {
       body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
       method: 'POST',
     }).then(r => r.json());
+  }
+
+  async function notify(type, params) {
+    let message;
+
+    switch (type) {
+      case 'discover':
+        let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
+        let pointName;
+
+        if (!subscriptions.has(params.guid)) { return; }
+
+        try {
+          pointName = (await getPointData(params.guid)).t;
+        } catch (error) {
+          pointName = params.guid;
+          console.log('Ошибка при получении данных точки.', error);
+        }
+
+        message = `"${pointName}": точка остыла.`;
+
+        break;
+    }
+
+    if (!message) { return; }
+
+    if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
+      let options = {
+        icon: '/icons/icon_512.png',
+      };
+      let notification = new Notification(message, options);
+    } else {
+      let toast = createToast(message, 'top left', 30000);
+
+      toast.options.className = 'sbgcui_toast-selection';
+      toast.showToast();
+
+      if ('vibrate' in window.navigator && config.vibration.notifications) {
+        window.navigator.vibrate(0);
+        window.navigator.vibrate([500, 300, 500, 300, 500]);
+      }
+    }
+  }
+
+  function isMobile() {
+    if ('maxTouchPoints' in window.navigator) {
+      return window.navigator.maxTouchPoints > 0;
+    } else if ('msMaxTouchPoints' in window.navigator) {
+      return window.navigator.msMaxTouchPoints > 0;
+    } else if ('orientation' in window) {
+      return true;
+    } else {
+      return (/\b(BlackBerry|webOS|iPhone|IEMobile|Android|Windows Phone|iPad|iPod)\b/i).test(window.navigator.userAgent);
+    }
   }
 
   function createSettingsMenu() {
@@ -658,10 +738,11 @@ async function main() {
       let subSection = document.createElement('section');
 
       let buttonsVibration = createInput('checkbox', 'vibration_buttons', +vibration.buttons, 'При нажатии кнопок');
+      let notificationsVibration = createInput('checkbox', 'vibration_notifications', +vibration.notifications, 'При уведомлениях');
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(buttonsVibration);
+      subSection.append(buttonsVibration, notificationsVibration);
 
       section.appendChild(subSection);
 
@@ -1039,7 +1120,7 @@ async function main() {
   /* Стили */
   {
     let mapFilters = config.mapFilters;
-    let style = this.document.createElement('style');
+    let style = document.createElement('style');
 
     document.head.appendChild(style);
 
@@ -1406,6 +1487,23 @@ async function main() {
         display: none;
       }
 
+      .sbgcui_toast-selection {
+        border: 1px var(--selection) solid;
+        border-color: var(--selection);
+	      box-shadow: 0 0 15px var(--selection);
+        background: var(--background);
+        color: var(--text);
+      }
+
+      .sbgcui_toast-team,
+      .sbgcui_compare_stats-toast {
+        border: 1px var(--team-${player.team}) solid;
+        border-color: var(--team-${player.team});
+	      box-shadow: 0 0 15px var(--team-${player.team});
+        background: var(--background);
+        color: var(--text);
+      }
+
       .sbgcui_compare_stats {
         display: flex;
         gap: 10px;
@@ -1422,12 +1520,7 @@ async function main() {
       }
 
       .sbgcui_compare_stats-toast {
-        border: 1px var(--team-${player.team}) solid;
-        border-color: var(--team-${player.team});
-	      box-shadow: 0 0 15px var(--team-${player.team});
         text-align: center;
-        background: var(--background);
-        color: var(--text);
       }
 
       .sbgcui_compare_stats-diff-wrp {
@@ -1442,6 +1535,24 @@ async function main() {
 
       .sbgcui_compare_stats-diff-valueNeg {
         color: red;
+      }
+
+      .sbgcui_point_bell {
+        background: none;
+        border: none;
+        color: unset;
+        position: absolute;
+        top: 5px;
+        right: 0;
+        width: 50px;
+        font-size: 32px;
+        display: flex;
+        justify-content: center;
+        text-shadow: 0 0 5px var(--text-shadow);
+      }
+
+      .sbgcui_point_bell.fa-bell {
+        color: var(--selection);
       }
 
       .sbgcui_settings_button {
@@ -2023,7 +2134,7 @@ async function main() {
 
   /* Кнопка обновления страницы */
   {
-    if (userAgent.includes('wv')) {
+    if (window.navigator.userAgent.toLowerCase().includes('wv')) {
       let gameMenu = document.querySelector('.game-menu');
       let reloadButton = document.createElement('button');
 
@@ -2082,6 +2193,58 @@ async function main() {
         }
       });
     }
+  }
+
+
+  /* Уведомления об остывании */
+  {
+    let pointImage = document.querySelector('.i-image-box');
+    let bell = document.createElement('button');
+    let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
+
+    for (let key in reminders) {
+      let timeout = reminders[key] - Date.now();
+
+      if (timeout > 0) {
+        setTimeout(() => { notify('discover', { guid: key }); }, timeout);
+      } else {
+        delete reminders[key];
+      }
+    }
+
+    localStorage.setItem('sbgcui_reminders', JSON.stringify(reminders));
+
+    bell.classList.add('sbgcui_point_bell', 'fa-solid', 'fa-bell');
+    bell.addEventListener('click', _ => {
+      let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
+      let guid = pointPopup.dataset.guid;
+
+      if (bell.classList.contains('fa-bell')) {
+        subscriptions.delete(guid);
+        bell.classList.replace('fa-bell', 'fa-bell-slash');
+      } else {
+        subscriptions.add(guid);
+        bell.classList.replace('fa-bell-slash', 'fa-bell');
+        if (!isMobile() && 'Notification' in window && Notification.permission == 'default') {
+          Notification.requestPermission();
+        }
+      }
+
+      localStorage.setItem('sbgcui_pointsSubscriptions', JSON.stringify([...subscriptions]));
+    });
+
+    pointImage.appendChild(bell);
+
+    pointPopup.addEventListener('pointPopupOpened', _ => {
+      let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
+      let guid = pointPopup.dataset.guid;
+
+      if (subscriptions.has(guid)) {
+        bell.classList.replace('fa-bell-slash', 'fa-bell');
+      } else {
+        bell.classList.replace('fa-bell', 'fa-bell-slash');
+      }
+    });
   }
 
 }
