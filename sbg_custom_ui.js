@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.30
+// @version      1.0.31
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.30';
+  const USERSCRIPT_VERSION = '1.0.31';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -99,6 +99,7 @@ async function main() {
   let inventoryButton = document.querySelector('#ops');
   let invTotalSpan = document.querySelector('#self-info__inv');
   let pointCores = document.querySelector('.i-stat__cores');
+  let pointImage = document.querySelector('.i-image-box');
   let pointLevelSpan = document.querySelector('#i-level');
   let pointOwnerSpan = document.querySelector('#i-stat__owner');
   let pointTitleSpan = document.querySelector('#i-title');
@@ -364,15 +365,7 @@ async function main() {
         if (inventoryButton.style.color.match('accent')) { inventoryButton.style.color = ''; }
 
         /* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
-        {
-          let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-          deleted.forEach(e => {
-            let cachedItem = cache.find(f => f.g == e.guid);
-            if (cachedItem) { cachedItem.a -= e.amount; }
-          });
-          cache = cache.filter(e => e.a > 0);
-          localStorage.setItem('inventory-cache', JSON.stringify(cache));
-        }
+        deleteFromCache(deleted);
 
 
         deleted = deleted.reduce((total, e) => {
@@ -467,7 +460,7 @@ async function main() {
       };
       let notification = new Notification(message, options);
     } else {
-      let toast = createToast(message, 'top left', 30000);
+      let toast = createToast(message, 'top left', -1);
 
       toast.options.className = 'sbgcui_toast-selection';
       toast.showToast();
@@ -489,6 +482,18 @@ async function main() {
     } else {
       return (/\b(BlackBerry|webOS|iPhone|IEMobile|Android|Windows Phone|iPad|iPod)\b/i).test(window.navigator.userAgent);
     }
+  }
+
+  function deleteFromCache(items) {
+    let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+
+    items.forEach(e => {
+      let cachedItem = cache.find(f => f.g == e.guid);
+      if (cachedItem) { cachedItem.a -= e.amount; }
+    });
+    cache = cache.filter(e => e.a > 0);
+
+    localStorage.setItem('inventory-cache', JSON.stringify(cache));
   }
 
   function createSettingsMenu() {
@@ -1177,6 +1182,7 @@ async function main() {
         box-shadow: 0px 0px 10px 0px rgba(110, 110, 110, 0.2);
         -moz-transform: rotate(-45deg);
         backdrop-filter: blur(1px);
+        -webkit-backdrop-filter: blur(1px);
       }
 
       #attack-menu::after {
@@ -1494,6 +1500,7 @@ async function main() {
 	      z-index: 2;
 	      margin-bottom: auto;
         backdrop-filter: blur(1px);
+        -webkit-backdrop-filter: blur(1px);
       }
 
       .xp-diff {
@@ -1549,11 +1556,15 @@ async function main() {
       .sbgcui_compare_stats-diff-valueNeg {
         color: red;
       }
-
-      .sbgcui_point_bell {
+      
+      .sbgcui_point_bell,
+      .sbgcui_point_trash {
         background: none;
         border: none;
         color: unset;
+      }
+
+      .sbgcui_point_bell {
         position: absolute;
         top: 5px;
         right: 0;
@@ -1566,6 +1577,17 @@ async function main() {
 
       .sbgcui_point_bell.fa-bell {
         color: var(--selection);
+      }
+
+      .sbgcui_point_trash {
+        position: absolute;
+        right: 0.2em;
+        bottom: -25px;
+        font-size: 20px;
+      }
+
+      #i-ref[data-has="0"] ~ .sbgcui_point_trash {
+        display: none;
       }
 
       .sbgcui_settings_button {
@@ -2059,7 +2081,7 @@ async function main() {
 
           if (!amount) { return; }
 
-          since += `${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}${i == dhms1.length - 1 ? '' : ', '}`;
+          since += `${since.length ? ', ' : ''}${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}`;
           ms -= amount * e;
         });
 
@@ -2212,7 +2234,6 @@ async function main() {
 
   /* Уведомления об остывании */
   {
-    let pointImage = document.querySelector('.i-image-box');
     let bell = document.createElement('button');
     let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
 
@@ -2259,6 +2280,59 @@ async function main() {
         bell.classList.replace('fa-bell', 'fa-bell-slash');
       }
     });
+  }
+
+
+  /* Ссылка на точку из списка ключей */
+  {
+    let inventoryContent = document.querySelector('.inventory__content');
+
+    inventoryContent.addEventListener('click', event => {
+      if (!event.target.classList.contains('inventory__ic-view')) { return; }
+
+      let guid = event.target.closest('.inventory__item').dataset.ref;
+
+      if (!guid) { return; }
+      if (confirm('Открыть карточку точки?')) { location.href = `/?point=${guid}`; }
+    });
+  }
+
+
+  /* Удаление ключей на карточке точки */
+  {
+    let trashCan = document.createElement('button');
+
+    trashCan.classList.add('sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
+
+    trashCan.addEventListener('click', _ => {
+      if (!confirm('Удалить все рефы от этой точки из инвентаря?')) { return; };
+
+      let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+      let pointGuid = pointPopup.dataset.guid;
+      let cachedRef = cache.filter(e => e.l == pointGuid)[0];
+      let toDelete = { guid: cachedRef.g, type: cachedRef.t, amount: cachedRef.a, };
+      
+      deleteItems([toDelete])
+        .then(responses => {
+          if (responses[0].error || !responses[0].status.match(/success/i)) { throw responses[0].error || responses[0].status; }
+          
+          let refSpan = document.querySelector('#i-ref');
+
+          refSpan.innerText = refSpan.innerText.replace(/[0-9]{1,}(?=\/[0-9]{1,})/, '0');
+          refSpan.setAttribute('data-has', 0);
+
+          deleteFromCache([toDelete]);
+        })
+        .catch(error => {
+          let toast = createToast('Ошибка при удалении рефов.');
+          toast.options.className = 'error-toast';
+          toast.showToast();
+
+          console.log(error);
+        });
+    });
+
+    pointImage.appendChild(trashCan);
   }
 
 }
