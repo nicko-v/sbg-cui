@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.29
+// @version      1.0.30
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.29';
+  const USERSCRIPT_VERSION = '1.0.30';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -101,6 +101,7 @@ async function main() {
   let pointCores = document.querySelector('.i-stat__cores');
   let pointLevelSpan = document.querySelector('#i-level');
   let pointOwnerSpan = document.querySelector('#i-stat__owner');
+  let pointTitleSpan = document.querySelector('#i-title');
   let pointPopup = document.querySelector('.info.popup');
   let profileNameSpan = document.querySelector('#pr-name');
   let profilePopup = document.querySelector('.profile.popup');
@@ -167,13 +168,15 @@ async function main() {
                 let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
 
                 if (subscriptions.has(guid)) {
+                  let dateNow = Date.now();
                   let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders')) || {};
-                  let timeout = reminders[guid] - Date.now();
+                  let hasActiveTimeout = (reminders[guid] - dateNow) > 0;
 
-                  if (timeout > 0) { return; }
+                  if (hasActiveTimeout) { return; }
+                  if (response.burnout && (response.burnout - dateNow <= 0)) { return; } // При первом дискавере после остывания точки приходит ответ с просроченным бёрнаутом.
 
-                  reminders[guid] = response.burnout || (Date.now() + response.cooldown * 1000);
-                  setTimeout(() => { notify('discover', { guid }); }, reminders[guid] - Date.now());
+                  reminders[guid] = response.burnout || (dateNow + response.cooldown * 1000);
+                  notify('discover', { guid, timeout: reminders[guid] - dateNow });
 
                   localStorage.setItem('sbgcui_reminders', JSON.stringify(reminders));
                 }
@@ -430,6 +433,11 @@ async function main() {
   }
 
   async function notify(type, params) {
+    if (params.timeout > 0) {
+      setTimeout(_ => { notify(type, {...params, timeout: 0}); }, params.timeout);
+      return;
+    }
+    
     let message;
 
     switch (type) {
@@ -944,10 +952,12 @@ async function main() {
       case 'point_level':
         color = getComputedStyle(pointLevelSpan).color;
         pointPopup.style.borderColor = color;
+        pointTitleSpan.style.color = color;
         break;
       case 'point_team':
         color = getComputedStyle(pointOwnerSpan).color;
         pointPopup.style.borderColor = color;
+        pointTitleSpan.style.color = color;
         break;
       default:
         color = '';
@@ -1148,7 +1158,8 @@ async function main() {
 	      position: relative;
       }
 
-      #attack-slider-fire {
+      #attack-slider-fire,
+      .draw-slider-buttons button {
         height: 50px;
       }
 
@@ -1165,6 +1176,7 @@ async function main() {
         border-color: var(--team-${player.team});
         box-shadow: 0px 0px 10px 0px rgba(110, 110, 110, 0.2);
         -moz-transform: rotate(-45deg);
+        backdrop-filter: blur(1px);
       }
 
       #attack-menu::after {
@@ -1474,13 +1486,14 @@ async function main() {
         max-width: unset;
         width: 100%;
         box-sizing: border-box;
-        background: linear-gradient(180deg, var(--team-${player.team}) -170%, rgba(255,255,255,0) 100%);
+        background: linear-gradient(180deg, var(--team-${player.team}) -100%, rgba(255,255,255,0) 100%);
         pointer-events: none;
         position: initial;
         top: initial;
         left: initial;
 	      z-index: 2;
 	      margin-bottom: auto;
+        backdrop-filter: blur(1px);
       }
 
       .xp-diff {
@@ -1934,7 +1947,7 @@ async function main() {
   }
 
 
-  /* Тонирование интерфейса браузера */
+  /* Тонирование интерфейса */
   {
     var theme = document.createElement('meta');
     var viewport = document.querySelector('meta[name="viewport"]')
@@ -1977,6 +1990,7 @@ async function main() {
         if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
       }
       pointPopup.style.borderColor = '';
+      pointTitleSpan.style.color = '';
     });
 
     profilePopup.addEventListener('profilePopupClosed', _ => {
@@ -2150,9 +2164,7 @@ async function main() {
     let image = document.querySelector('#i-image');
 
     image.addEventListener('click', _ => {
-      if (!image.hasAttribute('sbgcui_clicks')) {
-        image.setAttribute('sbgcui_clicks', 1);
-      } else {
+      if (image.hasAttribute('sbgcui_clicks')) {
         let clicks = +image.getAttribute('sbgcui_clicks');
 
         if (clicks + 1 == 5) {
@@ -2178,6 +2190,8 @@ async function main() {
         }
 
         image.setAttribute('sbgcui_clicks', clicks + 1);
+      } else {
+        image.setAttribute('sbgcui_clicks', 1);
       }
     });
   }
@@ -2206,7 +2220,7 @@ async function main() {
       let timeout = reminders[key] - Date.now();
 
       if (timeout > 0) {
-        setTimeout(() => { notify('discover', { guid: key }); }, timeout);
+        notify('discover', { guid: key, timeout });
       } else {
         delete reminders[key];
       }
