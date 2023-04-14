@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.31
+// @version      1.0.32
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.31';
+  const USERSCRIPT_VERSION = '1.0.32';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -427,10 +427,10 @@ async function main() {
 
   async function notify(type, params) {
     if (params.timeout > 0) {
-      setTimeout(_ => { notify(type, {...params, timeout: 0}); }, params.timeout);
+      setTimeout(_ => { notify(type, { ...params, timeout: 0 }); }, params.timeout);
       return;
     }
-    
+
     let message;
 
     switch (type) {
@@ -1579,11 +1579,22 @@ async function main() {
         color: var(--selection);
       }
 
+      .i-image-box.imghid > .sbgcui_point_bell {
+        top: calc(100% + 5px);
+      }
+
       .sbgcui_point_trash {
         position: absolute;
         right: 0.2em;
         bottom: -25px;
         font-size: 20px;
+      }
+
+      .i-image-box.imghid > .sbgcui_point_trash {
+        top: calc(100% + 5px);
+        font-size: 32px;
+        right: 50px;
+        bottom: unset;
       }
 
       #i-ref[data-has="0"] ~ .sbgcui_point_trash {
@@ -2311,15 +2322,17 @@ async function main() {
       let pointGuid = pointPopup.dataset.guid;
       let cachedRef = cache.filter(e => e.l == pointGuid)[0];
       let toDelete = { guid: cachedRef.g, type: cachedRef.t, amount: cachedRef.a, };
-      
+
       deleteItems([toDelete])
         .then(responses => {
           if (responses[0].error || !responses[0].status.match(/success/i)) { throw responses[0].error || responses[0].status; }
-          
+
           let refSpan = document.querySelector('#i-ref');
 
           refSpan.innerText = refSpan.innerText.replace(/[0-9]{1,}(?=\/[0-9]{1,})/, '0');
           refSpan.setAttribute('data-has', 0);
+
+          invTotalSpan.innerText = responses[0].count.total;
 
           deleteFromCache([toDelete]);
         })
