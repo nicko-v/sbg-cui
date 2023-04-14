@@ -695,7 +695,7 @@ async function main() {
 
       let invert = createInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия');
       let hueRotate = createInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность');
-      let brightness = createInput('range', 'mapFilters_brightness', 0, 1, 0.01, +mapFilters.brightness, 'Яркость');
+      let brightness = createInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость');
       let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
       let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
       let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
