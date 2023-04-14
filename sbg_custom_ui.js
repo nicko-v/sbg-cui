@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.33
+// @version      1.0.34
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.33';
+  const USERSCRIPT_VERSION = '1.0.34';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -2329,8 +2329,8 @@ async function main() {
 
           let refSpan = document.querySelector('#i-ref');
 
-          refSpan.innerText = refSpan.innerText.replace(/[0-9]{1,}(?=\/[0-9]{1,})/, '0');
-          refSpan.setAttribute('data-has', 0);
+          refSpan.innerText = refSpan.innerText.replace(/[0-9]{1,}(?=\/[0-9]{1,})/, responses[0].count.item);
+          refSpan.setAttribute('data-has', responses[0].count.item ? 1 : 0);
 
           invTotalSpan.innerText = responses[0].count.total;
 
