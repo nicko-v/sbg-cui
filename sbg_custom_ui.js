@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.32
+// @version      1.0.33
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.32';
+  const USERSCRIPT_VERSION = '1.0.33';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -2311,17 +2311,15 @@ async function main() {
 
   /* Удаление ключей на карточке точки */
   {
-    let trashCan = document.createElement('button');
-
-    trashCan.classList.add('sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
-
-    trashCan.addEventListener('click', _ => {
-      if (!confirm('Удалить все рефы от этой точки из инвентаря?')) { return; };
-
+    function deleteRefs(amount) {
       let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
       let pointGuid = pointPopup.dataset.guid;
       let cachedRef = cache.filter(e => e.l == pointGuid)[0];
-      let toDelete = { guid: cachedRef.g, type: cachedRef.t, amount: cachedRef.a, };
+      let toDelete = {
+        guid: cachedRef.g,
+        type: cachedRef.t,
+        amount: (amount == -1 ? cachedRef.a : amount),
+      };
 
       deleteItems([toDelete])
         .then(responses => {
@@ -2343,6 +2341,34 @@ async function main() {
 
           console.log(error);
         });
+    }
+
+    let trashCan = document.createElement('button');
+    let touchStartDate;
+    let timeoutID;
+
+    trashCan.classList.add('sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
+
+    trashCan.addEventListener('touchstart', _ => {
+      touchStartDate = Date.now();
+      timeoutID = setTimeout(_ => {
+        if (confirm('Удалить все рефы от этой точки из инвентаря?')) { deleteRefs(-1); }
+      }, 1000);
+    });
+    trashCan.addEventListener('touchend', _ => {
+      let touchDuration = Date.now() - touchStartDate;
+      if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+
+      let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВедите -1 или удерживайте кнопку с корзиной, что бы удалить всё.');
+
+      if (amount == null) {
+        return;
+      } else if (isNaN(amount) || amount < -1 || amount == 0) {
+        alert('Указано некорректное количество. \n\nВедите -1 или удерживайте кнопку с корзиной, что бы удалить всё.');
+        return;
+      } else {
+        deleteRefs(amount);
+      }
     });
 
     pointImage.appendChild(trashCan);
