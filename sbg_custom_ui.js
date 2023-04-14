@@ -58,6 +58,7 @@ async function main() {
       hueRotate: IS_DARK ? 180 : 0,
       brightness: IS_DARK ? 0.75 : 1,
       grayscale: IS_DARK ? 1 : 0,
+      sepia: 0,
       blur: 0,
     },
     tinting: {
@@ -75,13 +76,9 @@ async function main() {
   let config;
   if (localStorage.getItem('sbgcui_config')) {
     config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
-    for (let key in DEFAULT_CONFIG) {
-      if (!(key in config)) {
-        config[key] = DEFAULT_CONFIG[key];
-      }
-      updateConfigStructure(config, DEFAULT_CONFIG);
-      localStorage.setItem('sbgcui_config', JSON.stringify(config));
-    }
+    config = { ...DEFAULT_CONFIG, ...config };
+    updateConfigStructure(config, DEFAULT_CONFIG);
+    localStorage.setItem('sbgcui_config', JSON.stringify(config));
   } else {
     config = DEFAULT_CONFIG;
     localStorage.setItem('sbgcui_config', JSON.stringify(config));
@@ -700,11 +697,12 @@ async function main() {
       let hueRotate = createInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность');
       let brightness = createInput('range', 'mapFilters_brightness', 0, 1, 0.01, +mapFilters.brightness, 'Яркость');
       let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
+      let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
       let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(invert, hueRotate, brightness, grayscale, blur);
+      subSection.append(invert, hueRotate, brightness, grayscale, sepia, blur);
 
       section.appendChild(subSection);
 
@@ -979,12 +977,12 @@ async function main() {
     }
   }
 
-  function updateConfigStructure(obj1, obj2) {
-    for (let key in obj1) {
-      if (typeof obj1[key] != typeof obj2[key]) {
-        obj1[key] = obj2[key];
-      } else if (typeof obj1[key] == 'object') {
-        updateConfigStructure(obj1[key], obj2[key]);
+  function updateConfigStructure(storedConfig, defaultConfig) {
+    for (let key in defaultConfig) {
+      if (typeof defaultConfig[key] != typeof storedConfig[key]) {
+        storedConfig[key] = defaultConfig[key];
+      } else if (typeof defaultConfig[key] == 'object') {
+        updateConfigStructure(storedConfig[key], defaultConfig[key]);
       }
     }
   }
@@ -1145,6 +1143,7 @@ async function main() {
         --sbgcui-hueRotate: ${mapFilters.hueRotate}deg;
         --sbgcui-brightness: ${mapFilters.brightness};
         --sbgcui-grayscale: ${mapFilters.grayscale};
+        --sbgcui-sepia: ${mapFilters.sepia};
         --sbgcui-blur: ${mapFilters.blur}px;
       }
 
@@ -1431,7 +1430,7 @@ async function main() {
       }
 
       .ol-layer__osm {
-        filter: invert(var(--sbgcui-invert)) hue-rotate(var(--sbgcui-hueRotate)) brightness(var(--sbgcui-brightness)) grayscale(var(--sbgcui-grayscale)) blur(var(--sbgcui-blur)) !important;
+        filter: invert(var(--sbgcui-invert)) hue-rotate(var(--sbgcui-hueRotate)) brightness(var(--sbgcui-brightness)) grayscale(var(--sbgcui-grayscale)) sepia(var(--sbgcui-sepia)) blur(var(--sbgcui-blur)) !important;
       }
 
       .ol-rotate {
@@ -1617,7 +1616,7 @@ async function main() {
         pointer-events: auto;
         position: relative;
         z-index: 99;
-        max-height: 70vh;
+        max-height: 60vh;
         overflow: auto;
         box-shadow: 0px 0px 10px var(--shadow);
       }
