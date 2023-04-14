@@ -1967,15 +1967,18 @@ async function main() {
     let settingsButton = document.createElement('button');
     settingsButton.classList.add('sbgcui_settings_button');
     settingsButton.innerText = 'Настройки SBG CUI';
-    settingsButton.addEventListener('click', event => {
-      event.stopPropagation();
+    settingsButton.addEventListener('click', _ => {
       gameSettingsPopup.classList.add('hidden');
-      userscriptSettingsMenu.classList.remove('sbgcui_hidden');
+      userscriptSettingsMenu.classList.toggle('sbgcui_hidden');
     });
     gameSettingsContent.appendChild(settingsButton);
 
     document.body.addEventListener('click', event => {
-      if (!userscriptSettingsMenu.classList.contains('sbgcui_hidden') && !event.target.closest('.sbgcui_settings')) { closeSettingsMenu(); }
+      if (
+        !userscriptSettingsMenu.classList.contains('sbgcui_hidden') &&
+        !event.target.closest('.sbgcui_settings') &&
+        !event.target.closest('.sbgcui_settings_button')
+      ) { closeSettingsMenu(); }
     });
   }
 
