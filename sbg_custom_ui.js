@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.1.1
+// @version      1.2.0
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -18,17 +18,8 @@ async function main() {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  /* FontAwesome */
-  {
-    let fa = document.createElement('script');
-    fa.setAttribute('src', 'https://kit.fontawesome.com/babc27ae2f.js');
-    fa.setAttribute('crossorigin', 'anonymous');
-    document.head.appendChild(fa);
-  }
-
-
-  const USERSCRIPT_VERSION = '1.1.1';
-  const LATEST_KNOWN_VERSION = '0.2.8';
+  const USERSCRIPT_VERSION = '1.2.0';
+  const LATEST_KNOWN_VERSION = '0.2.9';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
   const MAX_TOASTS = 3;
@@ -70,58 +61,6 @@ async function main() {
       buttons: 1,
       notifications: 1,
     },
-  };
-
-
-  let config;
-  if (localStorage.getItem('sbgcui_config')) {
-    config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
-    config = { ...DEFAULT_CONFIG, ...config };
-    updateConfigStructure(config, DEFAULT_CONFIG);
-    localStorage.setItem('sbgcui_config', JSON.stringify(config));
-  } else {
-    config = DEFAULT_CONFIG;
-    localStorage.setItem('sbgcui_config', JSON.stringify(config));
-
-    let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
-    toast.options.className = 'error-toast';
-    toast.showToast();
-  }
-
-
-  let attackButton = document.querySelector('#attack-menu');
-  let attackSlider = document.querySelector('.attack-slider-wrp');
-  let coresList = document.querySelector('#cores-list');
-  let discoverButton = document.querySelector('#discover');
-  let inventoryButton = document.querySelector('#ops');
-  let invTotalSpan = document.querySelector('#self-info__inv');
-  let pointCores = document.querySelector('.i-stat__cores');
-  let pointImage = document.querySelector('.i-image-box');
-  let pointLevelSpan = document.querySelector('#i-level');
-  let pointOwnerSpan = document.querySelector('#i-stat__owner');
-  let pointTitleSpan = document.querySelector('#i-title');
-  let pointPopup = document.querySelector('.info.popup');
-  let profileNameSpan = document.querySelector('#pr-name');
-  let profilePopup = document.querySelector('.profile.popup');
-  let selfExpSpan = document.querySelector('#self-info__exp');
-  let selfLvlSpan = document.querySelector('#self-info__explv');
-  let selfNameSpan = document.querySelector('#self-info__name');
-  let xpDiffSpan = document.querySelector('.xp-diff');
-  let zoomContainer = document.querySelector('.ol-zoom');
-
-  let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
-  let isPointPopupOpened = !pointPopup.classList.contains('hidden');
-
-  let lastOpenedPoint = {};
-  let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
-
-  let discoverModifier;
-
-
-  let numbersConverter = {
-    I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
-    toDecimal(roman) { return this[roman]; },
-    toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
   };
 
 
@@ -210,7 +149,17 @@ async function main() {
               }
 
               if ('burnout' in response || 'cooldown' in response) {
-                if (response.cooldown <= DISCOVERY_COOLDOWN) { break; }
+                let dateNow = Date.now();
+                let discoveriesLeft;
+
+                // Пока точка не выжжена, в burnout приходит оставшее количество хаков.
+                // После выжигания в burnout приходит таймстамп остывания точки.
+                // 20 хаков – с запасом на случай ивентов.
+                if (response.burnout <= 20) {
+                  discoveriesLeft = response.burnout;
+                } else if (response.cooldown <= DISCOVERY_COOLDOWN || response.burnout < dateNow) {
+                  break;
+                }
 
                 let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
                 try {
@@ -218,20 +167,15 @@ async function main() {
                 } catch {
                   guid = new URLSearchParams(body).get('guid');
                 }
-                let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
 
-                if (subscriptions.has(guid)) {
-                  let dateNow = Date.now();
-                  let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders')) || {};
-                  let hasActiveTimeout = (reminders[guid] - dateNow) > 0;
+                if (guid in favorites) {
+                  if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
+                  if (favorites[guid].hasActiveCooldown) { break; }
 
-                  if (hasActiveTimeout) { return; }
-                  if (response.burnout && (response.burnout - dateNow <= 0)) { return; } // При первом дискавере после остывания точки приходит ответ с просроченным бёрнаутом.
+                  let cooldown = response.burnout || (dateNow + response.cooldown * 1000);
 
-                  reminders[guid] = response.burnout || (dateNow + response.cooldown * 1000);
-                  notify('discover', { guid, timeout: reminders[guid] - dateNow });
-
-                  localStorage.setItem('sbgcui_reminders', JSON.stringify(reminders));
+                  favorites[guid].cooldown = cooldown;
+                  favorites.save();
                 }
               }
 
@@ -246,6 +190,13 @@ async function main() {
     }
   }
 
+  class DiscoverModifier {
+    constructor(loot, refs) {
+      this.loot = loot;
+      this.refs = refs;
+    }
+  }
+
   class Point {
     constructor(pointData) {
       this.guid = pointData.g;
@@ -256,6 +207,7 @@ async function main() {
         out: pointData.li.o,
       };
       this.cores = {};
+      this.image = `https://lh3.googleusercontent.com/${pointData.i}`;
 
       this.update(pointData.co);
     }
@@ -318,12 +270,127 @@ async function main() {
     }
   }
 
-  class DiscoverModifier {
-    constructor(loot, refs) {
-      this.loot = loot;
-      this.refs = refs;
+  class Favorite {
+    #cooldown;
+
+    constructor(guid, cooldown, name) {
+      this.guid = guid;
+      this.name = name || guid;
+      this.cooldown = cooldown;
+      this.discoveriesLeft = undefined;
+      this.timeoutID = undefined;
+      this.isActive = 1;
+
+      if (!name) { this.#getName(); }
+    }
+
+    #getName() {
+      getPointData(this.guid)
+        .then(data => { this.name = data.t; })
+        .catch(error => { console.log('Ошибка при получении данных точки.', error); });
+    }
+
+    #notify() {
+      if (!this.isActive) { return; }
+
+      let message = `"${this.name}": точка остыла.`;
+
+      if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
+        let notification = new Notification(message, { icon: '/icons/icon_512.png' });
+      } else {
+        let toast = createToast(message, 'top left', -1);
+
+        toast.options.className = 'sbgcui_toast-selection';
+        toast.showToast();
+
+        if ('vibrate' in window.navigator && config.vibration.notifications) {
+          window.navigator.vibrate(0);
+          window.navigator.vibrate([500, 300, 500, 300, 500]);
+        }
+      }
+    }
+
+    #remindAt(timestamp) {
+      function onTimeout() {
+        this.#notify();
+        this.cooldown = null;
+      }
+
+      let delay = timestamp - Date.now();
+
+      clearTimeout(this.timeoutID);
+      this.timeoutID = setTimeout(onTimeout.bind(this), delay);
+    }
+
+    toJSON() {
+      return this.cooldown > Date.now() ? this.cooldown : null;
+    }
+
+    get hasActiveCooldown() {
+      return this.cooldown - Date.now() > 0;
+    }
+
+    get cooldown() {
+      return this.#cooldown;
+    }
+
+    set cooldown(timestamp) {
+      this.#cooldown = timestamp > Date.now() ? timestamp : null;
+      if (this.#cooldown) { this.#remindAt(this.#cooldown); }
     }
   }
+
+
+  let config;
+  if (localStorage.getItem('sbgcui_config')) {
+    config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
+    config = { ...DEFAULT_CONFIG, ...config };
+    updateConfigStructure(config, DEFAULT_CONFIG);
+    localStorage.setItem('sbgcui_config', JSON.stringify(config));
+  } else {
+    config = DEFAULT_CONFIG;
+    localStorage.setItem('sbgcui_config', JSON.stringify(config));
+
+    let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
+    toast.options.className = 'error-toast';
+    toast.showToast();
+  }
+
+
+  let attackButton = document.querySelector('#attack-menu');
+  let attackSlider = document.querySelector('.attack-slider-wrp');
+  let coresList = document.querySelector('#cores-list');
+  let discoverButton = document.querySelector('#discover');
+  let inventoryButton = document.querySelector('#ops');
+  let invTotalSpan = document.querySelector('#self-info__inv');
+  let pointCores = document.querySelector('.i-stat__cores');
+  let pointImage = document.querySelector('.i-image-box');
+  let pointLevelSpan = document.querySelector('#i-level');
+  let pointOwnerSpan = document.querySelector('#i-stat__owner');
+  let pointTitleSpan = document.querySelector('#i-title');
+  let pointPopup = document.querySelector('.info.popup');
+  let profileNameSpan = document.querySelector('#pr-name');
+  let profilePopup = document.querySelector('.profile.popup');
+  let selfExpSpan = document.querySelector('#self-info__exp');
+  let selfLvlSpan = document.querySelector('#self-info__explv');
+  let selfNameSpan = document.querySelector('#self-info__name');
+  let xpDiffSpan = document.querySelector('.xp-diff');
+  let zoomContainer = document.querySelector('.ol-zoom');
+
+  let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
+  let isPointPopupOpened = !pointPopup.classList.contains('hidden');
+
+  let lastOpenedPoint = {};
+  let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
+
+  let discoverModifier;
+
+
+  let numbersConverter = {
+    I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+    toDecimal(roman) { return this[roman]; },
+    toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
+  };
 
 
   async function getSelfData() {
@@ -480,53 +547,6 @@ async function main() {
       body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
       method: 'POST',
     }).then(r => r.json());
-  }
-
-  async function notify(type, params) {
-    if (params.timeout > 0) {
-      setTimeout(_ => { notify(type, { ...params, timeout: 0 }); }, params.timeout);
-      return;
-    }
-
-    let message;
-
-    switch (type) {
-      case 'discover':
-        let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
-        let pointName;
-
-        if (!subscriptions.has(params.guid)) { return; }
-
-        try {
-          pointName = (await getPointData(params.guid)).t;
-        } catch (error) {
-          pointName = params.guid;
-          console.log('Ошибка при получении данных точки.', error);
-        }
-
-        message = `"${pointName}": точка остыла.`;
-
-        break;
-    }
-
-    if (!message) { return; }
-
-    if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
-      let options = {
-        icon: '/icons/icon_512.png',
-      };
-      let notification = new Notification(message, options);
-    } else {
-      let toast = createToast(message, 'top left', -1);
-
-      toast.options.className = 'sbgcui_toast-selection';
-      toast.showToast();
-
-      if ('vibrate' in window.navigator && config.vibration.notifications) {
-        window.navigator.vibrate(0);
-        window.navigator.vibrate([500, 300, 500, 300, 500]);
-      }
-    }
   }
 
   function isMobile() {
@@ -1062,6 +1082,15 @@ async function main() {
   window.XMLHttpRequest = CustomXHR;
 
 
+  /* FontAwesome */
+  {
+    let fa = document.createElement('script');
+    fa.setAttribute('src', 'https://kit.fontawesome.com/babc27ae2f.js');
+    fa.setAttribute('crossorigin', 'anonymous');
+    document.head.appendChild(fa);
+  }
+
+
   /* Данные о себе и версии игры */
   {
     var selfData = await getSelfData();
@@ -1184,9 +1213,14 @@ async function main() {
 
   /* Прочие события */
   {
-    discoverButton.addEventListener('click', event => { if (event.target == discoverButton) {clearInventory(); } });
+    discoverButton.addEventListener('click', event => { if (event.target == discoverButton) { clearInventory(); } });
 
     attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
+
+    pointPopup.addEventListener('pointPopupOpened', () => {
+      let settings = JSON.parse(localStorage.getItem('settings')) || {};
+      pointPopup.style.backgroundImage = settings.imghid ? '' : `url("${lastOpenedPoint.image}")`;
+    });
   }
 
 
@@ -1205,6 +1239,17 @@ async function main() {
         --sbgcui-grayscale: ${mapFilters.grayscale};
         --sbgcui-sepia: ${mapFilters.sepia};
         --sbgcui-blur: ${mapFilters.blur}px;
+        --sbgcui-point-image-bg: #ccc;
+      }
+
+      :root[data-theme="dark"] {
+        --sbgcui-point-image-bg: #282828;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --sbgcui-point-image-bg: #282828;
+        }
       }
 
       html, button {
@@ -1259,9 +1304,37 @@ async function main() {
         height: initial !important;
       }
 
+      #repair {
+        order: 1;
+        grid-area: 1 / 1 / 2 / 2;
+      }
+
+      #draw {
+        order: 2;
+        grid-area: 1 / 2 / 2 / 3;
+      }
+
+      #deploy {
+        order: 3;
+        grid-area: 1 / 3 / 3 / 4;
+      }
+
       #discover {
-        flex-basis: calc(75% + 0.5em);
         order: 4;
+        grid-area: 2 / 1 / 3 / 3;
+      }
+
+      #i-image {
+        background-image: none !important;
+      }
+
+      #i-title,
+      .i-stat__entry,
+      .sbgcui_point_trash,
+      .cores-list__level,
+      .cores-list__amount,
+      .deploy-slider-error {
+        text-shadow: 0 0 5px var(--text-shadow);
       }
 
       #inventory__close {
@@ -1337,6 +1410,13 @@ async function main() {
         margin-top: 5px;
       }
 
+      .attack-slider-highlevel,
+      .deploy-slider-error {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
       .attack-slider-highlevel {
         height: unset;
         padding-bottom: 5px;
@@ -1382,12 +1462,37 @@ async function main() {
         text-align: center;
       }
 
+      .deploy-slider-error {
+        background: unset;
+        height: unset;
+        padding: 2px 0;
+      }
+
       .game-menu button {
         pointer-events: auto;
       }
 
+      .i-buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        grid-column-gap: 10px;
+        grid-row-gap: 10px;
+        width: 90%;
+        align-self: center;
+      }
+
       .i-buttons > button {
-        flex-basis: 25%;
+        padding: 5px 0;
+        box-shadow: 0 0 2px var(--shadow);
+      }
+
+      .info.popup {
+        background-color: var(--sbgcui-point-image-bg);
+        background-position: center;
+	      background-size: cover;
+        background-repeat: no-repeat;
+	      background-blend-mode: overlay;
       }
 
       .inventory__content {
@@ -1591,6 +1696,12 @@ async function main() {
         background: var(--background);
         color: var(--text);
       }
+      
+      .sbgcui_button_reset {
+        background: none;
+        border: none;
+        color: unset;
+      }
 
       .sbgcui_compare_stats {
         display: flex;
@@ -1647,15 +1758,8 @@ async function main() {
         right: 0;
         border-left: 2px solid var(--background);
       }
-      
-      .sbgcui_point_bell,
-      .sbgcui_point_trash {
-        background: none;
-        border: none;
-        color: unset;
-      }
 
-      .sbgcui_point_bell {
+      .sbgcui_point_star {
         position: absolute;
         top: 5px;
         right: 0;
@@ -1666,11 +1770,11 @@ async function main() {
         text-shadow: 0 0 5px var(--text-shadow);
       }
 
-      .sbgcui_point_bell.fa-bell {
+      .sbgcui_point_star.fa-solid {
         color: var(--selection);
       }
 
-      .i-image-box.imghid > .sbgcui_point_bell {
+      .i-image-box.imghid > .sbgcui_point_star {
         top: calc(100% + 5px);
       }
 
@@ -1828,6 +1932,99 @@ async function main() {
       .sbgcui_settings-forceclear {
         display: block;
         margin-top: 15px;
+      }
+
+      .sbgcui_favs {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        width: 70%;
+        max-height: 60%;
+        background-color: var(--background);
+        box-shadow: 0 0 5px var(--shadow);
+        border: 1px solid var(--team-${player.team});
+        border-radius: 3px;
+        z-index: 2;
+        padding: 0 10px;
+	      box-sizing: border-box;
+        overflow-y: auto;
+      }
+
+      .sbgcui_favs-header {
+        text-align: center;
+        margin: 0;
+        padding: 10px 0;
+        position: sticky;
+        top: 0;
+        background-color: var(--background);
+      }
+
+      .sbgcui_favs-content {
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-bottom: 10px;
+      }
+
+      .sbgcui_favs-content:not(:has([sbgcui_active]))::after {
+        content: "Нажмите звезду на карточке точки, чтобы добавить её в избранное.";
+	      color: var(--text-disabled);
+	      font-size: 0.8em;
+	      text-align: center;
+      }
+
+      .sbgcui_favs_star {
+        margin-bottom: 10px !important;
+      }
+
+      .sbgcui_favs_star::after {
+        content: attr(sbgcui_timers-min);
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 10px;
+        color: var(--text);
+        text-shadow: 0 0 3px var(--shadow);
+        backdrop-filter: blur(3px);
+      }
+      
+      .sbgcui_favs_star[sbgcui_timers="0"] {
+        display: none;
+      }
+
+      .sbgcui_favs-li {
+        display: flex;
+        align-items: center;
+      }
+
+      .sbgcui_favs-li > a {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sbgcui_favs-li > a[sbgcui_discoveries]::before {
+        content: attr(sbgcui_discoveries) " discoveries left";
+	      display: flex;
+	      color: var(--text-disabled);
+	      font-size: 0.8em;
+        order: 2;
+      }
+
+      .sbgcui_favs-li > a::after {
+        content: attr(sbgcui_cooldown);
+	      display: flex;
+	      color: var(--text-disabled);
+	      font-size: 0.8em;
+      }
+
+      .sbgcui_favs-li-delete {
+        font-size: 25px;
+        color: var(--accent);
       }
 
       .sbgcui_xpProgressBar {
@@ -2337,54 +2534,208 @@ async function main() {
   }
 
 
-  /* Уведомления об остывании */
+  /* Избранные точки */
   {
-    let bell = document.createElement('button');
-    let reminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
+    function reviver(guid, cooldown) {
+      return guid ? new Favorite(guid, cooldown) : cooldown;
+    }
 
-    for (let key in reminders) {
-      let timeout = reminders[key] - Date.now();
 
-      if (timeout > 0) {
-        notify('discover', { guid: key, timeout });
-      } else {
-        delete reminders[key];
+    var favorites = JSON.parse(localStorage.getItem('sbgcui_favorites'), reviver) || {};
+    Object.defineProperty(favorites, 'save', {
+      value: function () {
+        let activeFavs = {};
+
+        for (let guid in this) {
+          if (this[guid].isActive) { activeFavs[guid] = this[guid]; }
+        }
+
+        localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
+      },
+    });
+
+
+    /* Старый вариант хранения избранного */
+    {
+      let legacyFavs = JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions'));
+      let legacyReminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
+
+      if (legacyFavs) {
+        for (let guid of legacyFavs) {
+          let cooldown = legacyReminders[guid];
+          favorites[guid] = new Favorite(guid, cooldown);
+        }
+        favorites.save();
+        localStorage.removeItem('sbgcui_pointsSubscriptions');
+        localStorage.removeItem('sbgcui_reminders');
       }
     }
 
-    localStorage.setItem('sbgcui_reminders', JSON.stringify(reminders));
 
-    bell.classList.add('sbgcui_point_bell', 'fa-solid', 'fa-bell');
-    bell.addEventListener('click', _ => {
-      let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
+    /* Звезда на карточке точки */
+    {
+      let star = document.createElement('button');
       let guid = pointPopup.dataset.guid;
 
-      if (bell.classList.contains('fa-bell')) {
-        subscriptions.delete(guid);
-        bell.classList.replace('fa-bell', 'fa-bell-slash');
-      } else {
-        subscriptions.add(guid);
-        bell.classList.replace('fa-bell-slash', 'fa-bell');
-        if (!isMobile() && 'Notification' in window && Notification.permission == 'default') {
-          Notification.requestPermission();
+      star.classList.add('sbgcui_button_reset', 'sbgcui_point_star', `fa-${favorites[guid]?.isActive ? 'solid' : 'regular'}`, 'fa-star');
+
+      star.addEventListener('click', _ => {
+        let guid = pointPopup.dataset.guid;
+        let name = pointTitleSpan.innerText;
+
+        if (star.classList.contains('fa-solid')) {
+          favorites[guid].isActive = 0;
+          star.classList.replace('fa-solid', 'fa-regular');
+        } else {
+          if (guid in favorites) {
+            favorites[guid].isActive = 1;
+          } else {
+            let cooldowns = JSON.parse(localStorage.getItem('cooldowns')) || {};
+            let cooldown = (cooldowns[guid]?.c == 0) ? cooldowns[guid].t : null;
+
+            favorites[guid] = new Favorite(guid, cooldown, name);
+          }
+
+          star.classList.replace('fa-regular', 'fa-solid');
+
+          if (!isMobile() && 'Notification' in window && Notification.permission == 'default') {
+            Notification.requestPermission();
+          }
         }
+
+        favorites.save();
+      });
+
+      pointPopup.addEventListener('pointPopupOpened', _ => {
+        let guid = pointPopup.dataset.guid;
+
+        if (favorites[guid]?.isActive) {
+          star.classList.replace('fa-regular', 'fa-solid');
+        } else {
+          star.classList.replace('fa-solid', 'fa-regular');
+        }
+      });
+
+      pointImage.appendChild(star);
+    }
+
+
+    /* Список избранных */
+    {
+      let star = document.createElement('button');
+      let favsList = document.createElement('div');
+      let favsListHeader = document.createElement('h3');
+      let favsListContent = document.createElement('ul');
+      let isFavsListOpened = false;
+
+
+      function fillFavsList() {
+        function asTimer(cooldown) {
+          if (!cooldown) { return ''; }
+
+          let hms = [3600000, 60000, 1000];
+          let timer = '';
+          let ms = cooldown - Date.now();
+
+          hms.forEach((e, i) => {
+            let amount = Math.trunc(ms / e);
+            let isFirst = timer.length == 0;
+
+            timer += `${isFirst ? '' : ':'}${(isFirst || amount > 9) ? '' : '0'}${amount}`;
+            ms -= amount * e;
+          });
+
+          return timer;
+        }
+
+        let favs = [];
+
+        favsListContent.innerHTML = '';
+
+        if (Object.keys(favorites).length == 0) { return; }
+
+        for (let guid in favorites) {
+          if (favorites[guid].isActive) {
+            let li = document.createElement('li');
+            let pointLink = document.createElement('a');
+            let deleteButton = document.createElement('button');
+
+            pointLink.setAttribute('href', `/?point=${guid}`);
+            pointLink.innerText = favorites[guid].name;
+
+            deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa-solid', 'fa-circle-xmark');
+            deleteButton.addEventListener('click', _ => {
+              favorites[guid].isActive = 0;
+              favorites.save();
+              li.removeAttribute('sbgcui_active', '');
+              li.classList.add('sbgcui_hidden');
+            });
+
+            li.classList.add('sbgcui_favs-li');
+            li.setAttribute('sbgcui_active', '');
+
+            let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
+            let discoveriesLeft = favorites[guid].discoveriesLeft;
+
+            if (hasActiveCooldown) {
+              pointLink.setAttribute('sbgcui_cooldown', asTimer(favorites[guid].cooldown));
+              pointLink.sbgcuiCooldown = favorites[guid].cooldown;
+
+              let intervalID = setInterval(() => {
+                if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
+                  pointLink.setAttribute('sbgcui_cooldown', asTimer(favorites[guid].cooldown));
+                } else {
+                  clearInterval(intervalID);
+                }
+              }, 1000);
+            } else if (discoveriesLeft) {
+              pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
+              pointLink.discoveriesLeft = discoveriesLeft;
+            }
+
+            li.append(deleteButton, pointLink);
+            favs.push(li);
+          }
+        }
+        favs.sort((a, b) => {
+          a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
+          b = b.childNodes[1].sbgcuiCooldown || b.childNodes[1].discoveriesLeft;
+
+          return (a == undefined) ? 1 : (b == undefined) ? -1 : (a - b);
+        });
+        favsListContent.append(...favs);
       }
 
-      localStorage.setItem('sbgcui_pointsSubscriptions', JSON.stringify([...subscriptions]));
-    });
 
-    pointImage.appendChild(bell);
+      favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
+      favsListHeader.classList.add('sbgcui_favs-header');
+      favsListContent.classList.add('sbgcui_favs-content');
 
-    pointPopup.addEventListener('pointPopupOpened', _ => {
-      let subscriptions = new Set(JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions')));
-      let guid = pointPopup.dataset.guid;
+      favsListHeader.innerText = 'Избранные точки';
 
-      if (subscriptions.has(guid)) {
-        bell.classList.replace('fa-bell-slash', 'fa-bell');
-      } else {
-        bell.classList.replace('fa-bell', 'fa-bell-slash');
-      }
-    });
+      favsList.append(favsListHeader, favsListContent);
+
+      star.classList.add('sbgcui_button_reset', 'sbgcui_favs_star', 'fa-solid', 'fa-star');
+      star.addEventListener('click', () => {
+        fillFavsList();
+        favsList.classList.toggle('sbgcui_hidden');
+        isFavsListOpened = !isFavsListOpened;
+      });
+
+      document.body.addEventListener('click', event => {
+        if (
+          isFavsListOpened &&
+          !event.target.closest('.sbgcui_favs') &&
+          !event.target.closest('.sbgcui_favs_star')
+        ) {
+          favsList.classList.add('sbgcui_hidden');
+          isFavsListOpened = false;
+        }
+      });
+
+      zoomContainer.prepend(star);
+      document.body.appendChild(favsList);
+    }
   }
 
 
@@ -2441,7 +2792,7 @@ async function main() {
     let touchStartDate;
     let timeoutID;
 
-    trashCan.classList.add('sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
+    trashCan.classList.add('sbgcui_button_reset', 'sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
 
     trashCan.addEventListener('touchstart', _ => {
       touchStartDate = Date.now();
@@ -2453,12 +2804,12 @@ async function main() {
       let touchDuration = Date.now() - touchStartDate;
       if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 
-      let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВедите -1 или удерживайте кнопку с корзиной, что бы удалить всё.');
+      let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВведите "-1" или удерживайте кнопку с корзиной, что бы удалить всё.');
 
       if (amount == null) {
         return;
       } else if (isNaN(amount) || amount < -1 || amount == 0) {
-        alert('Указано некорректное количество. \n\nВедите -1 или удерживайте кнопку с корзиной, что бы удалить всё.');
+        alert('Указано некорректное количество. \n\nВведите "-1" или удерживайте кнопку с корзиной, что бы удалить всё.');
         return;
       } else {
         deleteRefs(amount);
