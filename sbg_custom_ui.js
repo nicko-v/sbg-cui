@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.0.34
+// @version      1.1.0
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.0.34';
+  const USERSCRIPT_VERSION = '1.1.0';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -115,6 +115,8 @@ async function main() {
   let lastOpenedPoint = {};
   let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
 
+  let discoverModifier;
+
 
   let numbersConverter = {
     I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -123,7 +125,36 @@ async function main() {
   };
 
 
-  class customXHR extends window.XMLHttpRequest {
+  class CustomXHR extends window.XMLHttpRequest {
+    get responseText() {
+      let response = this.response;
+      let path = this.responseURL.match(/\/api\/(discover)/);
+
+      if (!path) { return super.responseText; }
+
+      try {
+        response = JSON.parse(response);
+
+        switch (path[1]) {
+          case 'discover':
+            if (Object.values(discoverModifier).every(e => e == 1)) { break; }
+
+            if (discoverModifier.refs == 0) {
+              response.loot = response.loot.filter(e => e.t != 3);
+            } else if (discoverModifier.loot == 0) {
+              response.loot = [];
+            }
+            break;
+        }
+
+        response = JSON.stringify(response);
+      } catch (error) {
+        console.log('Ошибка при обработке ответа сервера.', error);
+      }
+
+      return response;
+    }
+
     send(body) {
       this.addEventListener('load', _ => {
         let path = this.responseURL.match(/\/api\/(point|deploy|attack2|discover)(?:.*?&(status=1))?/);
@@ -154,8 +185,32 @@ async function main() {
               localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
               break;
             case 'discover':
+              if ('loot' in response) {
+                let toDelete = [];
+
+                if (discoverModifier.refs == 0) {
+                  toDelete = response.loot.filter(e => e.t == 3).map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+                } else if (discoverModifier.loot == 0) {
+                  toDelete = response.loot.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+                }
+
+                if (toDelete.length) {
+                  deleteItems(toDelete)
+                    .then(responses => {
+                      if (responses[0].error || !responses[0].status.match(/success/i)) { throw responses[0].error || responses[0].status; }
+                    })
+                    .catch(error => {
+                      let toast = createToast('Ошибка при фильтрации лута.');
+                      toast.options.className = 'error-toast';
+                      toast.showToast();
+
+                      console.log(error);
+                    });
+                }
+              }
+
               if ('burnout' in response || 'cooldown' in response) {
-                if (response.cooldown <= DISCOVERY_COOLDOWN) { return; }
+                if (response.cooldown <= DISCOVERY_COOLDOWN) { break; }
 
                 let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
                 try {
@@ -182,8 +237,6 @@ async function main() {
 
               break;
           }
-
-          response = JSON.stringify(response);
         } catch (error) {
           console.log('Ошибка при обработке ответа сервера.', error);
         }
@@ -262,6 +315,13 @@ async function main() {
       }
 
       click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
+    }
+  }
+
+  class DiscoverModifier {
+    constructor(loot, refs) {
+      this.loot = loot;
+      this.refs = refs;
     }
   }
 
@@ -999,7 +1059,7 @@ async function main() {
   }
 
 
-  window.XMLHttpRequest = customXHR;
+  window.XMLHttpRequest = CustomXHR;
 
 
   /* Данные о себе и версии игры */
@@ -1199,6 +1259,11 @@ async function main() {
         height: initial !important;
       }
 
+      #discover {
+        flex-basis: calc(75% + 0.5em);
+        order: 4;
+      }
+
       #inventory__close {
         top: initial;
         bottom: 120px;
@@ -1319,6 +1384,10 @@ async function main() {
 
       .game-menu button {
         pointer-events: auto;
+      }
+
+      .i-buttons > button {
+        flex-basis: 25%;
       }
 
       .inventory__content {
@@ -1554,6 +1623,29 @@ async function main() {
 
       .sbgcui_compare_stats-diff-valueNeg {
         color: red;
+      }
+
+      .sbgcui_no_loot,
+      .sbgcui_no_refs {
+        position: absolute;
+        font-size: 1.1em;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 20%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+
+      .sbgcui_no_loot {
+        left: 0;
+        border-right: 2px solid var(--background);
+      }
+
+      .sbgcui_no_refs {
+        right: 0;
+        border-left: 2px solid var(--background);
       }
       
       .sbgcui_point_bell,
@@ -2374,6 +2466,29 @@ async function main() {
     });
 
     pointImage.appendChild(trashCan);
+  }
+
+
+  /* Дискавер без рефа или предметов */
+  {
+    let noLootSpan = document.createElement('span');
+    let noRefsSpan = document.createElement('span');
+
+    noLootSpan.classList.add('sbgcui_no_loot', 'fa-solid', 'fa-droplet-slash');
+    noRefsSpan.classList.add('sbgcui_no_refs', 'fa-solid', 'fa-link-slash');
+
+    discoverButton.append(noLootSpan, noRefsSpan);
+
+    discoverButton.addEventListener('click', event => {
+      if (event.target == discoverButton) {
+        discoverModifier = new DiscoverModifier(1, 1);
+      } else {
+        let isLoot = !event.target.classList.contains('sbgcui_no_loot');
+        let isRefs = !event.target.classList.contains('sbgcui_no_refs');
+
+        discoverModifier = new DiscoverModifier(isLoot, isRefs);
+      }
+    });
   }
 
 }
