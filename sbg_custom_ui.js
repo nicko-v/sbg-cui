@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.1.0
+// @version      1.1.1
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -27,7 +27,7 @@ async function main() {
   }
 
 
-  const USERSCRIPT_VERSION = '1.1.0';
+  const USERSCRIPT_VERSION = '1.1.1';
   const LATEST_KNOWN_VERSION = '0.2.8';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -1184,7 +1184,7 @@ async function main() {
 
   /* Прочие события */
   {
-    discoverButton.addEventListener('click', clearInventory);
+    discoverButton.addEventListener('click', event => { if (event.target == discoverButton) {clearInventory(); } });
 
     attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
   }
