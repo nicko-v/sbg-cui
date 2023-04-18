@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.0
+// @version      1.2.1
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const USERSCRIPT_VERSION = '1.2.0';
+  const USERSCRIPT_VERSION = '1.2.1';
   const LATEST_KNOWN_VERSION = '0.2.9';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -334,9 +334,25 @@ async function main() {
       return this.#cooldown;
     }
 
+    get timer() {
+      if (!this.cooldown) { return ''; }
+
+      let diff = new Date(this.cooldown - Date.now());
+      
+      if (diff < 0) { return ''; }
+
+      let options = { hour: 'numeric', minute: 'numeric', second: 'numeric', timeZone: 'UTC'};
+      let formatter = new Intl.DateTimeFormat('ru-RU', options);
+
+      return formatter.format(diff);
+    }
+
     set cooldown(timestamp) {
       this.#cooldown = timestamp > Date.now() ? timestamp : null;
-      if (this.#cooldown) { this.#remindAt(this.#cooldown); }
+      if (this.#cooldown) {
+        this.discoveriesLeft = undefined;
+        this.#remindAt(this.#cooldown);
+      }
     }
   }
 
@@ -364,7 +380,8 @@ async function main() {
   let inventoryButton = document.querySelector('#ops');
   let invTotalSpan = document.querySelector('#self-info__inv');
   let pointCores = document.querySelector('.i-stat__cores');
-  let pointImage = document.querySelector('.i-image-box');
+  let pointImage = document.querySelector('#i-image');
+  let pointImageBox = document.querySelector('.i-image-box');
   let pointLevelSpan = document.querySelector('#i-level');
   let pointOwnerSpan = document.querySelector('#i-stat__owner');
   let pointTitleSpan = document.querySelector('#i-title');
@@ -1220,6 +1237,7 @@ async function main() {
     pointPopup.addEventListener('pointPopupOpened', () => {
       let settings = JSON.parse(localStorage.getItem('settings')) || {};
       pointPopup.style.backgroundImage = settings.imghid ? '' : `url("${lastOpenedPoint.image}")`;
+      pointImage.style.backgroundImage = 'none';
     });
   }
 
@@ -1249,6 +1267,7 @@ async function main() {
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
           --sbgcui-point-image-bg: #282828;
+          --sbgcui-point-text-shadow: 0 0 5px var(--text-shadow);
         }
       }
 
@@ -1305,27 +1324,19 @@ async function main() {
       }
 
       #repair {
-        order: 1;
-        grid-area: 1 / 1 / 2 / 2;
+        grid-area: Repair;
       }
 
       #draw {
-        order: 2;
-        grid-area: 1 / 2 / 2 / 3;
+        grid-area: Draw;
       }
 
       #deploy {
-        order: 3;
-        grid-area: 1 / 3 / 3 / 4;
+        grid-area: Deploy;
       }
 
       #discover {
-        order: 4;
-        grid-area: 2 / 1 / 3 / 3;
-      }
-
-      #i-image {
-        background-image: none !important;
+        grid-area: Discover;
       }
 
       #i-title,
@@ -1334,7 +1345,7 @@ async function main() {
       .cores-list__level,
       .cores-list__amount,
       .deploy-slider-error {
-        text-shadow: 0 0 5px var(--text-shadow);
+        text-shadow: var(--sbgcui-point-text-shadow);
       }
 
       #inventory__close {
@@ -1464,8 +1475,6 @@ async function main() {
 
       .deploy-slider-error {
         background: unset;
-        height: unset;
-        padding: 2px 0;
       }
 
       .game-menu button {
@@ -1474,10 +1483,13 @@ async function main() {
 
       .i-buttons {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        grid-column-gap: 10px;
-        grid-row-gap: 10px;
+	      grid-template-columns: 1fr 1.5fr 1fr;
+	      grid-template-rows: 2fr 1fr 1fr;
+	      gap: 10px 10px;
+	      grid-template-areas:
+		      "Repair Draw Deploy"
+		      "Discover Discover Deploy"
+		      "Discover Discover Deploy";
         width: 90%;
         align-self: center;
       }
@@ -1634,6 +1646,10 @@ async function main() {
         transform: translateX(-50%);
       }
 
+      .profile-link {
+        font-weight: bold;
+      }
+
       .self-info {
         color: var(--team-${player.team});
         font-weight: bold;
@@ -1774,8 +1790,9 @@ async function main() {
         color: var(--selection);
       }
 
-      .i-image-box.imghid > .sbgcui_point_star {
-        top: calc(100% + 5px);
+      .i-image-box.imghid {
+        min-height: initial;
+	      max-height: initial;
       }
 
       .sbgcui_point_trash {
@@ -1783,13 +1800,6 @@ async function main() {
         right: 0.2em;
         bottom: -25px;
         font-size: 20px;
-      }
-
-      .i-image-box.imghid > .sbgcui_point_trash {
-        top: calc(100% + 5px);
-        font-size: 32px;
-        right: 50px;
-        bottom: unset;
       }
 
       #i-ref[data-has="0"] ~ .sbgcui_point_trash {
@@ -2485,11 +2495,9 @@ async function main() {
 
   /* Показ гуида точки */
   {
-    let image = document.querySelector('#i-image');
-
-    image.addEventListener('click', _ => {
-      if (image.hasAttribute('sbgcui_clicks')) {
-        let clicks = +image.getAttribute('sbgcui_clicks');
+    pointImage.addEventListener('click', _ => {
+      if (pointImage.hasAttribute('sbgcui_clicks')) {
+        let clicks = +pointImage.getAttribute('sbgcui_clicks');
 
         if (clicks + 1 == 5) {
           let iStat = document.querySelector('.i-stat');
@@ -2509,13 +2517,13 @@ async function main() {
 
           pointPopup.addEventListener('pointPopupClosed', _ => {
             guidSpan.remove();
-            image.setAttribute('sbgcui_clicks', 0);
+            pointImage.setAttribute('sbgcui_clicks', 0);
           });
         }
 
-        image.setAttribute('sbgcui_clicks', clicks + 1);
+        pointImage.setAttribute('sbgcui_clicks', clicks + 1);
       } else {
-        image.setAttribute('sbgcui_clicks', 1);
+        pointImage.setAttribute('sbgcui_clicks', 1);
       }
     });
   }
@@ -2616,7 +2624,7 @@ async function main() {
         }
       });
 
-      pointImage.appendChild(star);
+      pointImageBox.appendChild(star);
     }
 
 
@@ -2630,25 +2638,7 @@ async function main() {
 
 
       function fillFavsList() {
-        function asTimer(cooldown) {
-          if (!cooldown) { return ''; }
-
-          let hms = [3600000, 60000, 1000];
-          let timer = '';
-          let ms = cooldown - Date.now();
-
-          hms.forEach((e, i) => {
-            let amount = Math.trunc(ms / e);
-            let isFirst = timer.length == 0;
-
-            timer += `${isFirst ? '' : ':'}${(isFirst || amount > 9) ? '' : '0'}${amount}`;
-            ms -= amount * e;
-          });
-
-          return timer;
-        }
-
-        let favs = [];
+       let favs = [];
 
         favsListContent.innerHTML = '';
 
@@ -2678,12 +2668,12 @@ async function main() {
             let discoveriesLeft = favorites[guid].discoveriesLeft;
 
             if (hasActiveCooldown) {
-              pointLink.setAttribute('sbgcui_cooldown', asTimer(favorites[guid].cooldown));
+              pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
               pointLink.sbgcuiCooldown = favorites[guid].cooldown;
 
               let intervalID = setInterval(() => {
                 if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
-                  pointLink.setAttribute('sbgcui_cooldown', asTimer(favorites[guid].cooldown));
+                  pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
                 } else {
                   clearInterval(intervalID);
                 }
@@ -2697,6 +2687,7 @@ async function main() {
             favs.push(li);
           }
         }
+
         favs.sort((a, b) => {
           a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
           b = b.childNodes[1].sbgcuiCooldown || b.childNodes[1].discoveriesLeft;
@@ -2816,7 +2807,7 @@ async function main() {
       }
     });
 
-    pointImage.appendChild(trashCan);
+    pointImageBox.appendChild(trashCan);
   }
 
 
