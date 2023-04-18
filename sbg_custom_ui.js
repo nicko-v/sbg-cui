@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.1
+// @version      1.2.2
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const USERSCRIPT_VERSION = '1.2.1';
+  const USERSCRIPT_VERSION = '1.2.2';
   const LATEST_KNOWN_VERSION = '0.2.9';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -60,6 +60,10 @@ async function main() {
     vibration: {
       buttons: 1,
       notifications: 1,
+    },
+    ui: {
+      pointBgImage: 1,
+      pointBtnsRtl: 0,
     },
   };
 
@@ -859,6 +863,25 @@ async function main() {
       return section;
     }
 
+    function createUISection(ui) {
+      let section = createSection(
+        'Интерфейс',
+        'Некоторые аспекты дизайна можно отключить или изменить для большего удобства.'
+      );
+      let subSection = document.createElement('section');
+
+      let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
+      let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
+
+      subSection.classList.add('sbgcui_settings-subsection');
+
+      subSection.append(pointBgImage, pointBtnsRtl);
+
+      section.appendChild(subSection);
+
+      return section;
+    }
+
 
     let form = document.createElement('form');
     form.classList.add('sbgcui_settings', 'sbgcui_hidden');
@@ -896,6 +919,7 @@ async function main() {
       createColorSchemeSection(config.mapFilters),
       createTintingSection(config.tinting),
       createVibrationSection(config.vibration),
+      createUISection(config.ui),
     ];
 
     sections.forEach(e => {
@@ -919,7 +943,7 @@ async function main() {
           let path = key.split('_');
           if (path[0] == 'maxAmountInBag') {
             config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-          } else if (path[0].match(/autoSelect|mapFilters|tinting|vibration/)) {
+          } else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui/)) {
             let value = formEntries[key];
             config[path[0]][path[1]] = isNaN(+value) ? value : +value;
           }
@@ -943,13 +967,15 @@ async function main() {
   }
 
   function closeSettingsMenu() {
-    let mapFilters = config.mapFilters;
+    let { mapFilters, ui } = config;
     let root = document.querySelector(':root');
 
     for (let key in mapFilters) {
       let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
       root.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
     }
+
+    root.style.setProperty('--sbgcui-pointBtnsRtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
 
     if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -960,13 +986,17 @@ async function main() {
       let path = e.name.split('_');
       let value = path.reduce((obj, prop) => obj[prop], config);
 
-      if (e.type.match(/checkbox|number/)) {
-        e.value = +value;
-        e.checked = +value;
-      } else if (e.type == 'radio') {
-        e.checked = e.value == value;
-      } else if (e.type == 'range') {
-        e.value = +value;
+      switch (e.type) {
+        case 'number':
+        case 'range':
+          e.value = +value;
+          break;
+        case 'checkbox':
+          e.checked = +value;
+          break;
+        case 'radio':
+          e.checked = e.value == value;
+          break;
       }
     });
   }
@@ -1236,8 +1266,14 @@ async function main() {
 
     pointPopup.addEventListener('pointPopupOpened', () => {
       let settings = JSON.parse(localStorage.getItem('settings')) || {};
-      pointPopup.style.backgroundImage = settings.imghid ? '' : `url("${lastOpenedPoint.image}")`;
-      pointImage.style.backgroundImage = 'none';
+
+      if (config.ui.pointBgImage) {
+        pointPopup.style.backgroundImage = settings.imghid ? '' : `url("${lastOpenedPoint.image}")`;
+        pointImage.classList.add('sbgcui_no_bg_image');
+      } else {
+        pointPopup.style.backgroundImage = '';
+        pointImage.classList.remove('sbgcui_no_bg_image');
+      }
     });
   }
 
@@ -1245,6 +1281,7 @@ async function main() {
   /* Стили */
   {
     let mapFilters = config.mapFilters;
+    let ui = config.ui;
     let style = document.createElement('style');
 
     document.head.appendChild(style);
@@ -1258,6 +1295,7 @@ async function main() {
         --sbgcui-sepia: ${mapFilters.sepia};
         --sbgcui-blur: ${mapFilters.blur}px;
         --sbgcui-point-image-bg: #ccc;
+        --sbgcui-pointBtnsRtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
       }
 
       :root[data-theme="dark"] {
@@ -1492,6 +1530,7 @@ async function main() {
 		      "Discover Discover Deploy";
         width: 90%;
         align-self: center;
+        direction: var(--sbgcui-pointBtnsRtl);
       }
 
       .i-buttons > button {
@@ -1717,6 +1756,10 @@ async function main() {
         background: none;
         border: none;
         color: unset;
+      }
+
+      .sbgcui_no_bg_image {
+        background-image: none !important;
       }
 
       .sbgcui_compare_stats {
@@ -2795,12 +2838,12 @@ async function main() {
       let touchDuration = Date.now() - touchStartDate;
       if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 
-      let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВведите "-1" или удерживайте кнопку с корзиной, что бы удалить всё.');
+      let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВведите "-1" или удерживайте кнопку с корзиной, чтобы удалить всё.');
 
       if (amount == null) {
         return;
       } else if (isNaN(amount) || amount < -1 || amount == 0) {
-        alert('Указано некорректное количество. \n\nВведите "-1" или удерживайте кнопку с корзиной, что бы удалить всё.');
+        alert('Указано некорректное количество. \n\nВведите "-1" или удерживайте кнопку с корзиной, чтобы удалить всё.');
         return;
       } else {
         deleteRefs(amount);
