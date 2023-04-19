@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.3
+// @version      1.2.4
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const USERSCRIPT_VERSION = '1.2.3';
+  const USERSCRIPT_VERSION = '1.2.4';
   const LATEST_KNOWN_VERSION = '0.2.9';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -391,8 +391,10 @@ async function main() {
   let pointOwnerSpan = document.querySelector('#i-stat__owner');
   let pointTitleSpan = document.querySelector('#i-title');
   let pointPopup = document.querySelector('.info.popup');
+  let pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
   let profileNameSpan = document.querySelector('#pr-name');
   let profilePopup = document.querySelector('.profile.popup');
+  let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
   let selfExpSpan = document.querySelector('#self-info__exp');
   let selfLvlSpan = document.querySelector('#self-info__explv');
   let selfNameSpan = document.querySelector('#self-info__name');
@@ -1300,6 +1302,15 @@ async function main() {
         pointImage.classList.remove('sbgcui_no_bg_image');
       }
     });
+
+    document.addEventListener("backbutton", () => {
+      if (isPointPopupOpened) {
+        click(pointPopupCloseButton);
+      } else if (isProfilePopupOpened) {
+        click(profilePopupCloseButton);
+      }
+      return false;
+    });
   }
 
 
@@ -1571,6 +1582,10 @@ async function main() {
       .i-buttons > button {
         padding: 5px 0;
         box-shadow: 0 0 2px var(--shadow);
+      }
+
+      .info.popup > .popup-close {
+        font-size: 1.75em;
       }
 
       .inventory__content {
