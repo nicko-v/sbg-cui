@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.2
+// @version      1.2.3
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
   if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-  const USERSCRIPT_VERSION = '1.2.2';
+  const USERSCRIPT_VERSION = '1.2.3';
   const LATEST_KNOWN_VERSION = '0.2.9';
   const INVENTORY_LIMIT = 3000;
   const MIN_FREE_SPACE = 100;
@@ -64,6 +64,7 @@ async function main() {
     ui: {
       pointBgImage: 1,
       pointBtnsRtl: 0,
+      pointBgImageBlur: 0,
     },
   };
 
@@ -871,11 +872,23 @@ async function main() {
       let subSection = document.createElement('section');
 
       let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
+      let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
       let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
+
+      pointBgImage.addEventListener('click', event => {
+        if (event.target.id == 'ui_pointBgImage') {
+          if (event.target.checked) {
+            pointBgImageBlur.childNodes[1].removeAttribute('disabled');
+          } else {
+            pointBgImageBlur.childNodes[1].checked = 0;
+            pointBgImageBlur.childNodes[1].setAttribute('disabled', '');
+          }
+        }
+      });
 
       subSection.classList.add('sbgcui_settings-subsection');
 
-      subSection.append(pointBgImage, pointBtnsRtl);
+      subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl);
 
       section.appendChild(subSection);
 
@@ -975,7 +988,8 @@ async function main() {
       root.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
     }
 
-    root.style.setProperty('--sbgcui-pointBtnsRtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
+    root.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
+    root.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
 
     if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1027,7 +1041,7 @@ async function main() {
     element?.dispatchEvent(clickEvent);
   }
 
-  function createToast(text = '', position = 'top left', duration = 6000, container = null) {
+  function createToast(text = '', position = 'top left', duration = 4000, container = null) {
     let parts = position.split(/\s+/);
     let toast = Toastify({
       text,
@@ -1209,11 +1223,19 @@ async function main() {
 
 
     let pointPopupObserver = new MutationObserver(records => {
-      isPointPopupOpened = !records[0].target.classList.contains('hidden');
-      let event = new Event(isPointPopupOpened ? 'pointPopupOpened' : 'pointPopupClosed', { bubbles: true });
-      records[0].target.dispatchEvent(event);
+      let event;
+
+      if (records[0].target.classList.contains('hidden')) {
+        event = new Event('pointPopupClosed');
+        isPointPopupOpened = false;
+      } else if (records[0].oldValue?.includes('hidden')) {
+        event = new Event('pointPopupOpened');
+        isPointPopupOpened = true;
+      }
+
+      if (event) { records[0].target.dispatchEvent(event); }
     });
-    pointPopupObserver.observe(pointPopup, { attributes: true, attributeFilter: ["class"] });
+    pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
 
 
     let profilePopupObserver = new MutationObserver(records => {
@@ -1268,10 +1290,13 @@ async function main() {
       let settings = JSON.parse(localStorage.getItem('settings')) || {};
 
       if (config.ui.pointBgImage) {
-        pointPopup.style.backgroundImage = settings.imghid ? '' : `url("${lastOpenedPoint.image}")`;
+        document.querySelector(':root').style.setProperty(`--sbgcui-point-image`, settings.imghid ? '' : `url("${lastOpenedPoint.image}")`);
+        pointPopup.classList.add('sbgcui_point-popup-bg');
         pointImage.classList.add('sbgcui_no_bg_image');
       } else {
+        document.querySelector(':root').style.setProperty(`--sbgcui-point-image`, '');
         pointPopup.style.backgroundImage = '';
+        pointPopup.classList.remove('sbgcui_point-popup-bg');
         pointImage.classList.remove('sbgcui_no_bg_image');
       }
     });
@@ -1294,17 +1319,19 @@ async function main() {
         --sbgcui-grayscale: ${mapFilters.grayscale};
         --sbgcui-sepia: ${mapFilters.sepia};
         --sbgcui-blur: ${mapFilters.blur}px;
-        --sbgcui-point-image-bg: #ccc;
-        --sbgcui-pointBtnsRtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
+        --sbgcui-point-bg: #ccc;
+        --sbgcui-point-image: '';
+        --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
+        --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
       }
 
       :root[data-theme="dark"] {
-        --sbgcui-point-image-bg: #282828;
+        --sbgcui-point-bg: #282828;
       }
 
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
-          --sbgcui-point-image-bg: #282828;
+          --sbgcui-point-bg: #282828;
           --sbgcui-point-text-shadow: 0 0 5px var(--text-shadow);
         }
       }
@@ -1357,7 +1384,8 @@ async function main() {
         transition: transform 0.5s ease, border-radius 0.5s ease 0.2s;
       }
 
-      #catalysers-list > .splide__slide {
+      #catalysers-list > .splide__slide,
+      #cores-list > .splide__slide {
         height: initial !important;
       }
 
@@ -1498,11 +1526,14 @@ async function main() {
         pointer-events: auto;
       }
 
-      .catalysers-list__level {
+      .catalysers-list__level,
+      .cores-list__level {
         font-size: 1.5em;
       }
 
-      .catalysers-list__amount, .attack-slider-highlevel {
+      .catalysers-list__amount,
+      .cores-list__amount,
+      .attack-slider-highlevel {
         font-size: 1em;
       }
 
@@ -1513,6 +1544,10 @@ async function main() {
 
       .deploy-slider-error {
         background: unset;
+      }
+
+      .deploy-slider-wrp {
+        margin-top: 10px;
       }
 
       .game-menu button {
@@ -1530,20 +1565,12 @@ async function main() {
 		      "Discover Discover Deploy";
         width: 90%;
         align-self: center;
-        direction: var(--sbgcui-pointBtnsRtl);
+        direction: var(--sbgcui-point-btns-rtl);
       }
 
       .i-buttons > button {
         padding: 5px 0;
         box-shadow: 0 0 2px var(--shadow);
-      }
-
-      .info.popup {
-        background-color: var(--sbgcui-point-image-bg);
-        background-position: center;
-	      background-size: cover;
-        background-repeat: no-repeat;
-	      background-blend-mode: overlay;
       }
 
       .inventory__content {
@@ -1760,6 +1787,23 @@ async function main() {
 
       .sbgcui_no_bg_image {
         background-image: none !important;
+      }
+
+      .sbgcui_point-popup-bg::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        filter: blur(var(--sbgcui-point-image-blur));
+        background-color: var(--sbgcui-point-bg);
+        background-image: var(--sbgcui-point-image);
+        background-position: center;
+	      background-size: cover;
+        background-repeat: no-repeat;
+	      background-blend-mode: overlay;
       }
 
       .sbgcui_compare_stats {
