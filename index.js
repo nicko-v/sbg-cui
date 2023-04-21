@@ -1,4 +1,3 @@
-/* @preserve
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
@@ -10,7 +9,6 @@
 // @match        https://3d.sytes.net/*
 // @grant        none
 // ==/UserScript==
-@endpreserve */
 
 window.addEventListener('load', () => setTimeout(main, 1000), false);
 
