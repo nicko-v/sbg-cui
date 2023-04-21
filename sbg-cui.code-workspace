@@ -1,0 +1,35 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"window.menuBarVisibility": "toggle",
+		"workbench.editor.showTabs": true,
+		"workbench.colorCustomizations": {
+			"statusBar.background": "#1A1A1A",
+			"statusBar.noFolderBackground": "#212121",
+			"statusBar.debuggingBackground": "#263238"
+		},
+		"workbench.colorTheme": "Monokai Dimmed",
+		"explorer.decorations.colors": true,
+		"javascript.implicitProjectConfig.experimentalDecorators": true,
+		"workbench.editor.tabCloseButton": "left",
+		"MinifyAll.terserMinifyOptions": {
+			"format": {
+				"comments": "/(==\/*UserScript==)|(@).+/",
+			},
+			"mangle": true,
+			"compress": {
+				"drop_console": true,
+				"dead_code": false,
+				"keep_fnames": false,
+				"keep_classnames": false
+			}
+		},
+		"MinifyAll.PrefixOfNewMinifiedFiles": ".min",
+		"MinifyAll.minifyOnSaveToNewFile": true,
+		"MinifyAll.openMinifiedDocument": false
+	}
+}
