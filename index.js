@@ -1,14 +1,16 @@
+/* @preserve
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.7
-// @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
-// @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/main/sbg_custom_ui.js
+// @version      1.2.8
+// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
+// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://3d.sytes.net/*
 // @grant        none
 // ==/UserScript==
+@endpreserve */
 
 window.addEventListener('load', () => setTimeout(main, 1000), false);
 
@@ -18,7 +20,7 @@ async function main() {
     if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-    const USERSCRIPT_VERSION = '1.2.7';
+    const USERSCRIPT_VERSION = '1.2.8';
     const LATEST_KNOWN_VERSION = '0.2.9';
     const INVENTORY_LIMIT = 3000;
     const MIN_FREE_SPACE = 100;
@@ -1338,7 +1340,7 @@ async function main() {
   `);
 
         styles.setAttribute('rel', 'stylesheet');
-        styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles-min.css');
+        styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles.min.css');
 
         document.head.append(cssVars, styles);
     }
