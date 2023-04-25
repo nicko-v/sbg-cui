@@ -98,8 +98,8 @@ body {
 	z-index: 1;
 }
 
-#inventory-delete-section {
-	margin-right: auto;
+.inventory__content:not([data-type="3"]) ~ .inventory__controls > select {
+	display: none;
 }
 
 #layers {
@@ -312,6 +312,7 @@ body {
 }
 
 .inventory__controls {
+	justify-content: space-between;
 	order: 3;
 	height: 40px;
 }

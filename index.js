@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.2.10
+// @version      1.3.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.2.10';
+	const USERSCRIPT_VERSION = '1.3.0';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -382,6 +382,8 @@ async function main() {
 	let coresList = document.querySelector('#cores-list');
 	let discoverButton = document.querySelector('#discover');
 	let inventoryButton = document.querySelector('#ops');
+	let invCloseButton = document.querySelector('#inventory__close');
+	let inventoryContent = document.querySelector('.inventory__content');
 	let invTotalSpan = document.querySelector('#self-info__inv');
 	let pointCores = document.querySelector('.i-stat__cores');
 	let pointImage = document.querySelector('#i-image');
@@ -1299,7 +1301,7 @@ async function main() {
 				}
 			});
 		});
-		inventoryContentObserver.observe(document.querySelector('.inventory__content'), { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+		inventoryContentObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
 
 		let xpDiffSpanObserver = new MutationObserver(records => {
@@ -1307,6 +1309,17 @@ async function main() {
 			showXp(xp);
 		});
 		xpDiffSpanObserver.observe(xpDiffSpan, { childList: true });
+
+
+		let refsListObserver = new MutationObserver(() => {
+			let refs = Array.from(document.querySelectorAll('.inventory__content[data-type="3"] > .inventory__item'));
+
+			if (refs.every(e => e.classList.contains('loaded'))) {
+				let event = new Event('refsListLoaded');
+				inventoryContent.dispatchEvent(event);
+			}
+		});
+		refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] })
 	}
 
 
@@ -1348,7 +1361,6 @@ async function main() {
 		let fw = document.querySelector('#toggle-follow');
 		let blContainer = document.querySelector('.bottomleft-container');
 		let rotateArrow = document.querySelector('.ol-rotate');
-		let invCloseButton = document.querySelector('#inventory__close');
 		let layersButton = document.querySelector('#layers');
 
 
@@ -2041,6 +2053,126 @@ async function main() {
 				discoverModifier = new DiscoverModifier(isLoot, isRefs);
 			}
 		});
+	}
+
+
+	/* Сортировка рефов */
+	{
+		function isEveryRefLoaded(refsArr) {
+			return refsArr.every(e => e.classList.contains('loaded'));
+		}
+
+		function sortRefsBy(array, param, order) {
+			switch (param) {
+				case 'name':
+					array.sort((a, b) => {
+						let aName = a.querySelector('.inventory__item-title').innerText.match(/\(x[0-9]{1,}\)\s([\s\S]+)/)[1];
+						let bName = b.querySelector('.inventory__item-title').innerText.match(/\(x[0-9]{1,}\)\s([\s\S]+)/)[1];
+
+						return order == 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName);
+					});
+					break;
+				case 'level':
+					array.sort((a, b) => {
+						let aLevel = +a.querySelector('.inventory__item-descr > span').innerText.match(/level\s([0-9]{1,2})/i)[1];
+						let bLevel = +b.querySelector('.inventory__item-descr > span').innerText.match(/level\s([0-9]{1,2})/i)[1];
+
+						return order == 'asc' ? aLevel - bLevel : bLevel - aLevel;
+					});
+					break;
+				case 'team':
+					array.sort((a, b) => {
+						let aTeam = +a.querySelector('.inventory__item-title').style.color.match(/team-([1-3])/)?.[1] || 0;
+						let bTeam = +b.querySelector('.inventory__item-title').style.color.match(/team-([1-3])/)?.[1] || 0;
+
+						return order == 'asc' ? aTeam - bTeam : bTeam - aTeam;
+					});
+					break;
+				case 'energy':
+					array.sort((a, b) => {
+						let aEnergy = +a.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
+						let bEnergy = +b.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
+
+						return order == 'asc' ? aEnergy - bEnergy : bEnergy - aEnergy;
+					});
+					break;
+				case 'distance':
+					array.sort((a, b) => {
+						let aDist = a.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
+						let bDist = b.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
+						let aMatch = aDist.match(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/);
+						let bMatch = bDist.match(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/);
+
+						aDist = parseFloat(aMatch[1]) / ((aMatch[2] == 'cm') ? 100000 : (aMatch[2] == 'm') ? 1000 : 1);
+						bDist = parseFloat(bMatch[1]) / ((bMatch[2] == 'cm') ? 100000 : (bMatch[2] == 'm') ? 1000 : 1);
+
+						return order == 'asc' ? aDist - bDist : bDist - aDist;
+					});
+					break;
+			}
+		}
+
+		let invControls = document.querySelector('.inventory__controls');
+		let invDelete = document.querySelector('#inventory-delete');
+		let refsList = document.querySelector('.inventory__content');
+		let select = document.createElement('select');
+		let header = document.createElement('option');
+
+		header.innerText = 'Сортировка';
+		header.value = 'none';
+
+		select.appendChild(header);
+
+		[
+			['По названию', 'name'],
+			['По уровню', 'level'],
+			['По команде', 'team'],
+			['По заряду', 'energy'],
+			['По дистанции', 'distance'],
+		].forEach(e => {
+			let optionAsc = document.createElement('option');
+			let optionDesc = document.createElement('option');
+
+			optionAsc.innerText = `[^] ${e[0]}`;
+			optionAsc.value = `${e[1]}_asc`;
+
+			optionDesc.innerText = `[v] ${e[0]}`;
+			optionDesc.value = `${e[1]}_desc`;
+
+			select.append(optionAsc, optionDesc);
+		});
+
+		select.addEventListener('change', event => {
+			let refsArr = Array.from(refsList.children);
+			let [sortParam, sortOrder] = event.target.value.split('_');
+
+			if (sortParam == 'none') { return; }
+
+			select.setAttribute('disabled', '');
+
+			if (!isEveryRefLoaded(refsArr)) {
+				for (let i = 0; i <= refsList.scrollHeight; i += refsList.offsetHeight / 2) {
+					refsList.scrollTop = i;
+					refsList.dispatchEvent(new Event('scroll'));
+				}
+				refsList.scrollTop = 0;
+
+				refsList.addEventListener('refsListLoaded', () => {
+					sortRefsBy(refsArr, sortParam, sortOrder);
+					refsList.replaceChildren(...refsArr);
+					select.removeAttribute('disabled');
+				}, { once: true });
+			} else {
+				sortRefsBy(refsArr, sortParam, sortOrder);
+				refsList.replaceChildren(...refsArr);
+				select.removeAttribute('disabled');
+			}
+		});
+
+		document.querySelector('.inventory__tab').addEventListener('click', () => { select.value = 'none'; });
+		invCloseButton.addEventListener('click', () => { select.value = 'none'; });
+
+		invControls.insertBefore(select, invDelete);
 	}
 
 }
