@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.0
+// @version      1.3.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.0';
+	const USERSCRIPT_VERSION = '1.3.1';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2169,7 +2169,10 @@ async function main() {
 			}
 		});
 
-		document.querySelector('.inventory__tab').addEventListener('click', () => { select.value = 'none'; });
+		document.querySelector('.inventory__tabs').addEventListener('click', event => {
+			select.removeAttribute('disabled');
+			select.value = 'none';
+		});
 		invCloseButton.addEventListener('click', () => { select.value = 'none'; });
 
 		invControls.insertBefore(select, invDelete);
