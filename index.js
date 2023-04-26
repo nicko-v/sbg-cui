@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.3
+// @version      1.3.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.3';
+	const USERSCRIPT_VERSION = '1.3.4';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -1169,8 +1169,8 @@ async function main() {
 				total: selfData.exp,
 				current: selfData.exp - LEVEL_TARGETS.slice(0, selfData.lvl - 1).reduce((sum, e) => e + sum, 0),
 				goal: LEVEL_TARGETS[selfData.lvl - 1],
-				get percentage() { return this.current / this.goal * 100; },
-				set string(str) { [this.current, this.goal] = str.replaceAll(',', '').split(' / '); }
+				get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
+				set string(str) { [this.current, this.goal = Infinity] = str.replaceAll(',', '').split(' / '); }
 			},
 			auth: localStorage.getItem('auth'),
 			guid: selfData.guid,
