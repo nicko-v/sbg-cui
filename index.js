@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.2
+// @version      1.3.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.2';
+	const USERSCRIPT_VERSION = '1.3.3';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2067,7 +2067,7 @@ async function main() {
 
 			switch (param) {
 				case 'name':
-					regex = new RegExp(/\(x[0-9]{1,}\)\s([\s\S]+)/i);
+					regex = new RegExp(/\(x[0-9]{1,}\)\s(?:"|«)?([\s\S]+)/i);
 					return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
 				case 'level':
 					regex = new RegExp(/level\s([0-9]{1,2})/i);
@@ -2114,6 +2114,7 @@ async function main() {
 		let sortOrderButton = document.createElement('button');
 
 		sortOrderButton.classList.add('fa-solid', 'fa-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
+		select.classList.add('sbgcui_refs-sort-select');
 
 		[
 			['Сортировка', 'none'],
