@@ -839,6 +839,7 @@ body {
 	align-items: center;
 	border-radius: 50%;
 	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
 }
 
 .inventory__content:not([data-type="3"]) + .inventory__controls > .sbgcui_refs-sort-button {
