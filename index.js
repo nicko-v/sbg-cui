@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.1
+// @version      1.3.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.1';
+	const USERSCRIPT_VERSION = '1.3.2';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2062,91 +2062,83 @@ async function main() {
 			return refsArr.every(e => e.classList.contains('loaded'));
 		}
 
-		function sortRefsBy(array, param, order) {
+		function getSortParam(ref, param) {
+			let regex;
+
 			switch (param) {
 				case 'name':
-					array.sort((a, b) => {
-						let aName = a.querySelector('.inventory__item-title').innerText.match(/\(x[0-9]{1,}\)\s([\s\S]+)/)[1];
-						let bName = b.querySelector('.inventory__item-title').innerText.match(/\(x[0-9]{1,}\)\s([\s\S]+)/)[1];
-
-						return order == 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName);
-					});
-					break;
+					regex = new RegExp(/\(x[0-9]{1,}\)\s([\s\S]+)/i);
+					return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
 				case 'level':
-					array.sort((a, b) => {
-						let aLevel = +a.querySelector('.inventory__item-descr > span').innerText.match(/level\s([0-9]{1,2})/i)[1];
-						let bLevel = +b.querySelector('.inventory__item-descr > span').innerText.match(/level\s([0-9]{1,2})/i)[1];
-
-						return order == 'asc' ? aLevel - bLevel : bLevel - aLevel;
-					});
-					break;
+					regex = new RegExp(/level\s([0-9]{1,2})/i);
+					return +ref.querySelector('.inventory__item-descr > span').innerText.match(regex)[1];
 				case 'team':
-					array.sort((a, b) => {
-						let aTeam = +a.querySelector('.inventory__item-title').style.color.match(/team-([1-3])/)?.[1] || 0;
-						let bTeam = +b.querySelector('.inventory__item-title').style.color.match(/team-([1-3])/)?.[1] || 0;
-
-						return order == 'asc' ? aTeam - bTeam : bTeam - aTeam;
-					});
-					break;
+					regex = new RegExp(/team-([1-3])/);
+					return +ref.querySelector('.inventory__item-title').style.color.match(regex)?.[1] || 0;
 				case 'energy':
-					array.sort((a, b) => {
-						let aEnergy = +a.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
-						let bEnergy = +b.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
-
-						return order == 'asc' ? aEnergy - bEnergy : bEnergy - aEnergy;
-					});
-					break;
+					return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
 				case 'distance':
-					array.sort((a, b) => {
-						let aDist = a.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
-						let bDist = b.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
-						let aMatch = aDist.match(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/);
-						let bMatch = bDist.match(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/);
+					regex = new RegExp(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/i);
+					let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
+					let [_, value, units] = dist.match(regex);
 
-						aDist = parseFloat(aMatch[1]) / ((aMatch[2] == 'cm') ? 100000 : (aMatch[2] == 'm') ? 1000 : 1);
-						bDist = parseFloat(bMatch[1]) / ((bMatch[2] == 'cm') ? 100000 : (bMatch[2] == 'm') ? 1000 : 1);
-
-						return order == 'asc' ? aDist - bDist : bDist - aDist;
-					});
-					break;
+					return parseFloat(value) / ((units == 'cm') ? 100000 : (units == 'm') ? 1000 : 1);
+				case 'amount':
+					regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
+					return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
 			}
+		}
+
+		function sortRefsBy(array, param) {
+			array.sort((a, b) => {
+				let aParam = getSortParam(a, param);
+				let bParam = getSortParam(b, param);
+
+				if (param == 'name') {
+					return aParam.localeCompare(bParam);
+				} else if (aParam == bParam) {
+					let aName = getSortParam(a, 'name');
+					let bName = getSortParam(b, 'name');
+
+					return aName.localeCompare(bName);
+				} else {
+					return aParam - bParam;
+				}
+			});
 		}
 
 		let invControls = document.querySelector('.inventory__controls');
 		let invDelete = document.querySelector('#inventory-delete');
 		let refsList = document.querySelector('.inventory__content');
 		let select = document.createElement('select');
-		let header = document.createElement('option');
+		let sortOrderButton = document.createElement('button');
 
-		header.innerText = 'Сортировка';
-		header.value = 'none';
-
-		select.appendChild(header);
+		sortOrderButton.classList.add('fa-solid', 'fa-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
 
 		[
+			['Сортировка', 'none'],
 			['По названию', 'name'],
 			['По уровню', 'level'],
 			['По команде', 'team'],
 			['По заряду', 'energy'],
 			['По дистанции', 'distance'],
+			['По количеству', 'amount'],
 		].forEach(e => {
-			let optionAsc = document.createElement('option');
-			let optionDesc = document.createElement('option');
+			let option = document.createElement('option');
 
-			optionAsc.innerText = `[^] ${e[0]}`;
-			optionAsc.value = `${e[1]}_asc`;
+			option.innerText = e[0];
+			option.value = e[1];
 
-			optionDesc.innerText = `[v] ${e[0]}`;
-			optionDesc.value = `${e[1]}_desc`;
-
-			select.append(optionAsc, optionDesc);
+			select.appendChild(option);
 		});
 
 		select.addEventListener('change', event => {
 			let refsArr = Array.from(refsList.children);
-			let [sortParam, sortOrder] = event.target.value.split('_');
+			let sortParam = event.target.value;
 
 			if (sortParam == 'none') { return; }
+
+			refsList.classList.remove('sbgcui_refs-reverse');
 
 			select.setAttribute('disabled', '');
 
@@ -2158,12 +2150,12 @@ async function main() {
 				refsList.scrollTop = 0;
 
 				refsList.addEventListener('refsListLoaded', () => {
-					sortRefsBy(refsArr, sortParam, sortOrder);
+					sortRefsBy(refsArr, sortParam);
 					refsList.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
 				}, { once: true });
 			} else {
-				sortRefsBy(refsArr, sortParam, sortOrder);
+				sortRefsBy(refsArr, sortParam);
 				refsList.replaceChildren(...refsArr);
 				select.removeAttribute('disabled');
 			}
@@ -2175,7 +2167,13 @@ async function main() {
 		});
 		invCloseButton.addEventListener('click', () => { select.value = 'none'; });
 
+		sortOrderButton.addEventListener('click', () => {
+			refsList.classList.toggle('sbgcui_refs-reverse');
+			refsList.scrollTop = -refsList.scrollHeight;
+		});
+
 		invControls.insertBefore(select, invDelete);
+		invControls.appendChild(sortOrderButton);
 	}
 
 }
