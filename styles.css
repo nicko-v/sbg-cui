@@ -780,11 +780,24 @@ body {
 .sbgcui_favs-li {
 	display: flex;
 	align-items: center;
+	gap: 5px;
+}
+
+.sbgcui_favs-li-data {
+	display: flex;
+	flex-direction: column;
+	font-size: 0.8em;
+	text-align: end;
+	color: var(--text-disabled);
+	margin-left: auto;
+	flex-basis: 25%;
+	white-space: nowrap;
 }
 
 .sbgcui_favs-li>a {
 	display: flex;
 	flex-direction: column;
+	min-width: 0;
 }
 
 .sbgcui_favs-li>a[sbgcui_discoveries]::before {
@@ -802,9 +815,16 @@ body {
 	font-size: 0.8em;
 }
 
+.sbgcui_favs-li>a>span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .sbgcui_favs-li-delete {
 	font-size: 25px;
 	color: var(--accent);
+	padding: 0;
 }
 
 .sbgcui_xpProgressBar {

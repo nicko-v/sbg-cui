@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.4
+// @version      1.3.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.4';
+	const USERSCRIPT_VERSION = '1.3.5';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -1870,10 +1870,13 @@ async function main() {
 					if (favorites[guid].isActive) {
 						let li = document.createElement('li');
 						let pointLink = document.createElement('a');
+						let pointName = document.createElement('span');
 						let deleteButton = document.createElement('button');
+						let pointData = document.createElement('div');
 
+						pointName.innerText = favorites[guid].name;
+						pointLink.appendChild(pointName);
 						pointLink.setAttribute('href', `/?point=${guid}`);
-						pointLink.innerText = favorites[guid].name;
 
 						deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa-solid', 'fa-circle-xmark');
 						deleteButton.addEventListener('click', _ => {
@@ -1882,6 +1885,8 @@ async function main() {
 							li.removeAttribute('sbgcui_active', '');
 							li.classList.add('sbgcui_hidden');
 						});
+
+						pointData.classList.add('sbgcui_favs-li-data');
 
 						li.classList.add('sbgcui_favs-li');
 						li.setAttribute('sbgcui_active', '');
@@ -1905,8 +1910,16 @@ async function main() {
 							pointLink.discoveriesLeft = discoveriesLeft;
 						}
 
-						li.append(deleteButton, pointLink);
+						li.append(deleteButton, pointLink, pointData);
 						favs.push(li);
+
+						getPointData(guid)
+							.then(data => {
+								if (!data) { return; }
+								pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
+								pointLink.style.color = `var(--team-${data.te})`;
+								pointData.innerHTML = `${data.e}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
+							});
 					}
 				}
 
