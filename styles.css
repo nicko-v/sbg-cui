@@ -363,7 +363,7 @@ body {
 	color: var(--sbgcui-player-team);
 }
 
-.ol-layer__osm {
+.ol-layer__base {
 	filter: invert(var(--sbgcui-invert)) hue-rotate(var(--sbgcui-hueRotate)) brightness(var(--sbgcui-brightness)) grayscale(var(--sbgcui-grayscale)) sepia(var(--sbgcui-sepia)) blur(var(--sbgcui-blur)) !important;
 }
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.3.5
+// @version      1.4.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.3.5';
+	const USERSCRIPT_VERSION = '1.4.0';
 	const LATEST_KNOWN_VERSION = '0.2.9';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -68,136 +68,14 @@ async function main() {
 	};
 
 
-	class CustomXHR extends window.XMLHttpRequest {
-		get responseText() {
-			let response = this.response;
-			let path = this.responseURL.match(/\/api\/(discover)/);
-
-			if (!path) { return super.responseText; }
-
-			try {
-				response = JSON.parse(response);
-
-				switch (path[1]) {
-					case 'discover':
-						if (Object.values(discoverModifier).every(e => e == 1)) { break; }
-
-						if (discoverModifier.refs == 0) {
-							response.loot = response.loot.filter(e => e.t != 3);
-						} else if (discoverModifier.loot == 0) {
-							response.loot = [];
-						}
-						break;
-				}
-
-				response = JSON.stringify(response);
-			} catch (error) {
-				console.log('Ошибка при обработке ответа сервера.', error);
-			}
-
-			return response;
-		}
-
-		send(body) {
-			this.addEventListener('load', _ => {
-				let path = this.responseURL.match(/\/api\/(point|deploy|attack2|discover)(?:.*?&(status=1))?/);
-				let response = this.response;
-
-				if (!path) { return; }
-
-				try {
-					response = JSON.parse(response);
-
-					switch (path[1]) {
-						case 'point':
-							if ('data' in response && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
-								lastOpenedPoint = new Point(response.data);
-							}
-							break;
-						case 'deploy':
-							if ('data' in response) { // Есди деплой, то массив объектов с ядрами.
-								lastOpenedPoint.update(response.data.co, response.data.l);
-								lastOpenedPoint.selectCore(config.autoSelect.deploy);
-							} else if ('c' in response) { // Если апгрейд, то один объект с ядром.
-								lastOpenedPoint.update([response.c], response.l);
-								lastOpenedPoint.selectCore(config.autoSelect.upgrade, response.c.l);
-							}
-							break;
-						case 'attack2':
-							lastUsedCatalyser = JSON.parse(body).guid;
-							localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
-							break;
-						case 'discover':
-							if ('loot' in response) {
-								let toDelete = [];
-
-								if (discoverModifier.refs == 0) {
-									toDelete = response.loot.filter(e => e.t == 3).map(e => ({ guid: e.g, type: e.t, amount: e.a }));
-								} else if (discoverModifier.loot == 0) {
-									toDelete = response.loot.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
-								}
-
-								if (toDelete.length) {
-									deleteItems(toDelete)
-										.then(responses => {
-											if (responses[0].error || !responses[0].status.match(/success/i)) { throw responses[0].error || responses[0].status; }
-										})
-										.catch(error => {
-											let toast = createToast('Ошибка при фильтрации лута.');
-											toast.options.className = 'error-toast';
-											toast.showToast();
-
-											console.log(error);
-										});
-								}
-							}
-
-							if ('burnout' in response || 'cooldown' in response) {
-								let dateNow = Date.now();
-								let discoveriesLeft;
-
-								// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
-								// После выжигания в burnout приходит таймстамп остывания точки.
-								// 20 хаков – с запасом на случай ивентов.
-								if (response.burnout <= 20) {
-									discoveriesLeft = response.burnout;
-								} else if (response.cooldown <= DISCOVERY_COOLDOWN || response.burnout < dateNow) {
-									break;
-								}
-
-								let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
-								try {
-									guid = JSON.parse(body).guid;
-								} catch {
-									guid = new URLSearchParams(body).get('guid');
-								}
-
-								if (guid in favorites) {
-									if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
-									if (favorites[guid].hasActiveCooldown) { break; }
-
-									let cooldown = response.burnout || (dateNow + response.cooldown * 1000);
-
-									favorites[guid].cooldown = cooldown;
-									favorites.save();
-								}
-							}
-
-							break;
-					}
-				} catch (error) {
-					console.log('Ошибка при обработке ответа сервера.', error);
-				}
-			});
-
-			super.send(body);
-		}
-	}
-
 	class DiscoverModifier {
 		constructor(loot, refs) {
 			this.loot = loot;
 			this.refs = refs;
+		}
+
+		get isActive() {
+			return !(this.loot && this.refs);
 		}
 	}
 
@@ -291,7 +169,7 @@ async function main() {
 		#getName() {
 			getPointData(this.guid)
 				.then(data => { this.name = data.t; })
-				.catch(error => { console.log('Ошибка при получении данных точки.', error); });
+				.catch(error => { console.log('SBG CUI: Ошибка при получении данных точки.', error); });
 		}
 
 		#notify() {
@@ -376,6 +254,9 @@ async function main() {
 		toast.showToast();
 	}
 
+	let originalFetch = window.fetch;
+	window.fetch = proxiedFetch;
+
 	let html = document.documentElement;
 	let attackButton = document.querySelector('#attack-menu');
 	let attackSlider = document.querySelector('.attack-slider-wrp');
@@ -418,15 +299,126 @@ async function main() {
 	};
 
 
+	async function proxiedFetch(url, options) {
+		return new Promise((resolve, reject) => {
+			originalFetch(url, options)
+				.then(async response => {
+					let clonedResponse = response.clone();
+					let path = url.match(/\/api\/(point|deploy|attack2|discover)(?:.*?&(status=1))?/);
+
+					if (path == null) { resolve(response); return; }
+
+					clonedResponse.json().then(async parsedResponse => {
+						switch (path[1]) {
+							case 'point':
+								if ('data' in parsedResponse && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
+									lastOpenedPoint = new Point(parsedResponse.data);
+								}
+								break;
+							case 'deploy':
+								if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
+									lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
+									lastOpenedPoint.selectCore(config.autoSelect.deploy);
+								} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
+									lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
+									lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
+								}
+								break;
+							case 'attack2':
+								lastUsedCatalyser = JSON.parse(options.body).guid;
+								localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
+								break;
+							case 'discover':
+								if ('loot' in parsedResponse && discoverModifier.isActive) {
+									let toDelete = parsedResponse.loot
+										.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3)
+										.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+
+									if (toDelete.length == 0) { return; }
+
+									try {
+										let responses = await deleteItems(toDelete);
+
+										responses.forEach(response => { if ('error' in response) { throw response.error; } });
+										parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
+
+										let body = JSON.stringify(parsedResponse);
+										let options = {
+											status: response.status,
+											statusText: response.statusText,
+											headers: response.headers,
+										};
+										let modifiedResponse = new Response(body, options);
+
+										Object.defineProperty(modifiedResponse, 'url', { value: response.url, enumerable: true, });
+										
+										resolve(modifiedResponse);
+									} catch (error) {
+										let toast = createToast('Ошибка при фильтрации лута.');
+										toast.options.className = 'error-toast';
+										toast.showToast();
+
+										console.log('SBG CUI: Ошибка при фильтрации лута.', error);
+									}
+								}
+
+								if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
+									let dateNow = Date.now();
+									let discoveriesLeft;
+
+									// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
+									// После выжигания в burnout приходит таймстамп остывания точки.
+									// 20 хаков – с запасом на случай ивентов.
+									if (parsedResponse.burnout <= 20) {
+										discoveriesLeft = parsedResponse.burnout;
+									} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
+										break;
+									}
+
+									let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
+									try {
+										guid = JSON.parse(options.body).guid;
+									} catch {
+										guid = new URLSearchParams(options.body).get('guid');
+									}
+
+									if (guid in favorites) {
+										if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
+										if (favorites[guid].hasActiveCooldown) { break; }
+
+										let cooldown = parsedResponse.burnout || (dateNow + parsedResponse.cooldown * 1000);
+
+										favorites[guid].cooldown = cooldown;
+										favorites.save();
+									}
+								}
+								
+								break;
+						}
+					}).catch(error => {
+						console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
+					}).finally(() => {
+						resolve(response);
+					});
+				})
+				.catch(error => { reject(error); });
+		});
+	}
+
 	async function getSelfData() {
 		return fetch('/api/self', {
 			headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
 			method: "GET",
 		})
-			.then(r => { return Promise.all([r.headers.get('SBG-Version'), r]); })
-			.then(r => Promise.all([r[0], r[1].json()]))
-			.then(([version, data]) => { return { name: data.n, team: data.t, exp: data.x, lvl: data.l, guid: data.g, version }; })
-			.catch(err => { console.log(`Ошибка при получении данных игрока. ${err}`); });
+			.then(response => response.json().then(parsedResponse => ({
+				version: response.headers.get('SBG-Version'),
+				name: parsedResponse.n,
+				team: parsedResponse.t,
+				exp: parsedResponse.x,
+				lvl: parsedResponse.l,
+				guid: parsedResponse.g,
+			})))
+			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 	}
 
 	async function getPlayerData(guid) {
@@ -436,7 +428,7 @@ async function main() {
 		})
 			.then(r => r.json())
 			.then(r => r.data)
-			.catch(err => { console.log('Ошибка при получении данных игрока.', err); });
+			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 	}
 
 	async function getPointData(guid) {
@@ -532,15 +524,15 @@ async function main() {
 				let toast = createToast(`Удалено: ${message}`);
 				toast.showToast();
 			})
-			.catch(err => {
-				if (err.silent) { return; }
+			.catch(error => {
+				if (error.silent) { return; }
 
-				let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${err.message}`);
+				let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`);
 
 				toast.options.className = 'error-toast';
 				toast.showToast();
 
-				console.log('Ошибка при удалении предметов.', err);
+				console.log('SBG CUI: Ошибка при удалении предметов.', error);
 			});
 	}
 
@@ -969,13 +961,13 @@ async function main() {
 
 				let toast = createToast('Настройки сохранены');
 				toast.showToast();
-			} catch (err) {
-				let toast = createToast(`Ошибка при сохранении настроек. <br>${err.message}`);
+			} catch (error) {
+				let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`);
 
 				toast.options.className = 'error-toast';
 				toast.showToast();
 
-				console.log(`Ошибка при сохранении настроек. ${err}`);
+				console.log('SBG CUI: Ошибка при сохранении настроек.', error);
 			}
 		});
 
@@ -1140,9 +1132,6 @@ async function main() {
 		setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
 		setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
 	}
-
-
-	window.XMLHttpRequest = CustomXHR;
 
 
 	/* Данные о себе и версии игры */
@@ -1362,14 +1351,21 @@ async function main() {
 		let blContainer = document.querySelector('.bottomleft-container');
 		let rotateArrow = document.querySelector('.ol-rotate');
 		let layersButton = document.querySelector('#layers');
+		let attackSliderClose = document.querySelector('#attack-slider-close');
 
+		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"]').forEach(e => { e.remove(); });
+		document.querySelectorAll('.self-info__entry').forEach(e => {
+			let toDelete = [];
 
-		document.querySelectorAll('#attack-slider-close').forEach(e => { e.remove(); });
-		document.querySelectorAll('.self-info__entry, #attack-menu').forEach(e => {
 			e.childNodes.forEach(e => {
-				if (e.nodeType == 3) { e.remove(); }
-			})
+				if (e.nodeType == 3) { toDelete.push(e); }
+			});
+
+			toDelete.forEach(e => { e.remove(); });
 		});
+
+		attackSliderClose.remove; // Кнопка закрытия слайдера не нужна.
+		attackButton.childNodes[0].remove(); // Надпись Attack.
 
 		invCloseButton.innerText = '[x]';
 
@@ -1454,6 +1450,7 @@ async function main() {
 						let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
 						let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
 						let percentage = Math.floor(pointEnergy / maxEnergy * 100);
+						
 						let inventoryItem = event.target.closest('.inventory__item');
 
 						inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
@@ -1465,13 +1462,13 @@ async function main() {
 						showXp(r.xp.diff);
 					}
 				})
-				.catch(err => {
-					let toast = createToast(`Ошибка при зарядке. <br>${err.message}`);
+				.catch(error => {
+					let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
 
 					toast.options.className = 'error-toast';
 					toast.showToast();
 
-					console.log('Ошибка при зарядке.', err);
+					console.log('SBG CUI: Ошибка при зарядке.', error);
 				});
 		});
 	}
@@ -1918,7 +1915,7 @@ async function main() {
 								if (!data) { return; }
 								pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
 								pointLink.style.color = `var(--team-${data.te})`;
-								pointData.innerHTML = `${data.e}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
+								pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
 							});
 					}
 				}
@@ -1977,72 +1974,6 @@ async function main() {
 			if (!guid) { return; }
 			if (confirm('Открыть карточку точки?')) { location.href = `/?point=${guid}`; }
 		});
-	}
-
-
-	/* Удаление ключей на карточке точки */
-	{
-		function deleteRefs(amount) {
-			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-			let pointGuid = pointPopup.dataset.guid;
-			let cachedRef = cache.filter(e => e.l == pointGuid)[0];
-			let toDelete = {
-				guid: cachedRef.g,
-				type: cachedRef.t,
-				amount: (amount == -1 ? cachedRef.a : amount),
-			};
-
-			deleteItems([toDelete])
-				.then(responses => {
-					if (responses[0].error || !responses[0].status.match(/success/i)) { throw responses[0].error || responses[0].status; }
-
-					let refSpan = document.querySelector('#i-ref');
-
-					refSpan.innerText = refSpan.innerText.replace(/[0-9]{1,}(?=\/[0-9]{1,})/, responses[0].count.item);
-					refSpan.setAttribute('data-has', responses[0].count.item ? 1 : 0);
-
-					invTotalSpan.innerText = responses[0].count.total;
-
-					deleteFromCache([toDelete]);
-				})
-				.catch(error => {
-					let toast = createToast('Ошибка при удалении рефов.');
-					toast.options.className = 'error-toast';
-					toast.showToast();
-
-					console.log(error);
-				});
-		}
-
-		let trashCan = document.createElement('button');
-		let touchStartDate;
-		let timeoutID;
-
-		trashCan.classList.add('sbgcui_button_reset', 'sbgcui_point_trash', 'fa-solid', 'fa-trash-can');
-
-		trashCan.addEventListener('touchstart', _ => {
-			touchStartDate = Date.now();
-			timeoutID = setTimeout(_ => {
-				if (confirm('Удалить все рефы от этой точки из инвентаря?')) { deleteRefs(-1); }
-			}, 1000);
-		});
-		trashCan.addEventListener('touchend', _ => {
-			let touchDuration = Date.now() - touchStartDate;
-			if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
-
-			let amount = prompt('Сколько рефов удалить из инвентаря? \n\nВведите "-1" или удерживайте кнопку с корзиной, чтобы удалить всё.');
-
-			if (amount == null) {
-				return;
-			} else if (isNaN(amount) || amount < -1 || amount == 0) {
-				alert('Указано некорректное количество. \n\nВведите "-1" или удерживайте кнопку с корзиной, чтобы удалить всё.');
-				return;
-			} else {
-				deleteRefs(amount);
-			}
-		});
-
-		pointImageBox.appendChild(trashCan);
 	}
 
 
