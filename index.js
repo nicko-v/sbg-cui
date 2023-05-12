@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.4.0
+// @version      1.4.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,8 +18,8 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.4.0';
-	const LATEST_KNOWN_VERSION = '0.2.9';
+	const USERSCRIPT_VERSION = '1.4.1';
+	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
 	const DISCOVERY_COOLDOWN = 90;
@@ -1159,7 +1159,7 @@ async function main() {
 				current: selfData.exp - LEVEL_TARGETS.slice(0, selfData.lvl - 1).reduce((sum, e) => e + sum, 0),
 				goal: LEVEL_TARGETS[selfData.lvl - 1],
 				get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
-				set string(str) { [this.current, this.goal = Infinity] = str.replaceAll(',', '').split(' / '); }
+				set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
 			},
 			auth: localStorage.getItem('auth'),
 			guid: selfData.guid,
@@ -1278,7 +1278,7 @@ async function main() {
 		let inventoryContentObserver = new MutationObserver(records => {
 			records.forEach(e => {
 				if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
-					let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
+					let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
 					let isAllied = e.target.querySelector('.inventory__item-title').style.color.indexOf(`team-${player.team}`) > -1;
 
 					if (isAllied) {
@@ -1353,7 +1353,7 @@ async function main() {
 		let layersButton = document.querySelector('#layers');
 		let attackSliderClose = document.querySelector('#attack-slider-close');
 
-		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"]').forEach(e => { e.remove(); });
+		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 		document.querySelectorAll('.self-info__entry').forEach(e => {
 			let toDelete = [];
 
@@ -1705,7 +1705,7 @@ async function main() {
 			let gameMenu = document.querySelector('.game-menu');
 			let reloadButton = document.createElement('button');
 
-			reloadButton.innerText = 'Reload';
+			reloadButton.classList.add('fa-solid', 'fa-rotate');
 			reloadButton.addEventListener('click', _ => { window.location.reload(); });
 			gameMenu.appendChild(reloadButton);
 		}
