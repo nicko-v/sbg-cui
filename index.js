@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.4.1
+// @version      1.4.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.4.1';
+	const USERSCRIPT_VERSION = '1.4.2';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -66,6 +66,9 @@ async function main() {
 			pointBgImageBlur: 0,
 		},
 	};
+	
+	const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
+	const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
 
 
 	class DiscoverModifier {
@@ -2014,19 +2017,19 @@ async function main() {
 					regex = new RegExp(/\(x[0-9]{1,}\)\s(?:"|«)?([\s\S]+)/i);
 					return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
 				case 'level':
-					regex = new RegExp(/level\s([0-9]{1,2})/i);
-					return +ref.querySelector('.inventory__item-descr > span').innerText.match(regex)[1];
+					regex = new RegExp(/level-([0-9]{1,2})/);
+					return +ref.querySelector('.inventory__item-descr > span').style.color.match(regex)?.[1] || 0;
 				case 'team':
 					regex = new RegExp(/team-([1-3])/);
 					return +ref.querySelector('.inventory__item-title').style.color.match(regex)?.[1] || 0;
 				case 'energy':
-					return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue;
+					return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
 				case 'distance':
-					regex = new RegExp(/([0-9]+?(?:\.[0-9]+)?)\s(cm|m|km)/i);
-					let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent.replace(',', '');
+					regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
+					let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent;
 					let [_, value, units] = dist.match(regex);
 
-					return parseFloat(value) / ((units == 'cm') ? 100000 : (units == 'm') ? 1000 : 1);
+					return parseFloat(value) / ((['cm', 'см'].includes(units)) ? 100000 : (['m', 'м'].includes(units)) ? 1000 : 1);
 				case 'amount':
 					regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
 					return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
