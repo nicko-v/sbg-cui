@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.4.2
+// @version      1.4.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.4.2';
+	const USERSCRIPT_VERSION = '1.4.3';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2028,6 +2028,8 @@ async function main() {
 					regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
 					let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent;
 					let [_, value, units] = dist.match(regex);
+
+					value = value.replace(thousandSeparator, '').replace(decimalSeparator, '.');
 
 					return parseFloat(value) / ((['cm', 'см'].includes(units)) ? 100000 : (['m', 'м'].includes(units)) ? 1000 : 1);
 				case 'amount':
