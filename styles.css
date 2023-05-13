@@ -861,6 +861,7 @@ body {
 	box-shadow: 0 0 5px var(--shadow);
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
+	padding: 0;
 }
 
 .inventory__content:not([data-type="3"]) + .inventory__controls > .sbgcui_refs-sort-button {
