@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.4.3
+// @version      1.4.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.4.3';
+	const USERSCRIPT_VERSION = '1.4.4';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -1453,6 +1453,7 @@ async function main() {
 						let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
 						let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
 						let percentage = Math.floor(pointEnergy / maxEnergy * 100);
+						let refsCache = JSON.parse(localStorage.getItem('refs-cache'));
 						
 						let inventoryItem = event.target.closest('.inventory__item');
 
@@ -1463,6 +1464,9 @@ async function main() {
 
 						updateExpBar(r.xp.cur);
 						showXp(r.xp.diff);
+
+						refsCache[pointGuid].e = percentage;
+						localStorage.setItem('refs-cache', JSON.stringify(refsCache));
 					}
 				})
 				.catch(error => {
