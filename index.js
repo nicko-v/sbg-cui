@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.0
+// @version      1.5.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.0';
+	const USERSCRIPT_VERSION = '1.5.1';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -67,7 +67,7 @@ async function main() {
 			pointsHighlighting: 'fav', // fav || ref || off
 		},
 	};
-	
+
 	const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
 	const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
 
@@ -355,7 +355,7 @@ async function main() {
 										let modifiedResponse = new Response(body, options);
 
 										Object.defineProperty(modifiedResponse, 'url', { value: response.url, enumerable: true, });
-										
+
 										resolve(modifiedResponse);
 									} catch (error) {
 										let toast = createToast('Ошибка при фильтрации лута.');
@@ -396,7 +396,7 @@ async function main() {
 										favorites.save();
 									}
 								}
-								
+
 								break;
 						}
 					}).catch(error => {
@@ -1460,7 +1460,7 @@ async function main() {
 						let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
 						let percentage = Math.floor(pointEnergy / maxEnergy * 100);
 						let refsCache = JSON.parse(localStorage.getItem('refs-cache'));
-						
+
 						let inventoryItem = event.target.closest('.inventory__item');
 
 						inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
@@ -1776,34 +1776,6 @@ async function main() {
 
 	/* Избранные точки */
 	{
-		class OlFeature extends ol.Feature {
-			setStyle(arg) {
-				let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
-				
-				if (
-					(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
-					(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
-				) {
-					let originalRenderer = arg[0].renderer_;
-
-					arg[0].renderer_ = function (coords, state) {
-						if (originalRenderer) { originalRenderer(coords, state); }
-
-						const ctx = state.context;
-						const [[xc, yc], [xe, ye]] = coords;
-						const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
-
-						ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
-						ctx.beginPath();
-						ctx.arc(xc, yc, radius, 0, 360);
-						ctx.fill();
-					}
-				}
-
-				super.setStyle(arg);
-			}
-		}
-
 		function reviver(guid, cooldown) {
 			return guid ? new Favorite(guid, cooldown) : cooldown;
 		}
@@ -1821,9 +1793,6 @@ async function main() {
 				localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
 			},
 		});
-	
-
-		ol.Feature = OlFeature;
 
 
 		/* Старый вариант хранения избранного */
@@ -2167,4 +2136,64 @@ async function main() {
 		invControls.appendChild(sortOrderButton);
 	}
 
+
+	/* Подсветка точек */
+	{
+		class OlFeature extends ol.Feature {
+			constructor(arg) {
+				super(arg);
+
+				this.addEventListener('change', event => {
+					if (!event.target.id_ || !event.target.style_) { return; }
+					
+					let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+
+					if (
+						(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
+						(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
+					) {
+						let originalRenderer = event.target.style_[0].renderer_;
+
+						event.target.style_[0].renderer_ = function (coords, state) {
+							if (originalRenderer) { originalRenderer(coords, state); }
+
+							const ctx = state.context;
+							const [[xc, yc], [xe, ye]] = coords;
+							const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
+
+							ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+							ctx.beginPath();
+							ctx.arc(xc, yc, radius, 0, 360);
+							ctx.fill();
+						}
+					}
+				});
+			}
+
+			/*setStyle(style) {
+				let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+
+				if (
+					(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
+					(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
+				) {
+					style[1] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
+					style[1].renderer_ = function (coords, state) {
+						const ctx = state.context;
+						const [[xc, yc], [xe, ye]] = coords;
+						const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
+
+						ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+						ctx.beginPath();
+						ctx.arc(xc, yc, radius, 0, 360);
+						ctx.fill();
+					}
+				}
+
+				super.setStyle(style);
+			}*/
+		}
+
+		ol.Feature = OlFeature;
+	}
 }
