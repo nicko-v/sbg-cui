@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.4.4
+// @version      1.5.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.4.4';
+	const USERSCRIPT_VERSION = '1.5.0';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -64,6 +64,7 @@ async function main() {
 			pointBgImage: 1,
 			pointBtnsRtl: 0,
 			pointBgImageBlur: 0,
+			pointsHighlighting: 'fav', // fav || ref || off
 		},
 	};
 	
@@ -872,6 +873,11 @@ async function main() {
 			let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
+			let pointsHighlightingFav = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'fav'), 'Избранные', 'fav');
+			let pointsHighlightingRef = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'ref'), 'Имеется реф', 'ref');
+			let pointsHighlightingOff = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'off'), 'Нет', 'off');
+
+			let pointsHighlightingGroup = createRadioGroup('Подсвечивать точки:', [pointsHighlightingFav, pointsHighlightingRef, pointsHighlightingOff]);
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -886,7 +892,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl);
+			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl, pointsHighlightingGroup);
 
 			section.appendChild(subSection);
 
@@ -1770,6 +1776,34 @@ async function main() {
 
 	/* Избранные точки */
 	{
+		class OlFeature extends ol.Feature {
+			setStyle(arg) {
+				let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+				
+				if (
+					(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
+					(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
+				) {
+					let originalRenderer = arg[0].renderer_;
+
+					arg[0].renderer_ = function (coords, state) {
+						if (originalRenderer) { originalRenderer(coords, state); }
+
+						const ctx = state.context;
+						const [[xc, yc], [xe, ye]] = coords;
+						const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
+
+						ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+						ctx.beginPath();
+						ctx.arc(xc, yc, radius, 0, 360);
+						ctx.fill();
+					}
+				}
+
+				super.setStyle(arg);
+			}
+		}
+
 		function reviver(guid, cooldown) {
 			return guid ? new Favorite(guid, cooldown) : cooldown;
 		}
@@ -1787,6 +1821,9 @@ async function main() {
 				localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
 			},
 		});
+	
+
+		ol.Feature = OlFeature;
 
 
 		/* Старый вариант хранения избранного */
