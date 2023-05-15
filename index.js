@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.2
+// @version      1.5.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.2';
+	const USERSCRIPT_VERSION = '1.5.3';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -64,7 +64,10 @@ async function main() {
 			pointBgImage: 1,
 			pointBtnsRtl: 0,
 			pointBgImageBlur: 0,
-			pointsHighlighting: 'fav', // fav || ref || off
+		},
+		pointHighlighting: {
+			inner: 'fav', // fav || ref || uniqc || uniqv || off
+			outer: 'uniqc',
 		},
 	};
 
@@ -295,6 +298,8 @@ async function main() {
 
 	let discoverModifier;
 
+	let uniques = { c: new Set(), v: new Set() };
+
 
 	let numbersConverter = {
 		I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -305,10 +310,16 @@ async function main() {
 
 	async function proxiedFetch(url, options) {
 		return new Promise((resolve, reject) => {
+			if (url.match(/\/api\/inview/)) {
+				let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
+
+				if (uniqsHighlighting) { url += `&unique=${uniqsHighlighting == 'uniqc' ? 'c' : 'v'}`; }
+			}
+
 			originalFetch(url, options)
 				.then(async response => {
 					let clonedResponse = response.clone();
-					let path = url.match(/\/api\/(point|deploy|attack2|discover)(?:.*?&(status=1))?/);
+					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
 
 					if (path == null) { resolve(response); return; }
 
@@ -396,6 +407,14 @@ async function main() {
 										favorites.save();
 									}
 								}
+
+								break;
+							case 'inview':
+								if (!path[3]) { break; } // path[3] == v || c || undefined
+
+								parsedResponse.data.points?.forEach(point => {
+									if (!point.u) { uniques[path[3]].add(point.g); }
+								});
 
 								break;
 						}
@@ -663,6 +682,32 @@ async function main() {
 			return radioGroup;
 		}
 
+		function createDropdown(title, options = [], name, value) {
+			let header = document.createElement('h5');
+			let select = document.createElement('select');
+			let selectWrapper = document.createElement('div');
+
+			header.innerText = title;
+
+			options.forEach(e => {
+				let option = document.createElement('option');
+
+				option.innerText = e[0];
+				option.value = e[1];
+
+				select.appendChild(option);
+			});
+
+			select.classList.add('sbgcui_settings-dropdown-title');
+			select.name = name;
+			select.value = value;
+
+			selectWrapper.classList.add('sbgcui_settings-dropdown_wrapper');
+			selectWrapper.append(header, select);
+
+			return selectWrapper;
+		}
+
 		function createAutoDeleteSection(maxAmountInBag) {
 			let section = createSection(
 				'Автоудаление',
@@ -734,24 +779,39 @@ async function main() {
 			);
 			let subSection = document.createElement('section');
 
-			let attackMax = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'max'), 'Самый мощный', 'max');
-			let attackLatest = createInput('radio', 'autoSelect_attack', (autoSelect.attack == 'latest'), 'Последний использованный', 'latest');
-
-			let deployMin = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'min'), 'Наименьшее', 'min');
-			let deployMax = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'max'), 'Наибольшее', 'max');
-			let deployOff = createInput('radio', 'autoSelect_deploy', (autoSelect.deploy == 'off'), 'Вручную', 'off');
-
-			let upgradeMin = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'min'), 'Наименьшее', 'min');
-			let upgradeMax = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'max'), 'Наибольшее', 'max');
-			let upgradeOff = createInput('radio', 'autoSelect_upgrade', (autoSelect.upgrade == 'off'), 'Вручную', 'off');
-
-			let attackGroup = createRadioGroup('Катализатор при атаке:', [attackMax, attackLatest]);
-			let deployGroup = createRadioGroup('Ядро при деплое:', [deployMin, deployMax, deployOff]);
-			let upgradeGroup = createRadioGroup('Ядро при апгрейде:', [upgradeMin, upgradeMax, upgradeOff]);
+			let attackDropdown = createDropdown(
+				'Катализатор при атаке:',
+				[
+					['Самый мощный', 'max'],
+					['Последний использованный', 'latest'],
+				],
+				'autoSelect_attack',
+				autoSelect.attack
+			);
+			let deployDropdown = createDropdown(
+				'Ядро при деплое:',
+				[
+					['Наименьшее', 'min'],
+					['Наибольшее', 'max'],
+					['Вручную', 'off'],
+				],
+				'autoSelect_deploy',
+				autoSelect.deploy
+			);
+			let upgradeDropdown = createDropdown(
+				'Ядро при апгрейде:',
+				[
+					['Наименьшее', 'min'],
+					['Наибольшее', 'max'],
+					['Вручную', 'off'],
+				],
+				'autoSelect_upgrade',
+				autoSelect.upgrade
+			);
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(attackGroup, deployGroup, upgradeGroup);
+			subSection.append(attackDropdown, deployDropdown, upgradeDropdown);
 
 			section.appendChild(subSection);
 
@@ -819,9 +879,6 @@ async function main() {
 
 			let mapTinting = createInput('checkbox', 'tinting_map', +tinting.map, 'При просмотре карты');
 			let profileTinting = createInput('checkbox', 'tinting_profile', +tinting.profile, 'При просмотре профиля');
-			let pointTintingLvl = createInput('radio', 'tinting_point', (tinting.point == 'level'), 'Цвет уровня', 'level');
-			let pointTintingTeam = createInput('radio', 'tinting_point', (tinting.point == 'team'), 'Цвет команды', 'team');
-			let pointTintingOff = createInput('radio', 'tinting_point', (tinting.point == 'off'), 'Нет', 'off');
 
 			mapTinting.addEventListener('change', e => {
 				if (e.target.checked) {
@@ -831,11 +888,20 @@ async function main() {
 				}
 			});
 
-			let pointTintingGroup = createRadioGroup('При просмотре точки:', [pointTintingLvl, pointTintingTeam, pointTintingOff]);
+			let pointTintingDropdown = createDropdown(
+				'При просмотре точки:',
+				[
+					['Цвет уровня', 'level'],
+					['Цвет команды', 'team'],
+					['Нет', 'off'],
+				],
+				'tinting_point',
+				tinting.point
+			);
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(mapTinting, profileTinting, pointTintingGroup);
+			subSection.append(mapTinting, profileTinting, pointTintingDropdown);
 
 			section.appendChild(subSection);
 
@@ -873,11 +939,6 @@ async function main() {
 			let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
-			let pointsHighlightingFav = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'fav'), 'Избранные', 'fav');
-			let pointsHighlightingRef = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'ref'), 'Имеется реф', 'ref');
-			let pointsHighlightingOff = createInput('radio', 'ui_pointsHighlighting', (ui.pointsHighlighting == 'off'), 'Нет', 'off');
-
-			let pointsHighlightingGroup = createRadioGroup('Подсвечивать точки:', [pointsHighlightingFav, pointsHighlightingRef, pointsHighlightingOff]);
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -892,7 +953,67 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl, pointsHighlightingGroup);
+			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl);
+
+			section.appendChild(subSection);
+
+			return section;
+		}
+
+		function createPointHighlightingSection(pointHighlighting) {
+			let section = createSection(
+				'Подсветка точек',
+				'Точки на карте могут отображать по два маркера — снаружи точки и внутри неё. Выберите, что будет обозначать каждый из них.'
+			);
+			let subSection = document.createElement('section');
+
+			let innerMarker = createDropdown(
+				'Внутренний маркер:',
+				[
+					['Нет', 'off'],
+					['Избранная', 'fav'],
+					['Имеется реф', 'ref'],
+					['Не захвачена', 'uniqc'],
+					['Не исследована', 'uniqv'],
+				],
+				'pointHighlighting_inner',
+				pointHighlighting.inner
+			);
+			let outerMarker = createDropdown(
+				'Наружный маркер:',
+				[
+					['Нет', 'off'],
+					['Избранная', 'fav'],
+					['Имеется реф', 'ref'],
+					['Не захвачена', 'uniqc'],
+					['Не исследована', 'uniqv'],
+				],
+				'pointHighlighting_outer',
+				pointHighlighting.outer
+			);
+			let innerMarkerSelect = innerMarker.querySelector('select');
+			let outerMarkerSelect = outerMarker.querySelector('select');
+
+			innerMarkerSelect.addEventListener('change', event => {
+				if (
+					(event.target.value == 'uniqc' && outerMarkerSelect.value == 'uniqv') ||
+					(event.target.value == 'uniqv' && outerMarkerSelect.value == 'uniqc')
+				) {
+					outerMarkerSelect.value = 'off';
+				}
+			});
+			outerMarkerSelect.addEventListener('change', event => {
+				if (
+					(event.target.value == 'uniqc' && innerMarkerSelect.value == 'uniqv') ||
+					(event.target.value == 'uniqv' && innerMarkerSelect.value == 'uniqc')
+				) {
+					innerMarkerSelect.value = 'off';
+				}
+			});
+
+			subSection.classList.add('sbgcui_settings-subsection');
+
+			subSection.append(innerMarker, outerMarker);
 
 			section.appendChild(subSection);
 
@@ -937,6 +1058,7 @@ async function main() {
 			createTintingSection(config.tinting),
 			createVibrationSection(config.vibration),
 			createUISection(config.ui),
+			createPointHighlightingSection(config.pointHighlighting),
 		];
 
 		sections.forEach(e => {
@@ -960,7 +1082,7 @@ async function main() {
 					let path = key.split('_');
 					if (path[0] == 'maxAmountInBag') {
 						config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-					} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui/)) {
+					} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting/)) {
 						let value = formEntries[key];
 						config[path[0]][path[1]] = isNaN(+value) ? value : +value;
 					}
@@ -999,7 +1121,7 @@ async function main() {
 		document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
 		document.querySelectorAll('.sbgcui_settings > details').forEach(e => { e.open = false; });
 
-		document.querySelectorAll('.sbgcui_settings input:not([type="hidden"])').forEach(e => {
+		document.querySelectorAll('.sbgcui_settings input:not([type="hidden"]), .sbgcui_settings select').forEach(e => {
 			let path = e.name.split('_');
 			let value = path.reduce((obj, prop) => obj[prop], config);
 
@@ -1013,6 +1135,9 @@ async function main() {
 					break;
 				case 'radio':
 					e.checked = e.value == value;
+					break;
+				case 'select-one':
+					e.value = value;
 					break;
 			}
 		});
@@ -2144,54 +2269,55 @@ async function main() {
 				super(arg);
 
 				this.addEventListener('change', event => {
-					if (!event.target.id_ || !event.target.style_ || event.target.style_[1]) { return; }
-					
-					let style = event.target.style_;
+					if (!event.target.id_ || !event.target.style_) { return; }
+
 					let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
-					
-					if (
-						(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
-						(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
-					) {
-						style[1] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
-						style[1].renderer_ = function (coords, state) {
-							const ctx = state.context;
-							const [[xc, yc], [xe, ye]] = coords;
-							const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
-	
-							ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
-							ctx.beginPath();
-							ctx.arc(xc, yc, radius, 0, 360);
-							ctx.fill();
+					let { inner: innerMarker, outer: outerMarker } = config.pointHighlighting;
+					let style = event.target.style_;
+
+					// style[0] – стиль, который вешает игра.
+					// style[1] – стиль внутреннего маркера.
+					// style[2] – стиль внешнего маркера.
+					[innerMarker, outerMarker].forEach((marker, index) => {
+						let styleType = index + 1;
+
+						if (
+							(marker == 'fav' && this.id_ in favorites) ||
+							(marker == 'ref' && inventoryCache.includes(this.id_)) ||
+							(marker == 'uniqc' && uniques.c.has(this.id_)) ||
+							(marker == 'uniqv' && uniques.v.has(this.id_))
+						) {
+							style[styleType] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
+							style[styleType].renderer_ = styleType == 1 ? this.innerMarkerRenderer : this.outerMarkerRenderer;
+						} else {
+							style[styleType] = new ol.style.Style({});
 						}
-					}
+					});
 				});
 			}
 
-			// Второй рабочий вариант добавления рендерера.
-			// В отличии от варианта с эвентом, точка не перерисовывается при заходе в неё.
-			/*setStyle(style) {
-				let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+			innerMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
 
-				if (
-					(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
-					(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
-				) {
-					style[1] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
-					style[1].renderer_ = function (coords, state) {
-						const ctx = state.context;
-						const [[xc, yc], [xe, ye]] = coords;
-						const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
+				ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 0, 360);
+				ctx.fill();
+			}
 
-						ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
-						ctx.beginPath();
-						ctx.arc(xc, yc, radius, 0, 360);
-						ctx.fill();
-					}
-				}
+			outerMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
 
-				super.setStyle(style);
-			}*/
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
+				ctx.stroke();
+			}
 		}
 
 		ol.Feature = OlFeature;

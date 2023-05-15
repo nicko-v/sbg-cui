@@ -688,6 +688,15 @@ body {
 	padding-left: 15px;
 }
 
+.sbgcui_settings-dropdown_wrapper:not(:first-child) {
+	margin-top: 10px;
+}
+
+.sbgcui_settings-dropdown-title {
+	margin: 0;
+	font-weight: normal;
+}
+
 .sbgcui_settings-radio_group-title {
 	margin: 0;
 }
