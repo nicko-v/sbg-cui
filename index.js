@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.3
+// @version      1.5.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.3';
+	const USERSCRIPT_VERSION = '1.5.4';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -687,6 +687,7 @@ async function main() {
 			let select = document.createElement('select');
 			let selectWrapper = document.createElement('div');
 
+			header.classList.add('sbgcui_settings-dropdown-title');
 			header.innerText = title;
 
 			options.forEach(e => {
@@ -698,7 +699,6 @@ async function main() {
 				select.appendChild(option);
 			});
 
-			select.classList.add('sbgcui_settings-dropdown-title');
 			select.name = name;
 			select.value = value;
 

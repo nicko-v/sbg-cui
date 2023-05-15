@@ -689,11 +689,12 @@ body {
 }
 
 .sbgcui_settings-dropdown_wrapper:not(:first-child) {
-	margin-top: 10px;
+	margin-top: 15px;
 }
 
 .sbgcui_settings-dropdown-title {
 	margin: 0;
+	margin-bottom: 5px;
 	font-weight: normal;
 }
 
