@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.1
+// @version      1.5.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.1';
+	const USERSCRIPT_VERSION = '1.5.2';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2144,23 +2144,21 @@ async function main() {
 				super(arg);
 
 				this.addEventListener('change', event => {
-					if (!event.target.id_ || !event.target.style_) { return; }
+					if (!event.target.id_ || !event.target.style_ || event.target.style_[1]) { return; }
 					
+					let style = event.target.style_;
 					let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
-
+					
 					if (
 						(config.ui.pointsHighlighting == 'fav' && this.id_ in favorites) ||
 						(config.ui.pointsHighlighting == 'ref' && inventoryCache.includes(this.id_))
 					) {
-						let originalRenderer = event.target.style_[0].renderer_;
-
-						event.target.style_[0].renderer_ = function (coords, state) {
-							if (originalRenderer) { originalRenderer(coords, state); }
-
+						style[1] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
+						style[1].renderer_ = function (coords, state) {
 							const ctx = state.context;
 							const [[xc, yc], [xe, ye]] = coords;
 							const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
-
+	
 							ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
 							ctx.beginPath();
 							ctx.arc(xc, yc, radius, 0, 360);
@@ -2170,6 +2168,8 @@ async function main() {
 				});
 			}
 
+			// Второй рабочий вариант добавления рендерера.
+			// В отличии от варианта с эвентом, точка не перерисовывается при заходе в неё.
 			/*setStyle(style) {
 				let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
 
