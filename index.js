@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.5
+// @version      1.5.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.5';
+	const USERSCRIPT_VERSION = '1.5.6';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -71,7 +71,7 @@ async function main() {
 		pointHighlighting: {
 			inner: 'fav', // fav || ref || uniqc || uniqv || cores || highlevel || off
 			outer: 'uniqc',
-			text: 'level', // level || off
+			text: 'level', // level || refsAmount || off
 		},
 	};
 
@@ -417,22 +417,28 @@ async function main() {
 							case 'inview':
 								let isUniqueInRequest = path[3] != undefined;
 								let isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-								let inviewPointsLength = parsedResponse.data.points?.length;
+								let inviewPoints = parsedResponse.data?.points;
 
-								if (isHighlightCoresOrLevel && inviewPointsLength <= INVIEW_POINTS_LIMIT) {
-									let guids = parsedResponse.data.points?.map(e => e.g) || [];
+								if (!inviewPoints) { break; }
+
+								if (isHighlightCoresOrLevel) {
+									let capturedPoints = inviewPoints.filter(e => e.t);
+
+									if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
+										let guids = capturedPoints.map(e => e.g) || [];
 									
-									guids.forEach(guid => {
-										if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
+										guids.forEach(guid => {
+											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
 
-										getPointData(guid)
-											.then(data => { inview[guid] = { cores: data.co, level: data.l, timestamp: Date.now() }; })
-											.catch(() => { inview[guid] = { timestamp: Date.now() }; });
-									});
+											getPointData(guid)
+												.then(data => { inview[guid] = { cores: data.co, level: data.l, timestamp: Date.now() }; })
+												.catch(() => { inview[guid] = { timestamp: Date.now() }; });
+										});
+									}
 								}
 
 								if (isUniqueInRequest) {
-									parsedResponse.data.points?.forEach(point => {
+									inviewPoints?.forEach(point => {
 										if (!point.u) { uniques[path[3]].add(point.g); }
 									});
 								}
@@ -1021,6 +1027,7 @@ async function main() {
 				[
 					['Нет', 'off'],
 					['Уровень', 'level'],
+					['Количество рефов', 'refsAmount'],
 				],
 				'pointHighlighting_text',
 				pointHighlighting.text
@@ -1532,7 +1539,7 @@ async function main() {
 			toDelete.forEach(e => { e.remove(); });
 		});
 
-		attackSliderClose.remove; // Кнопка закрытия слайдера не нужна.
+		attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
 		attackButton.childNodes[0].remove(); // Надпись Attack.
 
 		invCloseButton.innerText = '[x]';
@@ -2310,14 +2317,14 @@ async function main() {
 
 					this.addStyle(style, 'inner', 1, this.isMarkerNeeded(inner));
 					this.addStyle(style, 'outer', 2, this.isMarkerNeeded(outer));
-					this.addStyle(style, null, 3, false, text == 'level' ? inview[this.id_]?.level : null);
+					this.addStyle(style, null, 3, false, this.textToRender(text));
 				});
 			}
 
 			isMarkerNeeded(marker) {
 				switch (marker) {
 					case 'fav': return this.id_ in favorites;
-					case 'ref': return this.inventoryCache.includes(this.id_);
+					case 'ref': return this.cachedRefsGuids.includes(this.id_);
 					case 'uniqc': return uniques.c.has(this.id_);
 					case 'uniqv': return uniques.v.has(this.id_);
 					case 'cores': return inview[this.id_]?.cores == 6;
@@ -2326,7 +2333,19 @@ async function main() {
 				}
 			}
 
-			addStyle(style, type, index, isMarkerNeeded, text = '') {
+			textToRender(type) {
+				switch (type) {
+					case 'level':
+						let level = inview[this.id_]?.level;
+						return typeof level == 'number' ? String(level) : null;
+					case 'refsAmount':
+						let amount = this.cachedRefsAmounts[this.id_];
+						return typeof amount == 'number' ? String(amount) : null;
+					default: return null;
+				}
+			}
+
+			addStyle(style, type, index, isMarkerNeeded, text) {
 				// style[0] – стиль, который вешает игра.
 				// style[1] – стиль внутреннего маркера.
 				// style[2] – стиль внешнего маркера.
@@ -2337,10 +2356,10 @@ async function main() {
 					style[index].renderer_ = this[`${type}MarkerRenderer`];
 				} else {
 					style[index] = new ol.style.Style({});
-					style[index].text_ = typeof text == 'number' ? new ol.style.Text({
+					style[index].text_ = text ? new ol.style.Text({
 						font: '14px Manrope',
 						offsetY: style[1].renderer_ ? -20 : 0,
-						text: String(text),
+						text,
 						fill: new ol.style.Fill({ color: '#000' }),
 						stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
 					}) : undefined;
@@ -2370,8 +2389,12 @@ async function main() {
 				ctx.stroke();
 			}
 
-			get inventoryCache() {
+			get cachedRefsGuids() {
 				return JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+			}
+
+			get cachedRefsAmounts() {
+				return Object.fromEntries(JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => [e.l, e.a]));
 			}
 		}
 
