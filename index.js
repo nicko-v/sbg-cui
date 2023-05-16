@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.6
+// @version      1.5.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.6';
+	const USERSCRIPT_VERSION = '1.5.7';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2268,7 +2268,11 @@ async function main() {
 
 			select.setAttribute('disabled', '');
 
-			if (!isEveryRefLoaded(refsArr)) {
+			if (sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) {
+				sortRefsBy(refsArr, sortParam);
+				refsList.replaceChildren(...refsArr);
+				select.removeAttribute('disabled');
+			} else {
 				for (let i = 0; i <= refsList.scrollHeight; i += refsList.offsetHeight / 2) {
 					refsList.scrollTop = i;
 					refsList.dispatchEvent(new Event('scroll'));
@@ -2280,10 +2284,6 @@ async function main() {
 					refsList.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
 				}, { once: true });
-			} else {
-				sortRefsBy(refsArr, sortParam);
-				refsList.replaceChildren(...refsArr);
-				select.removeAttribute('disabled');
 			}
 		});
 
