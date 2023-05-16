@@ -990,7 +990,7 @@ async function main() {
 		function createPointHighlightingSection(pointHighlighting) {
 			let section = createSection(
 				'Подсветка точек',
-				'Точки на карте могут отображать по два маркера — снаружи точки и внутри неё. Выберите, что будет обозначать каждый из них.'
+				'Точки на карте могут отображать по три маркера — кольцо снаружи точки, кружок внутри неё и текст рядом. Выберите, что будет обозначать каждый из них.'
 			);
 			let subSection = document.createElement('section');
 
