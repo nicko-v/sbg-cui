@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.7
+// @version      1.5.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.7';
+	const USERSCRIPT_VERSION = '1.5.8';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -72,6 +72,8 @@ async function main() {
 			inner: 'fav', // fav || ref || uniqc || uniqv || cores || highlevel || off
 			outer: 'uniqc',
 			text: 'level', // level || refsAmount || off
+			innerColor: '#BB7100',
+			outerColor: '#BB7100',
 		},
 	};
 
@@ -993,6 +995,8 @@ async function main() {
 				'Точки на карте могут отображать по три маркера — кольцо снаружи точки, кружок внутри неё и текст рядом. Выберите, что будет обозначать каждый из них.'
 			);
 			let subSection = document.createElement('section');
+			let innerMarkerColorPicker = document.createElement('input');
+			let outerMarkerColorPicker = document.createElement('input');
 
 			let innerMarker = createDropdown(
 				'Внутренний маркер:',
@@ -1051,6 +1055,17 @@ async function main() {
 					innerMarkerSelect.value = 'off';
 				}
 			});
+
+			innerMarkerColorPicker.type = 'color';
+			innerMarkerColorPicker.name = 'pointHighlighting_innerColor';
+			innerMarkerColorPicker.value = config.pointHighlighting.innerColor;
+
+			outerMarkerColorPicker.type = 'color';
+			outerMarkerColorPicker.name = 'pointHighlighting_outerColor';
+			outerMarkerColorPicker.value = config.pointHighlighting.outerColor;
+
+			innerMarker.appendChild(innerMarkerColorPicker);
+			outerMarker.appendChild(outerMarkerColorPicker);
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
@@ -1170,6 +1185,9 @@ async function main() {
 				case 'number':
 				case 'range':
 					e.value = +value;
+					break;
+				case 'color':
+					e.value = value;
 					break;
 				case 'checkbox':
 					e.checked = +value;
@@ -2371,7 +2389,7 @@ async function main() {
 				const [[xc, yc], [xe, ye]] = coords;
 				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
 
-				ctx.fillStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+				ctx.fillStyle = config.pointHighlighting.innerColor;
 				ctx.beginPath();
 				ctx.arc(xc, yc, radius, 0, 360);
 				ctx.fill();
@@ -2383,7 +2401,7 @@ async function main() {
 				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
 
 				ctx.lineWidth = 4;
-				ctx.strokeStyle = getComputedStyle(ctx.canvas).getPropertyValue('--selection');
+				ctx.strokeStyle = config.pointHighlighting.outerColor;
 				ctx.beginPath();
 				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
 				ctx.stroke();

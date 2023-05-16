@@ -688,14 +688,24 @@ body {
 	padding-left: 15px;
 }
 
+.sbgcui_settings-dropdown_wrapper {
+	display: flex;
+	flex-wrap: wrap;
+}
+
 .sbgcui_settings-dropdown_wrapper:not(:first-child) {
 	margin-top: 15px;
+}
+
+.sbgcui_settings-dropdown_wrapper > select {
+	margin-right: 10px;
 }
 
 .sbgcui_settings-dropdown-title {
 	margin: 0;
 	margin-bottom: 5px;
 	font-weight: normal;
+	flex-basis: 100%;
 }
 
 .sbgcui_settings-radio_group-title {
