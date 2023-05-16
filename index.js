@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.4
+// @version      1.5.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,11 +18,14 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.4';
+	const USERSCRIPT_VERSION = '1.5.5';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
 	const DISCOVERY_COOLDOWN = 90;
+	const INVIEW_POINTS_DATA_TTL = 7000;
+	const INVIEW_POINTS_LIMIT = 100;
+	const HIGHLEVEL_MARKER = 8;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
 	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
 	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
@@ -66,8 +69,9 @@ async function main() {
 			pointBgImageBlur: 0,
 		},
 		pointHighlighting: {
-			inner: 'fav', // fav || ref || uniqc || uniqv || off
+			inner: 'fav', // fav || ref || uniqc || uniqv || cores || highlevel || off
 			outer: 'uniqc',
+			text: 'level', // level || off
 		},
 	};
 
@@ -299,6 +303,7 @@ async function main() {
 	let discoverModifier;
 
 	let uniques = { c: new Set(), v: new Set() };
+	let inview = {};
 
 
 	let numbersConverter = {
@@ -310,7 +315,7 @@ async function main() {
 
 	async function proxiedFetch(url, options) {
 		return new Promise((resolve, reject) => {
-			if (url.match(/\/api\/inview/)) {
+			if (url.match(/\/api\/inview(?!.+?&unique=)/)) {
 				let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
 
 				if (uniqsHighlighting) { url += `&unique=${uniqsHighlighting == 'uniqc' ? 'c' : 'v'}`; }
@@ -410,11 +415,27 @@ async function main() {
 
 								break;
 							case 'inview':
-								if (!path[3]) { break; } // path[3] == v || c || undefined
+								let isUniqueInRequest = path[3] != undefined;
+								let isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
+								let inviewPointsLength = parsedResponse.data.points?.length;
 
-								parsedResponse.data.points?.forEach(point => {
-									if (!point.u) { uniques[path[3]].add(point.g); }
-								});
+								if (isHighlightCoresOrLevel && inviewPointsLength <= INVIEW_POINTS_LIMIT) {
+									let guids = parsedResponse.data.points?.map(e => e.g) || [];
+									
+									guids.forEach(guid => {
+										if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
+
+										getPointData(guid)
+											.then(data => { inview[guid] = { cores: data.co, level: data.l, timestamp: Date.now() }; })
+											.catch(() => { inview[guid] = { timestamp: Date.now() }; });
+									});
+								}
+
+								if (isUniqueInRequest) {
+									parsedResponse.data.points?.forEach(point => {
+										if (!point.u) { uniques[path[3]].add(point.g); }
+									});
+								}
 
 								break;
 						}
@@ -971,10 +992,12 @@ async function main() {
 				'Внутренний маркер:',
 				[
 					['Нет', 'off'],
+					[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
 					['Избранная', 'fav'],
 					['Имеется реф', 'ref'],
 					['Не захвачена', 'uniqc'],
 					['Не исследована', 'uniqv'],
+					['Полностью проставлена', 'cores'],
 				],
 				'pointHighlighting_inner',
 				pointHighlighting.inner
@@ -983,13 +1006,24 @@ async function main() {
 				'Наружный маркер:',
 				[
 					['Нет', 'off'],
+					[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
 					['Избранная', 'fav'],
 					['Имеется реф', 'ref'],
 					['Не захвачена', 'uniqc'],
 					['Не исследована', 'uniqv'],
+					['Полностью проставлена', 'cores'],
 				],
 				'pointHighlighting_outer',
 				pointHighlighting.outer
+			);
+			let textMarker = createDropdown(
+				'Текстовый маркер:',
+				[
+					['Нет', 'off'],
+					['Уровень', 'level'],
+				],
+				'pointHighlighting_text',
+				pointHighlighting.text
 			);
 			let innerMarkerSelect = innerMarker.querySelector('select');
 			let outerMarkerSelect = outerMarker.querySelector('select');
@@ -1013,7 +1047,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(innerMarker, outerMarker);
+			subSection.append(innerMarker, outerMarker, textMarker);
 
 			section.appendChild(subSection);
 
@@ -2268,32 +2302,49 @@ async function main() {
 			constructor(arg) {
 				super(arg);
 
-				this.addEventListener('change', event => {
-					if (!event.target.id_ || !event.target.style_) { return; }
+				this.addEventListener('change', () => {
+					if (!this.id_ || !this.style_) { return; }
 
-					let inventoryCache = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
-					let { inner: innerMarker, outer: outerMarker } = config.pointHighlighting;
-					let style = event.target.style_;
+					let { inner, outer, text } = config.pointHighlighting;
+					let style = this.style_;
 
-					// style[0] – стиль, который вешает игра.
-					// style[1] – стиль внутреннего маркера.
-					// style[2] – стиль внешнего маркера.
-					[innerMarker, outerMarker].forEach((marker, index) => {
-						let styleType = index + 1;
-
-						if (
-							(marker == 'fav' && this.id_ in favorites) ||
-							(marker == 'ref' && inventoryCache.includes(this.id_)) ||
-							(marker == 'uniqc' && uniques.c.has(this.id_)) ||
-							(marker == 'uniqv' && uniques.v.has(this.id_))
-						) {
-							style[styleType] = Object.assign(Object.create(Object.getPrototypeOf(style[0])), style[0]);
-							style[styleType].renderer_ = styleType == 1 ? this.innerMarkerRenderer : this.outerMarkerRenderer;
-						} else {
-							style[styleType] = new ol.style.Style({});
-						}
-					});
+					this.addStyle(style, 'inner', 1, this.isMarkerNeeded(inner));
+					this.addStyle(style, 'outer', 2, this.isMarkerNeeded(outer));
+					this.addStyle(style, null, 3, false, text == 'level' ? inview[this.id_]?.level : null);
 				});
+			}
+
+			isMarkerNeeded(marker) {
+				switch (marker) {
+					case 'fav': return this.id_ in favorites;
+					case 'ref': return this.inventoryCache.includes(this.id_);
+					case 'uniqc': return uniques.c.has(this.id_);
+					case 'uniqv': return uniques.v.has(this.id_);
+					case 'cores': return inview[this.id_]?.cores == 6;
+					case 'highlevel': return inview[this.id_]?.level >= HIGHLEVEL_MARKER;
+					default: return false;
+				}
+			}
+
+			addStyle(style, type, index, isMarkerNeeded, text = '') {
+				// style[0] – стиль, который вешает игра.
+				// style[1] – стиль внутреннего маркера.
+				// style[2] – стиль внешнего маркера.
+				// style[3] – стиль текстового маркера.
+				
+				if (isMarkerNeeded == true) {
+					style[index] = style[0].clone();
+					style[index].renderer_ = this[`${type}MarkerRenderer`];
+				} else {
+					style[index] = new ol.style.Style({});
+					style[index].text_ = typeof text == 'number' ? new ol.style.Text({
+						font: '14px Manrope',
+						offsetY: style[1].renderer_ ? -20 : 0,
+						text: String(text),
+						fill: new ol.style.Fill({ color: '#000' }),
+						stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
+					}) : undefined;
+				}
 			}
 
 			innerMarkerRenderer(coords, state) {
@@ -2317,6 +2368,10 @@ async function main() {
 				ctx.beginPath();
 				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
 				ctx.stroke();
+			}
+
+			get inventoryCache() {
+				return JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
 			}
 		}
 
