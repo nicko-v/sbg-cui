@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.8
+// @version      1.5.9
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.8';
+	const USERSCRIPT_VERSION = '1.5.9';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -71,9 +71,13 @@ async function main() {
 		pointHighlighting: {
 			inner: 'fav', // fav || ref || uniqc || uniqv || cores || highlevel || off
 			outer: 'uniqc',
+			outerTop: 'off',
+			outerBottom: 'off',
 			text: 'level', // level || refsAmount || off
 			innerColor: '#BB7100',
 			outerColor: '#BB7100',
+			outerTopColor: '#BB7100',
+			outerBottomColor: '#BB7100',
 		},
 	};
 
@@ -693,6 +697,16 @@ async function main() {
 			return wrapper;
 		}
 
+		function createColorPicker(name, value) {
+			let colorPicker = document.createElement('input');
+
+			colorPicker.type = 'color';
+			colorPicker.name = name;
+			colorPicker.value = value;
+
+			return colorPicker;
+		}
+
 		function createRadioGroup(title, inputs = []) {
 			let header = document.createElement('h5');
 			let inputsWrp = document.createElement('div');
@@ -990,42 +1004,44 @@ async function main() {
 		}
 
 		function createPointHighlightingSection(pointHighlighting) {
+			function switchOff(selects, option) {
+				selects.forEach(select => {
+					switch (option) {
+						case 'uniqc':
+							if (select.value == 'uniqv') {select.value = 'off'}
+							break;
+						case 'uniqv':
+							if (select.value == 'uniqc') {select.value = 'off'}
+							break;
+						default: select.value = 'off';
+					}
+				});
+			}
+			
 			let section = createSection(
 				'Подсветка точек',
-				'Точки на карте могут отображать по три маркера — кольцо снаружи точки, кружок внутри неё и текст рядом. Выберите, что будет обозначать каждый из них.'
+				'Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом. Выберите, что будет обозначать каждый из них.'
 			);
 			let subSection = document.createElement('section');
-			let innerMarkerColorPicker = document.createElement('input');
-			let outerMarkerColorPicker = document.createElement('input');
+			let innerMarkerColorPicker = createColorPicker('pointHighlighting_innerColor', pointHighlighting.innerColor);
+			let outerMarkerColorPicker = createColorPicker('pointHighlighting_outerColor', pointHighlighting.outerColor);
+			let outerTopMarkerColorPicker = createColorPicker('pointHighlighting_outerTopColor', pointHighlighting.outerTopColor);
+			let outerBottomMarkerColorPicker = createColorPicker('pointHighlighting_outerBottomColor', pointHighlighting.outerBottomColor);
+			
+			let markerOptions = [
+				['Нет', 'off'],
+				[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
+				['Избранная', 'fav'],
+				['Имеется реф', 'ref'],
+				['Не захвачена', 'uniqc'],
+				['Не исследована', 'uniqv'],
+				['Полностью проставлена', 'cores'],
+			];
 
-			let innerMarker = createDropdown(
-				'Внутренний маркер:',
-				[
-					['Нет', 'off'],
-					[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
-					['Избранная', 'fav'],
-					['Имеется реф', 'ref'],
-					['Не захвачена', 'uniqc'],
-					['Не исследована', 'uniqv'],
-					['Полностью проставлена', 'cores'],
-				],
-				'pointHighlighting_inner',
-				pointHighlighting.inner
-			);
-			let outerMarker = createDropdown(
-				'Наружный маркер:',
-				[
-					['Нет', 'off'],
-					[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
-					['Избранная', 'fav'],
-					['Имеется реф', 'ref'],
-					['Не захвачена', 'uniqc'],
-					['Не исследована', 'uniqv'],
-					['Полностью проставлена', 'cores'],
-				],
-				'pointHighlighting_outer',
-				pointHighlighting.outer
-			);
+			let innerMarker = createDropdown('Внутренний маркер (точка):', markerOptions, 'pointHighlighting_inner', pointHighlighting.inner);
+			let outerMarker = createDropdown('Наружный маркер (кольцо):', markerOptions, 'pointHighlighting_outer', pointHighlighting.outer);
+			let outerTopMarker = createDropdown('Наружный маркер (верхнее полукольцо):', markerOptions, 'pointHighlighting_outerTop', pointHighlighting.outerTop);
+			let outerBottomMarker = createDropdown('Наружный маркер (нижнее полукольцо):', markerOptions, 'pointHighlighting_outerBottom', pointHighlighting.outerBottom);
 			let textMarker = createDropdown(
 				'Текстовый маркер:',
 				[
@@ -1036,40 +1052,41 @@ async function main() {
 				'pointHighlighting_text',
 				pointHighlighting.text
 			);
+
 			let innerMarkerSelect = innerMarker.querySelector('select');
 			let outerMarkerSelect = outerMarker.querySelector('select');
+			let outerTopMarkerSelect = outerTopMarker.querySelector('select');
+			let outerBottomMarkerSelect = outerBottomMarker.querySelector('select');
 
-			innerMarkerSelect.addEventListener('change', event => {
-				if (
-					(event.target.value == 'uniqc' && outerMarkerSelect.value == 'uniqv') ||
-					(event.target.value == 'uniqv' && outerMarkerSelect.value == 'uniqc')
-				) {
-					outerMarkerSelect.value = 'off';
-				}
+			let selects = [innerMarkerSelect, outerMarkerSelect, outerTopMarkerSelect, outerBottomMarkerSelect];
+
+			selects.forEach(select => {
+				select.addEventListener('change', event => {
+					switch (event.target) {
+						case outerMarkerSelect:
+							switchOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
+							break;
+						case outerTopMarkerSelect:
+						case outerBottomMarkerSelect:
+							switchOff([outerMarkerSelect]);
+							break;
+					}
+					
+					if (['uniqc', 'uniqv'].includes(event.target.value)) {
+						let selectsToOff = selects.filter(e => e != select);
+						switchOff(selectsToOff, event.target.value);
+					}
+				});
 			});
-			outerMarkerSelect.addEventListener('change', event => {
-				if (
-					(event.target.value == 'uniqc' && innerMarkerSelect.value == 'uniqv') ||
-					(event.target.value == 'uniqv' && innerMarkerSelect.value == 'uniqc')
-				) {
-					innerMarkerSelect.value = 'off';
-				}
-			});
-
-			innerMarkerColorPicker.type = 'color';
-			innerMarkerColorPicker.name = 'pointHighlighting_innerColor';
-			innerMarkerColorPicker.value = config.pointHighlighting.innerColor;
-
-			outerMarkerColorPicker.type = 'color';
-			outerMarkerColorPicker.name = 'pointHighlighting_outerColor';
-			outerMarkerColorPicker.value = config.pointHighlighting.outerColor;
 
 			innerMarker.appendChild(innerMarkerColorPicker);
 			outerMarker.appendChild(outerMarkerColorPicker);
+			outerTopMarker.appendChild(outerTopMarkerColorPicker);
+			outerBottomMarker.appendChild(outerBottomMarkerColorPicker);
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(innerMarker, outerMarker, textMarker);
+			subSection.append(innerMarker, outerMarker, outerTopMarker, outerBottomMarker, textMarker);
 
 			section.appendChild(subSection);
 
@@ -2330,12 +2347,14 @@ async function main() {
 				this.addEventListener('change', () => {
 					if (!this.id_ || !this.style_) { return; }
 
-					let { inner, outer, text } = config.pointHighlighting;
+					let { inner, outer, outerTop, outerBottom, text } = config.pointHighlighting;
 					let style = this.style_;
 
 					this.addStyle(style, 'inner', 1, this.isMarkerNeeded(inner));
 					this.addStyle(style, 'outer', 2, this.isMarkerNeeded(outer));
-					this.addStyle(style, null, 3, false, this.textToRender(text));
+					this.addStyle(style, 'outerTop', 3, this.isMarkerNeeded(outerTop));
+					this.addStyle(style, 'outerBottom', 4, this.isMarkerNeeded(outerBottom));
+					this.addStyle(style, null, 5, false, this.textToRender(text));
 				});
 			}
 
@@ -2365,9 +2384,11 @@ async function main() {
 
 			addStyle(style, type, index, isMarkerNeeded, text) {
 				// style[0] – стиль, который вешает игра.
-				// style[1] – стиль внутреннего маркера.
-				// style[2] – стиль внешнего маркера.
-				// style[3] – стиль текстового маркера.
+				// style[1] – стиль внутреннего маркера: точка.
+				// style[2] – стиль внешнего маркера: кольцо.
+				// style[3] – стиль внешнего маркера: верхнее полукольцо.
+				// style[4] – стиль внешнего маркера: нижнее полукольцо.
+				// style[5] – стиль текстового маркера.
 				
 				if (isMarkerNeeded == true) {
 					style[index] = style[0].clone();
@@ -2391,7 +2412,7 @@ async function main() {
 
 				ctx.fillStyle = config.pointHighlighting.innerColor;
 				ctx.beginPath();
-				ctx.arc(xc, yc, radius, 0, 360);
+				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
 				ctx.fill();
 			}
 
@@ -2404,6 +2425,30 @@ async function main() {
 				ctx.strokeStyle = config.pointHighlighting.outerColor;
 				ctx.beginPath();
 				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
+				ctx.stroke();
+			}
+
+			outerTopMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
+
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = config.pointHighlighting.outerTopColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 195 * (Math.PI / 180), 345 * (Math.PI / 180));
+				ctx.stroke();
+			}
+
+			outerBottomMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
+
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = config.pointHighlighting.outerBottomColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 15 * (Math.PI / 180), 165 * (Math.PI / 180));
 				ctx.stroke();
 			}
 
