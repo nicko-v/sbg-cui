@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.9
+// @version      1.5.10
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.9';
+	const USERSCRIPT_VERSION = '1.5.10';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -428,7 +428,7 @@ async function main() {
 								if (!inviewPoints) { break; }
 
 								if (isHighlightCoresOrLevel) {
-									let capturedPoints = inviewPoints.filter(e => e.t);
+									let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
 
 									if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
 										let guids = capturedPoints.map(e => e.g) || [];
