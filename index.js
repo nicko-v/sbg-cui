@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.10
+// @version      1.5.11
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.10';
+	const USERSCRIPT_VERSION = '1.5.11';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -445,7 +445,7 @@ async function main() {
 
 								if (isUniqueInRequest) {
 									inviewPoints?.forEach(point => {
-										if (!point.u) { uniques[path[3]].add(point.g); }
+										if (!point.u) { uniques[path[3]].add(point.g); } else { uniques[path[3]].delete(point.g); }
 									});
 								}
 
