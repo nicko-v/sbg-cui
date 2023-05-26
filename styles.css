@@ -532,6 +532,8 @@ body {
 	align-items: center;
 	justify-content: center;
 	height: 100%;
+	padding: 0 5%;
+	box-sizing: border-box;
 }
 
 .sbgcui_no_loot {
