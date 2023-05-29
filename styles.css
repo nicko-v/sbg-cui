@@ -930,6 +930,10 @@ body {
 	color: var(--selection);
 }
 
+li[sbgcui-excluded-core] > span {
+	color: var(--text-disabled) !important;
+}
+
 .sbgcui_hidden {
 	display: none;
 }

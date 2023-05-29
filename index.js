@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.11
+// @version      1.5.12
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.11';
+	const USERSCRIPT_VERSION = '1.5.12';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -42,16 +42,16 @@ async function main() {
 			refs: { allied: -1, hostile: -1 },
 		},
 		autoSelect: {
-			deploy: 'min',  // min || max || off
+			deploy: 'max',  // min || max || off
 			upgrade: 'min', // min || max || off
-			attack: 'max',  // max || latest
+			attack: 'latest',  // max || latest
 		},
 		mapFilters: {
 			invert: IS_DARK ? 1 : 0,
 			hueRotate: IS_DARK ? 180 : 0,
 			brightness: IS_DARK ? 0.75 : 1,
 			grayscale: IS_DARK ? 1 : 0,
-			sepia: 0,
+			sepia: 1,
 			blur: 0,
 		},
 		tinting: {
@@ -66,18 +66,19 @@ async function main() {
 		ui: {
 			pointBgImage: 1,
 			pointBtnsRtl: 0,
-			pointBgImageBlur: 0,
+			pointBgImageBlur: 1,
+			pointDischargeTimeout: 1,
 		},
 		pointHighlighting: {
-			inner: 'fav', // fav || ref || uniqc || uniqv || cores || highlevel || off
-			outer: 'uniqc',
-			outerTop: 'off',
-			outerBottom: 'off',
-			text: 'level', // level || refsAmount || off
-			innerColor: '#BB7100',
-			outerColor: '#BB7100',
-			outerTopColor: '#BB7100',
-			outerBottomColor: '#BB7100',
+			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+			outer: 'off',
+			outerTop: 'cores',
+			outerBottom: 'highlevel',
+			text: 'refsAmount', // level || refsAmount || off
+			innerColor: '#E87100',
+			outerColor: '#E87100',
+			outerTopColor: '#EB4DBF',
+			outerBottomColor: '#28C4F4',
 		},
 	};
 
@@ -137,18 +138,50 @@ async function main() {
 			return playerCores; // { level: amount }
 		}
 
-		update(cores, level) {
-			cores.forEach(e => {
-				this.cores[e.g] = {
-					level: e.l,
-					owner: e.o,
+		get energy() {
+			if (Object.keys(this.cores).length == 0) { return 0; }
+
+			let maxPointEnergy = 0;
+			let pointEnergy = 0;
+
+			for (let guid in this.cores) {
+				maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
+				pointEnergy += this.cores[guid].energy;
+			}
+
+			return pointEnergy / maxPointEnergy * 100;
+		}
+
+		get dischargeTimeout() {
+			let timeout = this.energy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
+			let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
+			let dh2 = ['d', 'hr'];
+			let result = '';
+
+			dh1.forEach((e, i) => {
+				let amount = Math.trunc(timeout / e);
+
+				if (!amount) { return; }
+
+				result += `${result.length ? ', ' : '~'}${amount}${dh2[i]}`;
+				timeout -= amount * e;
+			});
+
+			return result;
+		}
+
+		update(cores) {
+			cores.forEach(core => {
+				this.cores[core.g] = {
+					energy: core.e,
+					level: core.l,
+					owner: core.o,
 				}
 			});
-			this.level = level;
 		}
 
 		selectCore(type, currentLevel) {
-			let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1).sort((a, b) => a.l - b.l);
+			let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1 && !excludedCores.has(e.g)).sort((a, b) => a.l - b.l);
 			let playerCores = this.playerCores;
 			let core;
 
@@ -286,6 +319,7 @@ async function main() {
 	let pointCores = document.querySelector('.i-stat__cores');
 	let pointImage = document.querySelector('#i-image');
 	let pointImageBox = document.querySelector('.i-image-box');
+	let pointEnergySpan = document.querySelector('#i-stat__energy');
 	let pointLevelSpan = document.querySelector('#i-level');
 	let pointOwnerSpan = document.querySelector('#i-stat__owner');
 	let pointTitleSpan = document.querySelector('#i-title');
@@ -305,6 +339,8 @@ async function main() {
 
 	let lastOpenedPoint = {};
 	let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
+
+	let excludedCores = new Set(JSON.parse(localStorage.getItem('sbgcui_excludedCores')));
 
 	let discoverModifier;
 
@@ -432,7 +468,7 @@ async function main() {
 
 									if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
 										let guids = capturedPoints.map(e => e.g) || [];
-									
+
 										guids.forEach(guid => {
 											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
 
@@ -982,6 +1018,7 @@ async function main() {
 			let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
+			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -996,7 +1033,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl);
+			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
 
 			section.appendChild(subSection);
 
@@ -1008,16 +1045,16 @@ async function main() {
 				selects.forEach(select => {
 					switch (option) {
 						case 'uniqc':
-							if (select.value == 'uniqv') {select.value = 'off'}
+							if (select.value == 'uniqv') { select.value = 'off' }
 							break;
 						case 'uniqv':
-							if (select.value == 'uniqc') {select.value = 'off'}
+							if (select.value == 'uniqc') { select.value = 'off' }
 							break;
 						default: select.value = 'off';
 					}
 				});
 			}
-			
+
 			let section = createSection(
 				'Подсветка точек',
 				'Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом. Выберите, что будет обозначать каждый из них.'
@@ -1027,7 +1064,7 @@ async function main() {
 			let outerMarkerColorPicker = createColorPicker('pointHighlighting_outerColor', pointHighlighting.outerColor);
 			let outerTopMarkerColorPicker = createColorPicker('pointHighlighting_outerTopColor', pointHighlighting.outerTopColor);
 			let outerBottomMarkerColorPicker = createColorPicker('pointHighlighting_outerBottomColor', pointHighlighting.outerBottomColor);
-			
+
 			let markerOptions = [
 				['Нет', 'off'],
 				[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
@@ -1071,7 +1108,7 @@ async function main() {
 							switchOff([outerMarkerSelect]);
 							break;
 					}
-					
+
 					if (['uniqc', 'uniqv'].includes(event.target.value)) {
 						let selectsToOff = selects.filter(e => e != select);
 						switchOff(selectsToOff, event.target.value);
@@ -1377,6 +1414,14 @@ async function main() {
 			set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
 			_level: selfData.lvl,
 		};
+
+		if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
+			config.maxAmountInBag = {
+				cores: { I: 100, II: 100, III: 100, IV: 100, V: 100, VI: 150, VII: 150, VIII: 120, IX: -1, X: -1 },
+				catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
+				refs: { allied: 20, hostile: 10 },
+			};
+		}
 	}
 
 
@@ -1541,6 +1586,17 @@ async function main() {
 				pointPopup.classList.remove('sbgcui_point-popup-bg');
 				pointImage.classList.remove('sbgcui_no_bg_image');
 			}
+
+			if (config.ui.pointDischargeTimeout) {
+				let timeout = lastOpenedPoint.dischargeTimeout;
+				if (timeout.length != 0) {
+					let span = document.createElement('span');
+
+					span.style.color = 'var(--text-disabled)';
+					span.innerText = ` (${timeout})`;
+					pointEnergySpan.appendChild(span);
+				}
+			}
 		});
 
 		document.addEventListener("backbutton", () => {
@@ -1550,6 +1606,15 @@ async function main() {
 				click(profilePopupCloseButton);
 			}
 			return false;
+		});
+
+		document.querySelector('.inventory__tab[data-type="3"]').addEventListener('click', event => {
+			let counter = document.querySelector('.inventory__tab[data-type="3"] > .inventory__tab-counter');
+			let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
+			let uniqueRefsAmount = inventoryContent.childNodes.length;
+
+			counter.innerText = uniqueRefsAmount;
+			setTimeout(() => { counter.innerText = refsAmount; }, 1000);
 		});
 	}
 
@@ -1623,6 +1688,11 @@ async function main() {
 
 		pointPopup.addEventListener('pointPopupOpened', _ => {
 			lastOpenedPoint.selectCore(config.autoSelect.deploy);
+			coresList.childNodes.forEach(coreSlide => {
+				if (excludedCores.has(coreSlide.dataset.guid)) {
+					coreSlide.setAttribute('sbgcui-excluded-core', '');
+				}
+			});
 		});
 
 		pointCores.addEventListener('click', event => {
@@ -1631,14 +1701,42 @@ async function main() {
 				lastOpenedPoint.selectCore(config.autoSelect.upgrade, currentLvl);
 			}
 		});
+
+		coresList.addEventListener('touchstart', event => {
+			let coreSlide = event.target.closest('.is-active.splide__slide');
+			if (coreSlide == null) { return; }
+
+			let touchStartDate = Date.now();
+			let guid = coreSlide.dataset.guid;
+
+			let timeoutID = setTimeout(() => {
+				let toast;
+
+				if (excludedCores.has(guid)) {
+					excludedCores.delete(guid);
+					coreSlide.removeAttribute('sbgcui-excluded-core');
+					toast = createToast('Теперь ядро доступно для автовыбора.');
+				} else {
+					excludedCores.add(guid);
+					coreSlide.setAttribute('sbgcui-excluded-core', '');
+					toast = createToast('Ядро больше не участвует в автовыборе.');
+				}
+
+				toast.showToast();
+				localStorage.setItem('sbgcui_excludedCores', JSON.stringify([...excludedCores]));
+			}, 1000);
+
+			coreSlide.addEventListener('touchend', () => {
+				let touchDuration = Date.now() - touchStartDate;
+				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+			},  { once: true });
+		});
 	}
 
 
 	/* Зарядка из инвентаря */
 	{
-		let refsList = document.querySelector('.inventory__content');
-
-		refsList.addEventListener('click', event => {
+		inventoryContent.addEventListener('click', event => {
 			if (!event.currentTarget.matches('.inventory__content[data-type="3"]')) { return; }
 			if (!event.target.closest('.inventory__item-controls')) { return; }
 			if (!event.target.closest('.inventory__item.loaded')) { return; }
@@ -2178,8 +2276,6 @@ async function main() {
 
 	/* Ссылка на точку из списка ключей */
 	{
-		let inventoryContent = document.querySelector('.inventory__content');
-
 		inventoryContent.addEventListener('click', event => {
 			if (!event.target.classList.contains('inventory__ic-view')) { return; }
 
@@ -2269,7 +2365,6 @@ async function main() {
 
 		let invControls = document.querySelector('.inventory__controls');
 		let invDelete = document.querySelector('#inventory-delete');
-		let refsList = document.querySelector('.inventory__content');
 		let select = document.createElement('select');
 		let sortOrderButton = document.createElement('button');
 
@@ -2294,29 +2389,29 @@ async function main() {
 		});
 
 		select.addEventListener('change', event => {
-			let refsArr = Array.from(refsList.children);
+			let refsArr = Array.from(inventoryContent.children);
 			let sortParam = event.target.value;
 
 			if (sortParam == 'none') { return; }
 
-			refsList.classList.remove('sbgcui_refs-reverse');
+			inventoryContent.classList.remove('sbgcui_refs-reverse');
 
 			select.setAttribute('disabled', '');
 
 			if (sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) {
 				sortRefsBy(refsArr, sortParam);
-				refsList.replaceChildren(...refsArr);
+				inventoryContent.replaceChildren(...refsArr);
 				select.removeAttribute('disabled');
 			} else {
-				for (let i = 0; i <= refsList.scrollHeight; i += refsList.offsetHeight / 2) {
-					refsList.scrollTop = i;
-					refsList.dispatchEvent(new Event('scroll'));
+				for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
+					inventoryContent.scrollTop = i;
+					inventoryContent.dispatchEvent(new Event('scroll'));
 				}
-				refsList.scrollTop = 0;
+				inventoryContent.scrollTop = 0;
 
-				refsList.addEventListener('refsListLoaded', () => {
+				inventoryContent.addEventListener('refsListLoaded', () => {
 					sortRefsBy(refsArr, sortParam);
-					refsList.replaceChildren(...refsArr);
+					inventoryContent.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
 				}, { once: true });
 			}
@@ -2329,8 +2424,8 @@ async function main() {
 		invCloseButton.addEventListener('click', () => { select.value = 'none'; });
 
 		sortOrderButton.addEventListener('click', () => {
-			refsList.classList.toggle('sbgcui_refs-reverse');
-			refsList.scrollTop = -refsList.scrollHeight;
+			inventoryContent.classList.toggle('sbgcui_refs-reverse');
+			inventoryContent.scrollTop = -inventoryContent.scrollHeight;
 		});
 
 		invControls.insertBefore(select, invDelete);
@@ -2389,7 +2484,7 @@ async function main() {
 				// style[3] – стиль внешнего маркера: верхнее полукольцо.
 				// style[4] – стиль внешнего маркера: нижнее полукольцо.
 				// style[5] – стиль текстового маркера.
-				
+
 				if (isMarkerNeeded == true) {
 					style[index] = style[0].clone();
 					style[index].renderer_ = this[`${type}MarkerRenderer`];
