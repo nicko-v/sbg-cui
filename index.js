@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.13
+// @version      1.5.14
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.13';
+	const USERSCRIPT_VERSION = '1.5.14';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -68,6 +68,8 @@ async function main() {
 			pointBtnsRtl: 0,
 			pointBgImageBlur: 1,
 			pointDischargeTimeout: 1,
+			branding: 'team', // team || custom
+			brandingColor: '#CCCCCC',
 		},
 		pointHighlighting: {
 			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
@@ -1019,6 +1021,32 @@ async function main() {
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
 			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
+			let branding = createDropdown('Цвет интерфейса:', [['Командный', 'team'], ['Собственный', 'custom']], 'ui_branding', ui.branding);
+			let brandingColorPicker = createColorPicker('ui_brandingColor', ui.brandingColor);
+
+			let brandingSelect = branding.querySelector('select');
+
+			brandingSelect.addEventListener('change', event => {
+				switch (event.target.value) {
+					case 'team':
+						brandingColorPicker.classList.add('sbgcui_hidden');
+						html.style.removeProperty(`--team-${player.team}`);
+						break;
+					case 'custom':
+						brandingColorPicker.classList.remove('sbgcui_hidden');
+						html.style.setProperty(`--team-${player.team}`, brandingColorPicker.value);
+						break;
+				}
+			});
+
+			brandingColorPicker.addEventListener('input', event => {
+				html.style.setProperty(`--team-${player.team}`, event.target.value);
+			});
+
+			if (ui.branding == 'team') { brandingColorPicker.classList.add('sbgcui_hidden'); }
+
+			branding.appendChild(brandingColorPicker);
+
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -1031,9 +1059,10 @@ async function main() {
 				}
 			});
 
+
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
+			subSection.append(branding, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
 
 			section.appendChild(subSection);
 
@@ -1226,6 +1255,14 @@ async function main() {
 
 		html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
 		html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
+		switch (ui.branding) {
+			case 'team':
+				html.style.removeProperty(`--team-${player.team}`);
+				break;
+			case 'custom':
+				html.style.setProperty(`--team-${player.team}`, ui.brandingColor);
+				break;
+		}
 
 		if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1428,8 +1465,7 @@ async function main() {
 
 	/* Стили */
 	{
-		let mapFilters = config.mapFilters;
-		let ui = config.ui;
+		let { mapFilters, ui } = config;
 		let cssVars = document.createElement('style');
 		let styles = document.createElement('link');
 		let fa = document.createElement('link');
@@ -1453,6 +1489,8 @@ async function main() {
         --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
       }
   	`);
+
+		if (ui.branding == 'custom') {html.style.setProperty(`--team-${player.team}`, ui.brandingColor);}
 
 		[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
