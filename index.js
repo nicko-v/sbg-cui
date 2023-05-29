@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.14
+// @version      1.5.15
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -10,15 +10,55 @@
 // @grant        none
 // ==/UserScript==
 
-window.addEventListener('load', () => setTimeout(main, 1000), false);
+let map, playerFeature;
+
+window.addEventListener('load', () => {
+	if (document.querySelector('script[src="/intel.js"]')) { return; }
+
+	navigator.geolocation.clearWatch(1);
+
+	fetch('/')
+		.then(r => r.text())
+		.then(data => {
+			let body = data.match(/<body>[\s\S]+?<\/body>/)[0];
+			let script = document.createElement('script');
+
+			script.src = '/script.js';
+			document.head.querySelector('script[src="/script.js"]').remove();
+
+			class Map extends ol.Map {
+				constructor(options) {
+					super(options);
+					map = this;
+				}
+			}
+			ol.Map = Map;
+
+			class Feature extends ol.Feature {
+				constructor(geometryOrProperties) {
+					super(geometryOrProperties);
+				}
+
+				setStyle(style) {
+					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+						playerFeature = this;
+					}
+					super.setStyle(style);
+				}
+			}
+			ol.Feature = Feature;
+
+			document.body.innerHTML = body;
+			document.head.appendChild(script);
+
+			setTimeout(main, 1000);
+		});
+}, false);
 
 async function main() {
 	'use strict';
 
-	if (document.querySelector('script[src="/intel.js"]')) { return; }
-
-
-	const USERSCRIPT_VERSION = '1.5.14';
+	const USERSCRIPT_VERSION = '1.5.15';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -64,6 +104,7 @@ async function main() {
 			notifications: 1,
 		},
 		ui: {
+			doubleClickZoom: 0,
 			pointBgImage: 1,
 			pointBtnsRtl: 0,
 			pointBgImageBlur: 1,
@@ -306,6 +347,13 @@ async function main() {
 		toast.showToast();
 	}
 
+	let doubleClickZoomInteraction;
+	map.getInteractions().forEach(interaction => {
+		if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
+	});
+	doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
+
+
 	let originalFetch = window.fetch;
 	window.fetch = proxiedFetch;
 
@@ -333,6 +381,7 @@ async function main() {
 	let selfExpSpan = document.querySelector('#self-info__exp');
 	let selfLvlSpan = document.querySelector('#self-info__explv');
 	let selfNameSpan = document.querySelector('#self-info__name');
+	let toggleFollow = document.querySelector('#toggle-follow');
 	let xpDiffSpan = document.querySelector('.xp-diff');
 	let zoomContainer = document.querySelector('.ol-zoom');
 
@@ -1017,6 +1066,7 @@ async function main() {
 			);
 			let subSection = document.createElement('section');
 
+			let doubleClickZoom = createInput('checkbox', 'ui_doubleClickZoom', +ui.doubleClickZoom, 'Зум карты по двойному нажатию');
 			let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
@@ -1062,7 +1112,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(branding, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
+			subSection.append(branding, doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
 
 			section.appendChild(subSection);
 
@@ -1258,11 +1308,14 @@ async function main() {
 		switch (ui.branding) {
 			case 'team':
 				html.style.removeProperty(`--team-${player.team}`);
+				document.querySelector('input[name="ui_brandingColor"]').classList.add('sbgcui_hidden');
 				break;
 			case 'custom':
 				html.style.setProperty(`--team-${player.team}`, ui.brandingColor);
 				break;
 		}
+
+		doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
 
 		if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1448,6 +1501,7 @@ async function main() {
 			},
 			auth: localStorage.getItem('auth'),
 			guid: selfData.guid,
+			feature: playerFeature,
 			get level() { return this._level; },
 			set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
 			_level: selfData.lvl,
@@ -1459,6 +1513,7 @@ async function main() {
 				catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
 				refs: { allied: 20, hostile: 10 },
 			};
+			localStorage.setItem('sbgcui_config', JSON.stringify(config));
 		}
 	}
 
@@ -1655,13 +1710,25 @@ async function main() {
 			counter.innerText = uniqueRefsAmount;
 			setTimeout(() => { counter.innerText = refsAmount; }, 1000);
 		});
+
+		toggleFollow.addEventListener('touchstart', event => {
+			let touchStartDate = Date.now();
+
+			let timeoutID = setTimeout(() => {
+				map.getView().animate({ center: player.feature.getGeometry().getCoordinates() }, { zoom: 17 });
+			}, 1000);
+
+			this.addEventListener('touchend', () => {
+				let touchDuration = Date.now() - touchStartDate;
+				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+			}, { once: true });
+		});
 	}
 
 
 	/* Удаление ненужного, переносы, переименования */
 	{
 		let ops = document.querySelector('#ops');
-		let fw = document.querySelector('#toggle-follow');
 		let blContainer = document.querySelector('.bottomleft-container');
 		let rotateArrow = document.querySelector('.ol-rotate');
 		let layersButton = document.querySelector('#layers');
@@ -1686,10 +1753,10 @@ async function main() {
 		layersButton.innerText = '';
 		layersButton.classList.add('fa-solid', 'fa-layer-group');
 
-		zoomContainer.append(rotateArrow, fw, layersButton);
+		zoomContainer.append(rotateArrow, toggleFollow, layersButton);
 
-		fw.innerText = '';
-		fw.classList.add('fa-solid', 'fa-location-crosshairs');
+		toggleFollow.innerText = '';
+		toggleFollow.classList.add('fa-solid', 'fa-location-crosshairs');
 
 		blContainer.appendChild(ops);
 
