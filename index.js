@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.12
+// @version      1.5.13
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -18,7 +18,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.12';
+	const USERSCRIPT_VERSION = '1.5.13';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -74,7 +74,7 @@ async function main() {
 			outer: 'off',
 			outerTop: 'cores',
 			outerBottom: 'highlevel',
-			text: 'refsAmount', // level || refsAmount || off
+			text: 'refsAmount', // energy || level || refsAmount || off
 			innerColor: '#E87100',
 			outerColor: '#E87100',
 			outerTopColor: '#EB4DBF',
@@ -473,7 +473,7 @@ async function main() {
 											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
 
 											getPointData(guid)
-												.then(data => { inview[guid] = { cores: data.co, level: data.l, timestamp: Date.now() }; })
+												.then(data => { inview[guid] = { cores: data.co, energy: data.e, level: data.l, timestamp: Date.now() }; })
 												.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 										});
 									}
@@ -1084,6 +1084,7 @@ async function main() {
 				[
 					['Нет', 'off'],
 					['Уровень', 'level'],
+					['Энергия', 'energy'],
 					['Количество рефов', 'refsAmount'],
 				],
 				'pointHighlighting_text',
@@ -2467,6 +2468,9 @@ async function main() {
 
 			textToRender(type) {
 				switch (type) {
+					case 'energy':
+						let energy = inview[this.id_]?.energy;
+						return typeof energy == 'number' ? String(Math.round(energy * 10) / 10) : null;
 					case 'level':
 						let level = inview[this.id_]?.level;
 						return typeof level == 'number' ? String(level) : null;
