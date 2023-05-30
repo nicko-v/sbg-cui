@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.16
+// @version      1.5.17
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -35,8 +35,20 @@ class Feature extends ol.Feature {
 ol.Map = Map;
 ol.Feature = Feature;
 
+let originalAppend = Element.prototype.append;
+Element.prototype.append = function () {
+	if (arguments[0].src == 'https://3d.sytes.net/script.js') { Array.prototype.shift.apply(arguments); }
+	originalAppend.apply(this, arguments);
+};
 
-window.addEventListener('load', () => setTimeout(main, 1000));
+fetch('/script.js')
+	.then(r => r.text())
+	.then(data => {
+		data = data.replace('const TeamColors = [', 'window.TeamColors = [');
+		eval(data);
+		window.addEventListener('load', () => setTimeout(main, 1000));
+	 });
+
 
 
 async function main() {
@@ -45,7 +57,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.16';
+	const USERSCRIPT_VERSION = '1.5.17';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -80,6 +92,8 @@ async function main() {
 			grayscale: IS_DARK ? 1 : 0,
 			sepia: 1,
 			blur: 0,
+			branding: 'default', // default || custom
+			brandingColor: '#CCCCCC',
 		},
 		tinting: {
 			map: 1,
@@ -96,8 +110,6 @@ async function main() {
 			pointBtnsRtl: 0,
 			pointBgImageBlur: 1,
 			pointDischargeTimeout: 1,
-			branding: 'team', // team || custom
-			brandingColor: '#CCCCCC',
 		},
 		pointHighlighting: {
 			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
@@ -648,7 +660,7 @@ async function main() {
 				let message = '';
 
 				for (let key in deleted) {
-					message += `<br><span style="background: var(--team-${player.team}); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${ITEMS_TYPES[key].eng}`;
+					message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${ITEMS_TYPES[key].eng}`;
 				}
 
 				let toast = createToast(`Удалено: ${message}`);
@@ -967,7 +979,7 @@ async function main() {
 
 			let section = createSection(
 				'Цветовая схема',
-				'Настройте оттенок карты.'
+				'Настройте цвет своей команды и оттенок карты.'
 			);
 			let subSection = document.createElement('section');
 
@@ -977,10 +989,35 @@ async function main() {
 			let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
 			let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
 			let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
+			let branding = createDropdown('Цвет вашей команды:', [['Стандартный', 'default'], ['Собственный', 'custom']], 'mapFilters_branding', mapFilters.branding);
+			let brandingColorPicker = createColorPicker('mapFilters_brandingColor', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
+
+			let brandingSelect = branding.querySelector('select');
+
+			brandingSelect.addEventListener('change', event => {
+				if (event.target.value == 'default') {
+					brandingColorPicker.value = hex326(player.teamColor);
+					html.style.setProperty(`--sbgcui-branding-color`, player.teamColor);
+				} else {
+					brandingColorPicker.value = mapFilters.brandingColor;
+					html.style.setProperty(`--sbgcui-branding-color`, mapFilters.brandingColor);
+				}
+			});
+
+			brandingColorPicker.addEventListener('input', event => {
+				if (brandingSelect.value == 'default') { brandingSelect.value = 'custom' }
+				html.style.setProperty(`--sbgcui-branding-color`, hex623(event.target.value));
+			});
+			brandingColorPicker.addEventListener('change', () => {
+				// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
+				brandingColorPicker.value = hex623(brandingColorPicker.value, false);
+			});
+
+			branding.appendChild(brandingColorPicker);
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(invert, hueRotate, brightness, grayscale, sepia, blur);
+			subSection.append(branding, invert, hueRotate, brightness, grayscale, sepia, blur);
 
 			section.appendChild(subSection);
 
@@ -1058,32 +1095,6 @@ async function main() {
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
 			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
-			let branding = createDropdown('Цвет интерфейса:', [['Командный', 'team'], ['Собственный', 'custom']], 'ui_branding', ui.branding);
-			let brandingColorPicker = createColorPicker('ui_brandingColor', ui.brandingColor);
-
-			let brandingSelect = branding.querySelector('select');
-
-			brandingSelect.addEventListener('change', event => {
-				switch (event.target.value) {
-					case 'team':
-						brandingColorPicker.classList.add('sbgcui_hidden');
-						html.style.removeProperty(`--team-${player.team}`);
-						break;
-					case 'custom':
-						brandingColorPicker.classList.remove('sbgcui_hidden');
-						html.style.setProperty(`--team-${player.team}`, brandingColorPicker.value);
-						break;
-				}
-			});
-
-			brandingColorPicker.addEventListener('input', event => {
-				html.style.setProperty(`--team-${player.team}`, event.target.value);
-			});
-
-			if (ui.branding == 'team') { brandingColorPicker.classList.add('sbgcui_hidden'); }
-
-			branding.appendChild(brandingColorPicker);
-
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -1099,7 +1110,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(branding, doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
+			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
 
 			section.appendChild(subSection);
 
@@ -1292,15 +1303,9 @@ async function main() {
 
 		html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
 		html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
-		switch (ui.branding) {
-			case 'team':
-				html.style.removeProperty(`--team-${player.team}`);
-				document.querySelector('input[name="ui_brandingColor"]').classList.add('sbgcui_hidden');
-				break;
-			case 'custom':
-				html.style.setProperty(`--team-${player.team}`, ui.brandingColor);
-				break;
-		}
+		html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
+		window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor}80`;
+		window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
 		doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
 
@@ -1458,6 +1463,16 @@ async function main() {
 		setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
 	}
 
+	function hex623(hex, isShort = true) {
+		return isShort ?
+			`#${[...hex].filter((e, i) => i % 2).join('')}` :
+			`#${[...hex].map((e, i, a) => i % 2 ? e : a[i - 1]).join('')}`;
+	}
+
+	function hex326(hex) {
+		return [...hex].map(e => e == '#' ? e : e + e).join('');
+	}
+
 
 	/* Данные о себе и версии игры */
 	{
@@ -1489,6 +1504,7 @@ async function main() {
 			auth: localStorage.getItem('auth'),
 			guid: selfData.guid,
 			feature: playerFeature,
+			teamColor: getComputedStyle(html).getPropertyValue(`--team-${selfData.team}`),
 			get level() { return this._level; },
 			set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
 			_level: selfData.lvl,
@@ -1516,7 +1532,6 @@ async function main() {
 
 		cssVars.innerHTML = (`
       :root {
-        --sbgcui-player-team: var(--team-${player.team});
         --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
         --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
         --sbgcui-invert: ${mapFilters.invert};
@@ -1529,10 +1544,15 @@ async function main() {
         --sbgcui-point-image: '';
         --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
         --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
+				--sbgcui-branding-color: ${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor};
+				--team-${player.team}: var(--sbgcui-branding-color);
       }
   	`);
 
-		if (ui.branding == 'custom') {html.style.setProperty(`--team-${player.team}`, ui.brandingColor);}
+		if (mapFilters.branding == 'custom') {
+			window.TeamColors[player.team].fill = mapFilters.brandingColor + '80';
+			window.TeamColors[player.team].stroke = hex623(mapFilters.brandingColor);
+		}
 
 		[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
@@ -2319,7 +2339,7 @@ async function main() {
 							.then(data => {
 								if (!data) { return; }
 								pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
-								pointLink.style.color = `var(--team-${data.te})`;
+								pointLink.style.color = data.te == player.team ? 'var(--sbgcui-branding-color)' : `var(--team-${data.te})`;
 								pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
 							});
 					}

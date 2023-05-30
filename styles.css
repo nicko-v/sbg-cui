@@ -40,7 +40,7 @@ body {
 	padding: 0;
 	border-width: 8px;
 	border-radius: 50%;
-	border-color: var(--sbgcui-player-team);
+	border-color: var(--sbgcui-branding-color);
 	box-shadow: 0px 0px 10px 0px rgba(110, 110, 110, 0.2);
 	-moz-transform: rotate(-45deg);
 	backdrop-filter: blur(1px);
@@ -52,7 +52,7 @@ body {
 	content: "";
 	width: 50%;
 	height: 50%;
-	background-color: var(--sbgcui-player-team);
+	background-color: var(--sbgcui-branding-color);
 	border-radius: 30%;
 	margin: auto;
 	transition: transform 0.5s ease, border-radius 0.5s ease 0.2s;
@@ -134,6 +134,7 @@ body {
 	left: 100%;
 	z-index: 1;
 	pointer-events: auto;
+	color: var(--sbgcui-branding-color) !important;
 }
 
 #toggle-follow {
@@ -152,7 +153,7 @@ body {
 
 #ops,
 .game-menu>button {
-	color: var(--sbgcui-player-team);
+	color: var(--sbgcui-branding-color);
 	background-color: var(--ol-background-color);
 	border: 1px solid var(--ol-subtle-background-color);
 	border-radius: 4px;
@@ -294,7 +295,7 @@ body {
 	height: 100%;
 	width: var(--sbgcui-energy);
 	opacity: 0.3;
-	background-color: var(--sbgcui-player-team);
+	background-color: var(--sbgcui-branding-color);
 	transition: width 0.5s ease;
 }
 
@@ -353,14 +354,14 @@ body {
 }
 
 .ol-control button {
-	color: var(--sbgcui-player-team);
+	color: var(--sbgcui-branding-color);
 	font-size: 1.7em !important;
 }
 
 .ol-control button:hover,
 .ol-control button:focus {
 	outline: unset;
-	color: var(--sbgcui-player-team);
+	color: var(--sbgcui-branding-color);
 }
 
 .ol-layer__base {
@@ -399,7 +400,7 @@ body {
 }
 
 .self-info {
-	color: var(--sbgcui-player-team);
+	color: var(--sbgcui-branding-color);
 	font-weight: bold;
 	border: none;
 	background-color: unset;
@@ -429,7 +430,7 @@ body {
 	max-width: unset;
 	width: 100%;
 	box-sizing: border-box;
-	background: linear-gradient(180deg, var(--sbgcui-player-team) -100%, rgba(255, 255, 255, 0) 100%);
+	background: linear-gradient(180deg, var(--sbgcui-branding-color) -100%, rgba(255, 255, 255, 0) 100%);
 	pointer-events: none;
 	position: initial;
 	top: initial;
@@ -454,9 +455,9 @@ body {
 
 .sbgcui_toast-team,
 .sbgcui_compare_stats-toast {
-	border: 1px var(--sbgcui-player-team) solid;
-	border-color: var(--sbgcui-player-team);
-	box-shadow: 0 0 15px var(--sbgcui-player-team);
+	border: 1px var(--sbgcui-branding-color) solid;
+	border-color: var(--sbgcui-branding-color);
+	box-shadow: 0 0 15px var(--sbgcui-branding-color);
 	background: var(--background);
 	color: var(--text);
 }
@@ -659,7 +660,7 @@ body {
 }
 
 .sbgcui_settings-amount_label_allied {
-	color: var(--sbgcui-player-team);
+	color: var(--sbgcui-branding-color);
 }
 
 .sbgcui_settings-amount_label_hostile {
@@ -747,7 +748,7 @@ body {
 	max-height: 60%;
 	background-color: var(--background);
 	box-shadow: 0 0 5px var(--shadow);
-	border: 1px solid var(--sbgcui-player-team);
+	border: 1px solid var(--sbgcui-branding-color);
 	border-radius: 3px;
 	z-index: 2;
 	padding: 0 10px;
@@ -850,7 +851,7 @@ body {
 }
 
 .sbgcui_xpProgressBar {
-	border: 1px solid var(--sbgcui-player-team);
+	border: 1px solid var(--sbgcui-branding-color);
 	position: relative;
 }
 
@@ -860,7 +861,7 @@ body {
 	left: 0;
 	width: var(--sbgcui-player-exp-percentage);
 	height: 100%;
-	background-color: var(--sbgcui-player-team);
+	background-color: var(--sbgcui-branding-color);
 	opacity: 0.3;
 }
 
