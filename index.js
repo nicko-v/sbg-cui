@@ -1723,7 +1723,7 @@ async function main() {
 
 			let timeoutID = setTimeout(() => {
 				map.getView().animate({ center: player.feature.getGeometry().getCoordinates() }, { zoom: 17 });
-			}, 1000);
+			}, 500);
 
 			this.addEventListener('touchend', () => {
 				let touchDuration = Date.now() - touchStartDate;
