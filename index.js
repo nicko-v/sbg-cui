@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.15
+// @version      1.5.16
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -12,53 +12,40 @@
 
 let map, playerFeature;
 
-window.addEventListener('load', () => {
-	if (document.querySelector('script[src="/intel.js"]')) { return; }
+class Map extends ol.Map {
+	constructor(options) {
+		super(options);
+		map = this;
+	}
+}
 
-	navigator.geolocation.clearWatch(1);
+class Feature extends ol.Feature {
+	constructor(geometryOrProperties) {
+		super(geometryOrProperties);
+	}
 
-	fetch('/')
-		.then(r => r.text())
-		.then(data => {
-			let body = data.match(/<body>[\s\S]+?<\/body>/)[0];
-			let script = document.createElement('script');
+	setStyle(style) {
+		if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+			playerFeature = this;
+		}
+		super.setStyle(style);
+	}
+}
 
-			script.src = '/script.js';
-			document.head.querySelector('script[src="/script.js"]').remove();
+ol.Map = Map;
+ol.Feature = Feature;
 
-			class Map extends ol.Map {
-				constructor(options) {
-					super(options);
-					map = this;
-				}
-			}
-			ol.Map = Map;
 
-			class Feature extends ol.Feature {
-				constructor(geometryOrProperties) {
-					super(geometryOrProperties);
-				}
+window.addEventListener('load', () => setTimeout(main, 1000));
 
-				setStyle(style) {
-					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
-						playerFeature = this;
-					}
-					super.setStyle(style);
-				}
-			}
-			ol.Feature = Feature;
-
-			document.body.innerHTML = body;
-			document.head.appendChild(script);
-
-			setTimeout(main, 1000);
-		});
-}, false);
 
 async function main() {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.5.15';
+	if (document.querySelector('script[src="/intel.js"]')) { return; }
+
+
+	const USERSCRIPT_VERSION = '1.5.16';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
