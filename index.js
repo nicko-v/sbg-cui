@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.18
+// @version      1.5.19
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,6 +11,8 @@
 // ==/UserScript==
 
 let map, playerFeature;
+
+if (window.navigator.userAgent.toLowerCase().includes('wv')) { return; }
 
 class Map extends ol.Map {
 	constructor(options) {
@@ -57,7 +59,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.18';
+	const USERSCRIPT_VERSION = '1.5.19';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
