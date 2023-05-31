@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.19
+// @version      1.5.20
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -59,7 +59,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.19';
+		const USERSCRIPT_VERSION = '1.5.20';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2431,6 +2431,13 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				return refsArr.every(e => e.classList.contains('loaded'));
 			}
 
+			function isEveryRefCached(refsArr) {
+				let cache = JSON.parse(localStorage.getItem('refs-cache')) || {};
+				let cachedGuids = Object.keys(cache);
+
+				return refsArr.every(e => cachedGuids.includes(e.dataset.ref));
+			}
+
 			function getSortParam(ref, param) {
 				let regex;
 
@@ -2507,10 +2514,32 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				});
 			}
 
+			function onRefsListLoaded() {
+				sortRefsBy(refsArr, sortParam);
+				inventoryContent.replaceChildren(...refsArr);
+				select.removeAttribute('disabled');
+				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
+				inventoryContent.classList.remove('sbgcui_inventory-blurred');
+			}
+
+			function abortLoading() {
+				clearInterval(intervalID);
+				inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
+
+				select.value = 'none';
+				select.removeAttribute('disabled');
+
+				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
+				inventoryContent.classList.remove('sbgcui_inventory-blurred');
+			}
+
 			let invControls = document.querySelector('.inventory__controls');
 			let invDelete = document.querySelector('#inventory-delete');
 			let select = document.createElement('select');
 			let sortOrderButton = document.createElement('button');
+			let intervalID;
+			let refsArr;
+			let sortParam;
 
 			sortOrderButton.classList.add('fa-solid', 'fa-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
 			select.classList.add('sbgcui_refs-sort-select');
@@ -2533,8 +2562,8 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			});
 
 			select.addEventListener('change', event => {
-				let refsArr = Array.from(inventoryContent.children);
-				let sortParam = event.target.value;
+				refsArr = Array.from(inventoryContent.children);
+				sortParam = event.target.value;
 
 				if (sortParam == 'none') { return; }
 
@@ -2547,9 +2576,9 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					inventoryContent.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
 				} else {
-					let intervalID;
 					let scrollTop = 0;
 					let scrollStep = inventoryContent.offsetHeight * 0.9;
+					let interval = isEveryRefCached(refsArr) ? 0 : 50;
 
 					inventoryContent.classList.add('sbgcui_inventory-blurred');
 
@@ -2558,26 +2587,19 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 							inventoryContent.scrollTop = scrollTop;
 							inventoryContent.dispatchEvent(new Event('scroll'));
 							scrollTop += scrollStep;
+							inventoryContent.style.setProperty('--sbgcui-blur-height', `${inventoryContent.scrollHeight}px`);
 						} else {
 							clearInterval(intervalID);
 							inventoryContent.scrollTop = 0;
-							inventoryContent.classList.remove('sbgcui_inventory-blurred');
 						}
-					}, 50);
+					}, interval);
 
-					inventoryContent.addEventListener('refsListLoaded', () => {
-						sortRefsBy(refsArr, sortParam);
-						inventoryContent.replaceChildren(...refsArr);
-						select.removeAttribute('disabled');
-					}, { once: true });
+					inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
 				}
 			});
 
-			document.querySelector('.inventory__tabs').addEventListener('click', event => {
-				select.removeAttribute('disabled');
-				select.value = 'none';
-			});
-			invCloseButton.addEventListener('click', () => { select.value = 'none'; });
+			document.querySelector('.inventory__tabs').addEventListener('click', abortLoading);
+			invCloseButton.addEventListener('click', abortLoading);
 
 			sortOrderButton.addEventListener('click', () => {
 				inventoryContent.classList.toggle('sbgcui_refs-reverse');
