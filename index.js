@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.22
+// @version      1.5.23
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -58,7 +58,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.22';
+		const USERSCRIPT_VERSION = '1.5.23';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2432,9 +2432,8 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 
 			function isEveryRefCached(refsArr) {
 				let cache = JSON.parse(localStorage.getItem('refs-cache')) || {};
-				let cachedGuids = Object.keys(cache);
 
-				return refsArr.every(e => cachedGuids.includes(e.dataset.ref));
+				return refsArr.every(e => cache[e.dataset.ref]?.t > Date.now());
 			}
 
 			function getSortParam(ref, param) {
@@ -2598,7 +2597,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 								inventoryContent.dispatchEvent(new Event('scroll'));
 								inventoryContent.scrollTop = 0;
 							}
-						}, 50);
+						}, 10);
 					}
 
 					inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
