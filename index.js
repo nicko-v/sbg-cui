@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.20
+// @version      1.5.21
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -59,7 +59,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.20';
+		const USERSCRIPT_VERSION = '1.5.21';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2590,6 +2590,8 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 							inventoryContent.style.setProperty('--sbgcui-blur-height', `${inventoryContent.scrollHeight}px`);
 						} else {
 							clearInterval(intervalID);
+							inventoryContent.scrollTop = inventoryContent.scrollHeight;
+							inventoryContent.dispatchEvent(new Event('scroll'));
 							inventoryContent.scrollTop = 0;
 						}
 					}, interval);
