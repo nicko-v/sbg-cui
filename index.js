@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.23
+// @version      1.5.24
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -27,8 +27,21 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 
 		setStyle(style) {
 			if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+				let setCenter = style[1].getGeometry().setCenter;
+
+				style[1].getGeometry().setCenter = pos => {
+					setCenter.call(style[1].getGeometry(), pos);
+					style[3].getGeometry().setCenter(pos);
+				};
+
+				style[3] = new ol.style.Style({
+					geometry: new ol.geom.Circle(ol.proj.fromLonLat([0, 0]), 0),
+					stroke: new ol.style.Stroke({ color: '#CCCCCC33', width: 4 }),
+				});
+
 				playerFeature = this;
 			}
+
 			super.setStyle(style);
 		}
 	}
@@ -45,9 +58,15 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 	fetch('/script.js')
 		.then(r => r.text())
 		.then(data => {
+			let script = document.createElement('script');
+			
+			data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 			data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 			data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-			eval(data);
+			
+			script.textContent = data;
+			document.head.appendChild(script);
+
 			window.addEventListener('load', () => setTimeout(main, 1000));
 		});
 
@@ -58,7 +77,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.23';
+		const USERSCRIPT_VERSION = '1.5.24';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -360,6 +379,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		let html = document.documentElement;
 		let attackButton = document.querySelector('#attack-menu');
 		let attackSlider = document.querySelector('.attack-slider-wrp');
+		let catalysersList = document.querySelector('#catalysers-list');
 		let coresList = document.querySelector('#cores-list');
 		let discoverButton = document.querySelector('#discover');
 		let inventoryButton = document.querySelector('#ops');
@@ -1473,6 +1493,11 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		function hex326(hex) {
 			return [...hex].map(e => e == '#' ? e : e + e).join('');
 		}
+	
+		function toOLMeters(meters, rate) {
+			rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, map.getView().getCenter(), 'm');
+			return meters * rate;
+		}
 
 
 		/* Данные о себе и версии игры */
@@ -1665,7 +1690,15 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					inventoryContent.dispatchEvent(event);
 				}
 			});
-			refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] })
+			refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+			let catalysersListObserver = new MutationObserver(records => {
+				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
+					let event = new Event('activeSlideChanged');
+					catalysersList.dispatchEvent(event);
+				}
+			});
+			catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 		}
 
 
@@ -2744,6 +2777,29 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			}
 
 			ol.Feature = OlFeature;
+		}
+
+		/* Показ радиуса катализатора */
+		{
+			function drawBlastRange() {
+				let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
+				let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+				let level = cache.find(e => e.g == activeSlide.dataset.guid).l;
+				let range = window.Catalysers[level].range;
+
+				playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
+				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
+				playerFeature.changed();
+			}
+
+			function hideBlastRange() {
+				playerFeature.getStyle()[3].getGeometry().setRadius(0);
+				playerFeature.changed();
+			}
+
+			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
+			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
+			attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
 		}
 	}
 }
