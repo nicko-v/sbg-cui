@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.21
+// @version      1.5.22
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -52,14 +52,13 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		});
 
 
-
 	async function main() {
 		'use strict';
 
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.21';
+		const USERSCRIPT_VERSION = '1.5.22';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2578,23 +2577,29 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				} else {
 					let scrollTop = 0;
 					let scrollStep = inventoryContent.offsetHeight * 0.9;
-					let interval = isEveryRefCached(refsArr) ? 0 : 50;
 
-					inventoryContent.classList.add('sbgcui_inventory-blurred');
-
-					intervalID = setInterval(() => {
-						if (scrollTop <= inventoryContent.scrollHeight) {
-							inventoryContent.scrollTop = scrollTop;
+					if (isEveryRefCached(refsArr)) {
+						for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
+							inventoryContent.scrollTop = i;
 							inventoryContent.dispatchEvent(new Event('scroll'));
-							scrollTop += scrollStep;
-							inventoryContent.style.setProperty('--sbgcui-blur-height', `${inventoryContent.scrollHeight}px`);
-						} else {
-							clearInterval(intervalID);
-							inventoryContent.scrollTop = inventoryContent.scrollHeight;
-							inventoryContent.dispatchEvent(new Event('scroll'));
-							inventoryContent.scrollTop = 0;
 						}
-					}, interval);
+						inventoryContent.scrollTop = 0;
+					} else {
+						inventoryContent.classList.add('sbgcui_inventory-blurred');
+						intervalID = setInterval(() => {
+							if (scrollTop <= inventoryContent.scrollHeight) {
+								inventoryContent.scrollTop = scrollTop;
+								inventoryContent.dispatchEvent(new Event('scroll'));
+								scrollTop += scrollStep;
+								inventoryContent.style.setProperty('--sbgcui-blur-height', `${inventoryContent.scrollHeight}px`);
+							} else {
+								clearInterval(intervalID);
+								inventoryContent.scrollTop = inventoryContent.scrollHeight;
+								inventoryContent.dispatchEvent(new Event('scroll'));
+								inventoryContent.scrollTop = 0;
+							}
+						}, 50);
+					}
 
 					inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
 				}
