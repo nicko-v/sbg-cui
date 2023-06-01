@@ -43,6 +43,7 @@ body {
 	border-radius: 50%;
 	border-color: var(--sbgcui-branding-color);
 	box-shadow: 0px 0px 10px 0px rgba(110, 110, 110, 0.2);
+	transform: rotate(0deg);
 	-moz-transform: rotate(-45deg);
 	backdrop-filter: blur(1px);
 	-webkit-backdrop-filter: blur(1px);
@@ -265,13 +266,13 @@ body {
 	position: relative;
 }
 
-.inventory__content[data-type="3"]::before {
+.inventory__content[data-type="3"].sbgcui_refs_list-blur::before {
 	content: "";
 	position: absolute;
 	top: 0;
 	left: 0;
 	width: 100%;
-	height: var(--sbgcui-blur-height);
+	height: 100%;
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
 	z-index: 1;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.26
+// @version      1.5.27
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -77,7 +77,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.26';
+		const USERSCRIPT_VERSION = '1.5.27';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2558,7 +2558,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				sortRefsBy(refsArr, sortParam);
 				inventoryContent.replaceChildren(...refsArr);
 				select.removeAttribute('disabled');
-				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
+				inventoryContent.classList.remove('sbgcui_refs_list-blur');
 
 				if (isInMeasurementMode) {
 					performance.mark(perfMarkB);
@@ -2577,14 +2577,16 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				}
 			}
 
-			function onRefsTabClose() {
+			function onRefsTabClose(event) {
+				if (!event.isTrusted) { return; }
+
 				clearInterval(intervalID);
 				inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
 
 				select.value = 'none';
 				select.removeAttribute('disabled');
 
-				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
+				inventoryContent.classList.remove('sbgcui_refs_list-blur');
 			}
 
 			function clearMeasurements() {
@@ -2628,11 +2630,20 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			});
 
 			select.addEventListener('change', event => {
+				let scrollEvent = new Event('scroll');
+
+				Object.defineProperty(scrollEvent, 'target', {
+					value: {
+						scrollTop: 0,
+						clientHeight: inventoryContent.clientHeight,
+					}
+				});
+
 				refsArr = Array.from(inventoryContent.children);
 				sortParam = event.target.value;
 
 				if (sortParam == 'none') { return; }
-
+				
 				inventoryContent.classList.remove('sbgcui_refs-reverse');
 				select.setAttribute('disabled', '');
 
@@ -2644,8 +2655,12 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					let scrollTop = 0;
 					let scrollStep = inventoryContent.offsetHeight * 0.9;
 
+					inventoryContent.classList.add('sbgcui_refs_list-blur');
+
 					if (isInMeasurementMode) {
+						// Если все рефы уже подгружены, надо сбросить их – для этого обновляем вкладку:
 						if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-type="3"]')?.click(); }
+
 						localStorage.removeItem('refs-cache');
 						performance.mark(perfMarkA);
 						console.log(`Загрузка и сортировка рефов начаты: ${new Date().toLocaleTimeString()}`);
@@ -2653,22 +2668,18 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					
 					if (isEveryRefCached(refsArr)) {
 						for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
-							inventoryContent.scrollTop = i;
-							inventoryContent.dispatchEvent(new Event('scroll'));
+							scrollEvent.target.scrollTop = i;
+							inventoryContent.dispatchEvent(scrollEvent);
 						}
-						inventoryContent.scrollTop = 0;
 					} else {
 						intervalID = setInterval(() => {
 							if (scrollTop <= inventoryContent.scrollHeight) {
-								inventoryContent.scrollTop = scrollTop;
-								inventoryContent.dispatchEvent(new Event('scroll'));
-								scrollTop += scrollStep;
-								inventoryContent.style.setProperty('--sbgcui-blur-height', `${inventoryContent.scrollHeight}px`);
+								scrollEvent.target.scrollTop += scrollStep;
+								inventoryContent.dispatchEvent(scrollEvent);
 							} else {
 								clearInterval(intervalID);
-								inventoryContent.scrollTop = inventoryContent.scrollHeight;
-								inventoryContent.dispatchEvent(new Event('scroll'));
-								inventoryContent.scrollTop = 0;
+								scrollEvent.target.scrollTop = scrollTop;
+								inventoryContent.dispatchEvent(scrollEvent);
 							}
 						}, 10);
 					}
