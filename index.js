@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.25
+// @version      1.5.26
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -77,7 +77,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.25';
+		const USERSCRIPT_VERSION = '1.5.26';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -214,12 +214,17 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				return pointEnergy / maxPointEnergy * 100;
 			}
 
-			get mostChargedCatalyser() {
-				return Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
+			get mostChargedCatalyserEnergy() {
+				let energy = Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
+				return isFinite(energy) ? energy : null;
 			}
 
 			get dischargeTimeout() {
-				let timeout = this.mostChargedCatalyser / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
+				let mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
+
+				if (mostChargedCatalyserEnergy == null) { return ''; }
+
+				let timeout = mostChargedCatalyserEnergy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
 				let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
 				let dh2 = ['d', 'hr'];
 				let result = '';
@@ -1706,6 +1711,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			});
 			refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] });
 
+
 			let catalysersListObserver = new MutationObserver(records => {
 				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
 					let event = new Event('activeSlideChanged');
@@ -2559,9 +2565,11 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					console.log(`Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
 
 					let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
+					let duration = Math.round(measure.duration / 1000);
+					let uniqueRefsAmount = inventoryContent.childNodes.length;
 					let toast;
 
-					toast = createToast(`Загрузка и сортировка рефов заняли ${Math.round(measure.duration / 1000)} сек.`, 'top left', -1);
+					toast = createToast(`Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`, 'top left', -1);
 					toast.options.className = 'sbgcui_toast-selection';
 					toast.showToast();
 
