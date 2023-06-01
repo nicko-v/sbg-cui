@@ -2678,7 +2678,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 								inventoryContent.dispatchEvent(scrollEvent);
 							} else {
 								clearInterval(intervalID);
-								scrollEvent.target.scrollTop = scrollTop;
+								scrollEvent.target.scrollTop = inventoryContent.scrollHeight;
 								inventoryContent.dispatchEvent(scrollEvent);
 							}
 						}, 10);
