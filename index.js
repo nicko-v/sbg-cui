@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.24
+// @version      1.5.25
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -77,7 +77,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.24';
+		const USERSCRIPT_VERSION = '1.5.25';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -214,8 +214,12 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				return pointEnergy / maxPointEnergy * 100;
 			}
 
+			get mostChargedCatalyser() {
+				return Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
+			}
+
 			get dischargeTimeout() {
-				let timeout = this.energy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
+				let timeout = this.mostChargedCatalyser / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
 				let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
 				let dh2 = ['d', 'hr'];
 				let result = '';
@@ -385,6 +389,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		let inventoryButton = document.querySelector('#ops');
 		let invCloseButton = document.querySelector('#inventory__close');
 		let inventoryContent = document.querySelector('.inventory__content');
+		let inventoryPopup = document.querySelector('.inventory.popup');
 		let invTotalSpan = document.querySelector('#self-info__inv');
 		let pointCores = document.querySelector('.i-stat__cores');
 		let pointImage = document.querySelector('#i-image');
@@ -405,8 +410,9 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		let xpDiffSpan = document.querySelector('.xp-diff');
 		let zoomContainer = document.querySelector('.ol-zoom');
 
-		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
+		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
+		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 
 		let lastOpenedPoint = {};
 		let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
@@ -1649,6 +1655,14 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
 
 
+			let inventoryPopupObserver = new MutationObserver(records => {
+				isInventoryPopupOpened = !records[0].target.classList.contains('hidden');
+				let event = new Event(isInventoryPopupOpened ? 'inventoryPopupOpened' : 'inventoryPopupClosed');
+				records[0].target.dispatchEvent(event);
+			});
+			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ["class"] });
+
+
 			let attackSliderObserver = new MutationObserver(records => {
 				let isHidden = records[0].target.classList.contains('hidden');
 				let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
@@ -2531,17 +2545,6 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 						default:
 							return aParam - bParam;
 					}
-
-					if (param == 'name') {
-						return aParam.localeCompare(bParam);
-					} else if (aParam == bParam) {
-						let aName = getSortParam(a, 'name');
-						let bName = getSortParam(b, 'name');
-
-						return aName.localeCompare(bName);
-					} else {
-						return aParam - bParam;
-					}
 				});
 			}
 
@@ -2550,10 +2553,23 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				inventoryContent.replaceChildren(...refsArr);
 				select.removeAttribute('disabled');
 				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
-				inventoryContent.classList.remove('sbgcui_inventory-blurred');
+
+				if (isInMeasurementMode) {
+					performance.mark(perfMarkB);
+					console.log(`Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
+
+					let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
+					let toast;
+
+					toast = createToast(`Загрузка и сортировка рефов заняли ${Math.round(measure.duration / 1000)} сек.`, 'top left', -1);
+					toast.options.className = 'sbgcui_toast-selection';
+					toast.showToast();
+
+					clearMeasurements();
+				}
 			}
 
-			function abortLoading() {
+			function onRefsTabClose() {
 				clearInterval(intervalID);
 				inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
 
@@ -2561,13 +2577,24 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				select.removeAttribute('disabled');
 
 				inventoryContent.style.setProperty('--sbgcui-blur-height', 0);
-				inventoryContent.classList.remove('sbgcui_inventory-blurred');
+			}
+
+			function clearMeasurements() {
+				isInMeasurementMode = false;
+				performance.clearMarks(perfMarkA);
+				performance.clearMarks(perfMarkB);
+				performance.clearMeasures(perfMeasure);
+				invCloseButton.removeAttribute('sbgcui_measurement_mode');
 			}
 
 			let invControls = document.querySelector('.inventory__controls');
 			let invDelete = document.querySelector('#inventory-delete');
 			let select = document.createElement('select');
 			let sortOrderButton = document.createElement('button');
+			let perfMarkA = 'sbgcui_refs_sort_begin';
+			let perfMarkB = 'sbgcui_refs_sort_end';
+			let perfMeasure = 'sbgcui_refs_sort_measure';
+			let isInMeasurementMode = false;
 			let intervalID;
 			let refsArr;
 			let sortParam;
@@ -2599,10 +2626,9 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				if (sortParam == 'none') { return; }
 
 				inventoryContent.classList.remove('sbgcui_refs-reverse');
-
 				select.setAttribute('disabled', '');
 
-				if (sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) {
+				if ((sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) && !isInMeasurementMode) {
 					sortRefsBy(refsArr, sortParam);
 					inventoryContent.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
@@ -2610,6 +2636,13 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					let scrollTop = 0;
 					let scrollStep = inventoryContent.offsetHeight * 0.9;
 
+					if (isInMeasurementMode) {
+						if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-type="3"]')?.click(); }
+						localStorage.removeItem('refs-cache');
+						performance.mark(perfMarkA);
+						console.log(`Загрузка и сортировка рефов начаты: ${new Date().toLocaleTimeString()}`);
+					}
+					
 					if (isEveryRefCached(refsArr)) {
 						for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
 							inventoryContent.scrollTop = i;
@@ -2617,7 +2650,6 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 						}
 						inventoryContent.scrollTop = 0;
 					} else {
-						inventoryContent.classList.add('sbgcui_inventory-blurred');
 						intervalID = setInterval(() => {
 							if (scrollTop <= inventoryContent.scrollHeight) {
 								inventoryContent.scrollTop = scrollTop;
@@ -2637,8 +2669,32 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				}
 			});
 
-			document.querySelector('.inventory__tabs').addEventListener('click', abortLoading);
-			invCloseButton.addEventListener('click', abortLoading);
+			document.querySelector('.inventory__tabs').addEventListener('click', onRefsTabClose);
+			invCloseButton.addEventListener('click', onRefsTabClose);
+			inventoryPopup.addEventListener('inventoryPopupOpened', clearMeasurements);
+			invCloseButton.addEventListener('touchstart', () => {
+				let touchStartDate = Date.now();
+
+				let timeoutID = setTimeout(() => {
+					let toast;
+					let message = `Режим измерения производительности. <br><br>
+						Выберите тип сортировки (кроме "По названию" и "По количеству") для измерения скорости загрузки данных. <br><br>
+						Кэш рефов будет очищен. <br><br>
+						Для отмены операции закройте инвентарь.`;
+
+					toast = createToast(message, 'bottom center', -1);
+					toast.options.className = 'sbgcui_toast-selection';
+					toast.showToast();
+
+					isInMeasurementMode = true;
+					invCloseButton.setAttribute('sbgcui_measurement_mode', '');
+				}, 2000);
+
+				invCloseButton.addEventListener('touchend', () => {
+					let touchDuration = Date.now() - touchStartDate;
+					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+				}, { once: true });
+			});
 
 			sortOrderButton.addEventListener('click', () => {
 				inventoryContent.classList.toggle('sbgcui_refs-reverse');

@@ -99,6 +99,10 @@ body {
 	z-index: 2;
 }
 
+#inventory__close[sbgcui_measurement_mode]:has(~.inventory__content[data-type="3"]) {
+	color: var(--selection);
+}
+
 .inventory__content:not([data-type="3"])~.inventory__controls>select {
 	display: none;
 }
@@ -261,7 +265,7 @@ body {
 	position: relative;
 }
 
-.inventory__content[data-type="3"].sbgcui_inventory-blurred::before {
+.inventory__content[data-type="3"]::before {
 	content: "";
 	position: absolute;
 	top: 0;
