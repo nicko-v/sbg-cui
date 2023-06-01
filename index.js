@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.27
+// @version      1.5.28
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -77,7 +77,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.27';
+		const USERSCRIPT_VERSION = '1.5.28';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -2644,6 +2644,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 
 				if (sortParam == 'none') { return; }
 				
+				inventoryContent.scrollTop = 0;
 				inventoryContent.classList.remove('sbgcui_refs-reverse');
 				select.setAttribute('disabled', '');
 
@@ -2652,7 +2653,6 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					inventoryContent.replaceChildren(...refsArr);
 					select.removeAttribute('disabled');
 				} else {
-					let scrollTop = 0;
 					let scrollStep = inventoryContent.offsetHeight * 0.9;
 
 					inventoryContent.classList.add('sbgcui_refs_list-blur');
@@ -2673,7 +2673,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 						}
 					} else {
 						intervalID = setInterval(() => {
-							if (scrollTop <= inventoryContent.scrollHeight) {
+							if (scrollEvent.target.scrollTop <= inventoryContent.scrollHeight) {
 								scrollEvent.target.scrollTop += scrollStep;
 								inventoryContent.dispatchEvent(scrollEvent);
 							} else {
