@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.1
+// @version      0.0.2
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
@@ -82,7 +82,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '0.0.1';
+		const USERSCRIPT_VERSION = '0.0.2';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -445,6 +445,18 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		});
 		dragPan.setActive(localStorage.getItem('follow') == 'false');
 		doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
+
+		let geolocation = new ol.Geolocation({
+			projection: map.getView().getProjection(),
+			tracking: true,
+			trackingOptions: { enableHighAccuracy: true },
+		});
+		let speedSpan = document.createElement('span');
+
+		document.querySelector('.self-info').appendChild(speedSpan);
+		geolocation.on('change:speed', () => {
+			speedSpan.innerText = geolocation.getSpeed();
+		});
 
 
 		async function proxiedFetch(url, options) {
