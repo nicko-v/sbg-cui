@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         SBG CUI
+// @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      1.5.28
-// @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
-// @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
-// @description  SBG Custom UI
+// @version      0.0.1
+// @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
+// @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
+// @description  SBG Custom UI [Unstable]
 // @author       NV
 // @match        https://3d.sytes.net/*
 // @grant        none
@@ -17,6 +17,11 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		constructor(options) {
 			super(options);
 			map = this;
+		}
+
+		forEachFeatureAtPixel(pixel, callback, options = {}) {
+			options.hitTolerance = 25;
+			super.forEachFeatureAtPixel(pixel, callback, options);
 		}
 	}
 
@@ -77,7 +82,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 		if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-		const USERSCRIPT_VERSION = '1.5.28';
+		const USERSCRIPT_VERSION = '0.0.1';
 		const LATEST_KNOWN_VERSION = '0.3.0';
 		const INVENTORY_LIMIT = 3000;
 		const MIN_FREE_SPACE = 100;
@@ -375,12 +380,6 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			toast.showToast();
 		}
 
-		let doubleClickZoomInteraction;
-		map.getInteractions().forEach(interaction => {
-			if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
-		});
-		doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
-
 
 		let originalFetch = window.fetch;
 		window.fetch = proxiedFetch;
@@ -435,6 +434,17 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 			toDecimal(roman) { return this[roman]; },
 			toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
 		};
+
+
+		let dragPan;
+		let doubleClickZoomInteraction;
+
+		map.getInteractions().forEach(interaction => {
+			if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
+			if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
+		});
+		dragPan.setActive(localStorage.getItem('follow') == 'false');
+		doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
 
 
 		async function proxiedFetch(url, options) {
@@ -1772,7 +1782,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 				setTimeout(() => { counter.innerText = refsAmount; }, 1000);
 			});
 
-			toggleFollow.addEventListener('touchstart', event => {
+			toggleFollow.addEventListener('touchstart', () => {
 				let touchStartDate = Date.now();
 
 				let timeoutID = setTimeout(() => {
@@ -1784,6 +1794,10 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 				}, { once: true });
 			});
+
+			toggleFollow.addEventListener('click', () => {
+				dragPan.setActive(toggleFollow.dataset.active == 'false');
+			})
 		}
 
 
@@ -2565,7 +2579,7 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
 					console.log(`Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
 
 					let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
-					let duration = Math.round(measure.duration / 1000);
+					let duration = +(measure.duration / 1000).toFixed(1);
 					let uniqueRefsAmount = inventoryContent.childNodes.length;
 					let toast;
 
