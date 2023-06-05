@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.29
+// @version      1.5.30
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -24,7 +24,7 @@ Element.prototype.append = function () {
 fetch('/script.js')
 	.then(r => r.text())
 	.then(data => {
-		document.addEventListener('DOMContentLoaded', () => {
+		window.addEventListener('load', () => {
 			class Map extends ol.Map {
 				constructor(options) {
 					super(options);
@@ -85,7 +85,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.29';
+	const USERSCRIPT_VERSION = '1.5.30';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
