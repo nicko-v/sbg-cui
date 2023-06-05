@@ -1,1595 +1,1604 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.2
+// @version      0.0.3
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
 // @author       NV
 // @match        https://3d.sytes.net/*
+// @run-at       document-start
 // @grant        none
 // ==/UserScript==
 
-if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
-	let map, playerFeature;
+if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
 
-	class Map extends ol.Map {
-		constructor(options) {
-			super(options);
-			map = this;
-		}
+let map, playerFeature;
 
-		forEachFeatureAtPixel(pixel, callback, options = {}) {
-			options.hitTolerance = 25;
-			super.forEachFeatureAtPixel(pixel, callback, options);
-		}
-	}
+let originalAppend = Element.prototype.append;
+Element.prototype.append = function () {
+	if (arguments[0].src == 'https://3d.sytes.net/script.js') { Array.prototype.shift.apply(arguments); }
+	originalAppend.apply(this, arguments);
+};
 
-	class Feature extends ol.Feature {
-		constructor(geometryOrProperties) {
-			super(geometryOrProperties);
-		}
-
-		setStyle(style) {
-			if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
-				let setCenter = style[1].getGeometry().setCenter;
-
-				style[1].getGeometry().setCenter = pos => {
-					setCenter.call(style[1].getGeometry(), pos);
-					style[3].getGeometry().setCenter(pos);
-				};
-
-				style[3] = new ol.style.Style({
-					geometry: new ol.geom.Circle(ol.proj.fromLonLat([0, 0]), 0),
-					stroke: new ol.style.Stroke({ color: '#CCCCCC33', width: 4 }),
-				});
-
-				playerFeature = this;
-			}
-
-			super.setStyle(style);
-		}
-	}
-
-	ol.Map = Map;
-	ol.Feature = Feature;
-
-	let originalAppend = Element.prototype.append;
-	Element.prototype.append = function () {
-		if (arguments[0].src == 'https://3d.sytes.net/script.js') { Array.prototype.shift.apply(arguments); }
-		originalAppend.apply(this, arguments);
-	};
-
-	fetch('/script.js')
-		.then(r => r.text())
-		.then(data => {
-			let script = document.createElement('script');
+fetch('/script.js')
+	.then(r => r.text())
+	.then(data => {
+		document.addEventListener('DOMContentLoaded', () => {
+			class Map extends ol.Map {
+				constructor(options) {
+					super(options);
+					map = this;
+					window.dispatchEvent(new Event('mapReady'));
+				}
 			
+				forEachFeatureAtPixel(pixel, callback, options = {}) {
+					options.hitTolerance = 15;
+					super.forEachFeatureAtPixel(pixel, callback, options);
+				}
+			}
+			
+			class Feature extends ol.Feature {
+				constructor(geometryOrProperties) {
+					super(geometryOrProperties);
+				}
+			
+				setStyle(style) {
+					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+						let setCenter = style[1].getGeometry().setCenter;
+			
+						style[1].getGeometry().setCenter = pos => {
+							setCenter.call(style[1].getGeometry(), pos);
+							style[3].getGeometry().setCenter(pos);
+						};
+			
+						style[3] = new ol.style.Style({
+							geometry: new ol.geom.Circle(ol.proj.fromLonLat([0, 0]), 0),
+							stroke: new ol.style.Stroke({ color: '#CCCCCC33', width: 4 }),
+						});
+			
+						playerFeature = this;
+					}
+			
+					super.setStyle(style);
+				}
+			}
+			
+			ol.Map = Map;
+			ol.Feature = Feature;
+	
+			let script = document.createElement('script');
+	
 			data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 			data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 			data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-			
+	
 			script.textContent = data;
 			document.head.appendChild(script);
-
-			window.addEventListener('load', () => setTimeout(main, 1000));
 		});
+	})
+	.catch(error => {
+		alert(`Произошла ошибка при загрузке основного скрипта. ${error.message}`);
+		console.log(error);
+	});
+
+window.addEventListener('mapReady', main);
+
+async function main() {
+	'use strict';
+
+	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	async function main() {
-		'use strict';
+	const USERSCRIPT_VERSION = '0.0.3';
+	const LATEST_KNOWN_VERSION = '0.3.0';
+	const INVENTORY_LIMIT = 3000;
+	const MIN_FREE_SPACE = 100;
+	const DISCOVERY_COOLDOWN = 90;
+	const INVIEW_POINTS_DATA_TTL = 7000;
+	const INVIEW_POINTS_LIMIT = 100;
+	const HIGHLEVEL_MARKER = 8;
+	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
+	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
+	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
+	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+	const ITEMS_TYPES = {
+		1: { eng: 'cores', rus: 'ядра' },
+		2: { eng: 'catalysers', rus: 'катализаторы' },
+		3: { eng: 'refs', rus: 'рефы' }
+	};
+	const DEFAULT_CONFIG = {
+		maxAmountInBag: {
+			cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+			catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+			refs: { allied: -1, hostile: -1 },
+		},
+		autoSelect: {
+			deploy: 'max',  // min || max || off
+			upgrade: 'min', // min || max || off
+			attack: 'latest',  // max || latest
+		},
+		mapFilters: {
+			invert: IS_DARK ? 1 : 0,
+			hueRotate: IS_DARK ? 180 : 0,
+			brightness: IS_DARK ? 0.75 : 1,
+			grayscale: IS_DARK ? 1 : 0,
+			sepia: 1,
+			blur: 0,
+			branding: 'default', // default || custom
+			brandingColor: '#CCCCCC',
+		},
+		tinting: {
+			map: 1,
+			point: 'level', // level || team || off
+			profile: 1,
+		},
+		vibration: {
+			buttons: 1,
+			notifications: 1,
+		},
+		ui: {
+			doubleClickZoom: 0,
+			pointBgImage: 1,
+			pointBtnsRtl: 0,
+			pointBgImageBlur: 1,
+			pointDischargeTimeout: 1,
+		},
+		pointHighlighting: {
+			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+			outer: 'off',
+			outerTop: 'cores',
+			outerBottom: 'highlevel',
+			text: 'refsAmount', // energy || level || refsAmount || off
+			innerColor: '#E87100',
+			outerColor: '#E87100',
+			outerTopColor: '#EB4DBF',
+			outerBottomColor: '#28C4F4',
+		},
+	};
 
-		if (document.querySelector('script[src="/intel.js"]')) { return; }
-
-
-		const USERSCRIPT_VERSION = '0.0.2';
-		const LATEST_KNOWN_VERSION = '0.3.0';
-		const INVENTORY_LIMIT = 3000;
-		const MIN_FREE_SPACE = 100;
-		const DISCOVERY_COOLDOWN = 90;
-		const INVIEW_POINTS_DATA_TTL = 7000;
-		const INVIEW_POINTS_LIMIT = 100;
-		const HIGHLEVEL_MARKER = 8;
-		const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
-		const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-		const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
-		const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
-		const ITEMS_TYPES = {
-			1: { eng: 'cores', rus: 'ядра' },
-			2: { eng: 'catalysers', rus: 'катализаторы' },
-			3: { eng: 'refs', rus: 'рефы' }
-		};
-		const DEFAULT_CONFIG = {
-			maxAmountInBag: {
-				cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-				catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-				refs: { allied: -1, hostile: -1 },
-			},
-			autoSelect: {
-				deploy: 'max',  // min || max || off
-				upgrade: 'min', // min || max || off
-				attack: 'latest',  // max || latest
-			},
-			mapFilters: {
-				invert: IS_DARK ? 1 : 0,
-				hueRotate: IS_DARK ? 180 : 0,
-				brightness: IS_DARK ? 0.75 : 1,
-				grayscale: IS_DARK ? 1 : 0,
-				sepia: 1,
-				blur: 0,
-				branding: 'default', // default || custom
-				brandingColor: '#CCCCCC',
-			},
-			tinting: {
-				map: 1,
-				point: 'level', // level || team || off
-				profile: 1,
-			},
-			vibration: {
-				buttons: 1,
-				notifications: 1,
-			},
-			ui: {
-				doubleClickZoom: 0,
-				pointBgImage: 1,
-				pointBtnsRtl: 0,
-				pointBgImageBlur: 1,
-				pointDischargeTimeout: 1,
-			},
-			pointHighlighting: {
-				inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-				outer: 'off',
-				outerTop: 'cores',
-				outerBottom: 'highlevel',
-				text: 'refsAmount', // energy || level || refsAmount || off
-				innerColor: '#E87100',
-				outerColor: '#E87100',
-				outerTopColor: '#EB4DBF',
-				outerBottomColor: '#28C4F4',
-			},
-		};
-
-		const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
-		const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
+	const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
+	const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
 
 
-		class DiscoverModifier {
-			constructor(loot, refs) {
-				this.loot = loot;
-				this.refs = refs;
+	class DiscoverModifier {
+		constructor(loot, refs) {
+			this.loot = loot;
+			this.refs = refs;
+		}
+
+		get isActive() {
+			return !(this.loot && this.refs);
+		}
+	}
+
+	class Point {
+		constructor(pointData) {
+			this.guid = pointData.g;
+			this.level = pointData.l;
+			this.team = pointData.te;
+			this.lines = {
+				in: pointData.li.i,
+				out: pointData.li.o,
+			};
+			this.cores = {};
+			this.image = `https://lh3.googleusercontent.com/${pointData.i}`;
+
+			this.update(pointData.co);
+		}
+
+		get emptySlots() {
+			return 6 - Object.keys(this.cores);
+		}
+
+		get isEmptySlots() {
+			return this.emptySlots > 0;
+		}
+
+		get playerCores() {
+			let playerCores = {};
+
+			for (let key in this.cores) {
+				let core = this.cores[key];
+
+				if (core.owner == player.name) {
+					if (core.level in playerCores) {
+						playerCores[core.level] += 1
+					} else {
+						playerCores[core.level] = 1;
+					}
+				}
 			}
 
-			get isActive() {
-				return !(this.loot && this.refs);
+			return playerCores; // { level: amount }
+		}
+
+		get energy() {
+			if (Object.keys(this.cores).length == 0) { return 0; }
+
+			let maxPointEnergy = 0;
+			let pointEnergy = 0;
+
+			for (let guid in this.cores) {
+				maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
+				pointEnergy += this.cores[guid].energy;
+			}
+
+			return pointEnergy / maxPointEnergy * 100;
+		}
+
+		get mostChargedCatalyserEnergy() {
+			let energy = Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
+			return isFinite(energy) ? energy : null;
+		}
+
+		get dischargeTimeout() {
+			let mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
+
+			if (mostChargedCatalyserEnergy == null) { return ''; }
+
+			let timeout = mostChargedCatalyserEnergy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
+			let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
+			let dh2 = ['d', 'hr'];
+			let result = '';
+
+			dh1.forEach((e, i) => {
+				let amount = Math.trunc(timeout / e);
+
+				if (!amount) { return; }
+
+				result += `${result.length ? ', ' : '~'}${amount}${dh2[i]}`;
+				timeout -= amount * e;
+			});
+
+			return result;
+		}
+
+		update(cores) {
+			cores.forEach(core => {
+				this.cores[core.g] = {
+					energy: core.e,
+					level: core.l,
+					owner: core.o,
+				}
+			});
+		}
+
+		selectCore(type, currentLevel) {
+			let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1 && !excludedCores.has(e.g)).sort((a, b) => a.l - b.l);
+			let playerCores = this.playerCores;
+			let core;
+
+			switch (type) {
+				case 'min':
+					if (currentLevel) { // Если передан уровень ядра - ищем ядро для апгрейда не ниже этого уровня.
+						core = cachedCores.find(e => (e.l > currentLevel) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
+					} else { // Иначе ищем ядро минимального уровня.
+						core = cachedCores.find(e => ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
+					}
+					break;
+				case 'max':
+					core = cachedCores.findLast(e => (e.l <= player.level) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]));
+					break;
+			}
+
+			click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
+		}
+	}
+
+	class Favorite {
+		#cooldown;
+
+		constructor(guid, cooldown, name) {
+			this.guid = guid;
+			this.name = name || guid;
+			this.cooldown = cooldown;
+			this.discoveriesLeft = undefined;
+			this.timeoutID = undefined;
+			this.isActive = 1;
+
+			if (!name) { this.#getName(); }
+		}
+
+		#getName() {
+			getPointData(this.guid)
+				.then(data => { this.name = data.t; })
+				.catch(error => { console.log('SBG CUI: Ошибка при получении данных точки.', error); });
+		}
+
+		#notify() {
+			if (!this.isActive) { return; }
+
+			let message = `"${this.name}": точка остыла.`;
+
+			if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
+				let notification = new Notification(message, { icon: '/icons/icon_512.png' });
+			} else {
+				let toast = createToast(message, 'top left', -1);
+
+				toast.options.className = 'sbgcui_toast-selection';
+				toast.showToast();
+
+				if ('vibrate' in window.navigator && config.vibration.notifications) {
+					window.navigator.vibrate(0);
+					window.navigator.vibrate([500, 300, 500, 300, 500]);
+				}
 			}
 		}
 
-		class Point {
-			constructor(pointData) {
-				this.guid = pointData.g;
-				this.level = pointData.l;
-				this.team = pointData.te;
-				this.lines = {
-					in: pointData.li.i,
-					out: pointData.li.o,
-				};
-				this.cores = {};
-				this.image = `https://lh3.googleusercontent.com/${pointData.i}`;
-
-				this.update(pointData.co);
+		#remindAt(timestamp) {
+			function onTimeout() {
+				this.#notify();
+				this.cooldown = null;
 			}
 
-			get emptySlots() {
-				return 6 - Object.keys(this.cores);
-			}
+			let delay = timestamp - Date.now();
 
-			get isEmptySlots() {
-				return this.emptySlots > 0;
-			}
-
-			get playerCores() {
-				let playerCores = {};
-
-				for (let key in this.cores) {
-					let core = this.cores[key];
-
-					if (core.owner == player.name) {
-						if (core.level in playerCores) {
-							playerCores[core.level] += 1
-						} else {
-							playerCores[core.level] = 1;
-						}
-					}
-				}
-
-				return playerCores; // { level: amount }
-			}
-
-			get energy() {
-				if (Object.keys(this.cores).length == 0) { return 0; }
-
-				let maxPointEnergy = 0;
-				let pointEnergy = 0;
-
-				for (let guid in this.cores) {
-					maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
-					pointEnergy += this.cores[guid].energy;
-				}
-
-				return pointEnergy / maxPointEnergy * 100;
-			}
-
-			get mostChargedCatalyserEnergy() {
-				let energy = Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
-				return isFinite(energy) ? energy : null;
-			}
-
-			get dischargeTimeout() {
-				let mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
-
-				if (mostChargedCatalyserEnergy == null) { return ''; }
-
-				let timeout = mostChargedCatalyserEnergy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
-				let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
-				let dh2 = ['d', 'hr'];
-				let result = '';
-
-				dh1.forEach((e, i) => {
-					let amount = Math.trunc(timeout / e);
-
-					if (!amount) { return; }
-
-					result += `${result.length ? ', ' : '~'}${amount}${dh2[i]}`;
-					timeout -= amount * e;
-				});
-
-				return result;
-			}
-
-			update(cores) {
-				cores.forEach(core => {
-					this.cores[core.g] = {
-						energy: core.e,
-						level: core.l,
-						owner: core.o,
-					}
-				});
-			}
-
-			selectCore(type, currentLevel) {
-				let cachedCores = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 1 && !excludedCores.has(e.g)).sort((a, b) => a.l - b.l);
-				let playerCores = this.playerCores;
-				let core;
-
-				switch (type) {
-					case 'min':
-						if (currentLevel) { // Если передан уровень ядра - ищем ядро для апгрейда не ниже этого уровня.
-							core = cachedCores.find(e => (e.l > currentLevel) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
-						} else { // Иначе ищем ядро минимального уровня.
-							core = cachedCores.find(e => ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]) && (e.l <= player.level));
-						}
-						break;
-					case 'max':
-						core = cachedCores.findLast(e => (e.l <= player.level) && ((playerCores[e.l] || 0) < CORES_LIMITS[e.l]));
-						break;
-				}
-
-				click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
-			}
+			clearTimeout(this.timeoutID);
+			this.timeoutID = setTimeout(onTimeout.bind(this), delay);
 		}
 
-		class Favorite {
-			#cooldown;
+		toJSON() {
+			return this.cooldown > Date.now() ? this.cooldown : null;
+		}
 
-			constructor(guid, cooldown, name) {
-				this.guid = guid;
-				this.name = name || guid;
-				this.cooldown = cooldown;
+		get hasActiveCooldown() {
+			return this.cooldown - Date.now() > 0;
+		}
+
+		get cooldown() {
+			return this.#cooldown;
+		}
+
+		get timer() {
+			if (!this.cooldown) { return ''; }
+
+			let diff = new Date(this.cooldown - Date.now());
+
+			if (diff < 0) { return ''; }
+
+			let options = { hour: 'numeric', minute: 'numeric', second: 'numeric', timeZone: 'UTC' };
+			let formatter = new Intl.DateTimeFormat('ru-RU', options);
+
+			return formatter.format(diff);
+		}
+
+		set cooldown(timestamp) {
+			this.#cooldown = timestamp > Date.now() ? timestamp : null;
+			if (this.#cooldown) {
 				this.discoveriesLeft = undefined;
-				this.timeoutID = undefined;
-				this.isActive = 1;
-
-				if (!name) { this.#getName(); }
-			}
-
-			#getName() {
-				getPointData(this.guid)
-					.then(data => { this.name = data.t; })
-					.catch(error => { console.log('SBG CUI: Ошибка при получении данных точки.', error); });
-			}
-
-			#notify() {
-				if (!this.isActive) { return; }
-
-				let message = `"${this.name}": точка остыла.`;
-
-				if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
-					let notification = new Notification(message, { icon: '/icons/icon_512.png' });
-				} else {
-					let toast = createToast(message, 'top left', -1);
-
-					toast.options.className = 'sbgcui_toast-selection';
-					toast.showToast();
-
-					if ('vibrate' in window.navigator && config.vibration.notifications) {
-						window.navigator.vibrate(0);
-						window.navigator.vibrate([500, 300, 500, 300, 500]);
-					}
-				}
-			}
-
-			#remindAt(timestamp) {
-				function onTimeout() {
-					this.#notify();
-					this.cooldown = null;
-				}
-
-				let delay = timestamp - Date.now();
-
-				clearTimeout(this.timeoutID);
-				this.timeoutID = setTimeout(onTimeout.bind(this), delay);
-			}
-
-			toJSON() {
-				return this.cooldown > Date.now() ? this.cooldown : null;
-			}
-
-			get hasActiveCooldown() {
-				return this.cooldown - Date.now() > 0;
-			}
-
-			get cooldown() {
-				return this.#cooldown;
-			}
-
-			get timer() {
-				if (!this.cooldown) { return ''; }
-
-				let diff = new Date(this.cooldown - Date.now());
-
-				if (diff < 0) { return ''; }
-
-				let options = { hour: 'numeric', minute: 'numeric', second: 'numeric', timeZone: 'UTC' };
-				let formatter = new Intl.DateTimeFormat('ru-RU', options);
-
-				return formatter.format(diff);
-			}
-
-			set cooldown(timestamp) {
-				this.#cooldown = timestamp > Date.now() ? timestamp : null;
-				if (this.#cooldown) {
-					this.discoveriesLeft = undefined;
-					this.#remindAt(this.#cooldown);
-				}
+				this.#remindAt(this.#cooldown);
 			}
 		}
+	}
 
 
-		let config;
-		if (localStorage.getItem('sbgcui_config')) {
-			config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
-			config = { ...DEFAULT_CONFIG, ...config };
-			updateConfigStructure(config, DEFAULT_CONFIG);
-			localStorage.setItem('sbgcui_config', JSON.stringify(config));
-		} else {
-			config = DEFAULT_CONFIG;
-			localStorage.setItem('sbgcui_config', JSON.stringify(config));
+	let config;
+	if (localStorage.getItem('sbgcui_config')) {
+		config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
+		config = { ...DEFAULT_CONFIG, ...config };
+		updateConfigStructure(config, DEFAULT_CONFIG);
+		localStorage.setItem('sbgcui_config', JSON.stringify(config));
+	} else {
+		config = DEFAULT_CONFIG;
+		localStorage.setItem('sbgcui_config', JSON.stringify(config));
 
-			let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
-			toast.options.className = 'error-toast';
-			toast.showToast();
-		}
-
-
-		let originalFetch = window.fetch;
-		window.fetch = proxiedFetch;
-
-		let html = document.documentElement;
-		let attackButton = document.querySelector('#attack-menu');
-		let attackSlider = document.querySelector('.attack-slider-wrp');
-		let catalysersList = document.querySelector('#catalysers-list');
-		let coresList = document.querySelector('#cores-list');
-		let discoverButton = document.querySelector('#discover');
-		let inventoryButton = document.querySelector('#ops');
-		let invCloseButton = document.querySelector('#inventory__close');
-		let inventoryContent = document.querySelector('.inventory__content');
-		let inventoryPopup = document.querySelector('.inventory.popup');
-		let invTotalSpan = document.querySelector('#self-info__inv');
-		let pointCores = document.querySelector('.i-stat__cores');
-		let pointImage = document.querySelector('#i-image');
-		let pointImageBox = document.querySelector('.i-image-box');
-		let pointEnergySpan = document.querySelector('#i-stat__energy');
-		let pointLevelSpan = document.querySelector('#i-level');
-		let pointOwnerSpan = document.querySelector('#i-stat__owner');
-		let pointTitleSpan = document.querySelector('#i-title');
-		let pointPopup = document.querySelector('.info.popup');
-		let pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
-		let profileNameSpan = document.querySelector('#pr-name');
-		let profilePopup = document.querySelector('.profile.popup');
-		let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
-		let selfExpSpan = document.querySelector('#self-info__exp');
-		let selfLvlSpan = document.querySelector('#self-info__explv');
-		let selfNameSpan = document.querySelector('#self-info__name');
-		let toggleFollow = document.querySelector('#toggle-follow');
-		let xpDiffSpan = document.querySelector('.xp-diff');
-		let zoomContainer = document.querySelector('.ol-zoom');
-
-		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
-		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
-		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
-
-		let lastOpenedPoint = {};
-		let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
-
-		let excludedCores = new Set(JSON.parse(localStorage.getItem('sbgcui_excludedCores')));
-
-		let discoverModifier;
-
-		let uniques = { c: new Set(), v: new Set() };
-		let inview = {};
+		let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
+		toast.options.className = 'error-toast';
+		toast.showToast();
+	}
 
 
-		let numbersConverter = {
-			I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
-			toDecimal(roman) { return this[roman]; },
-			toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
-		};
+	let originalFetch = window.fetch;
+	window.fetch = proxiedFetch;
+
+	let html = document.documentElement;
+	let attackButton = document.querySelector('#attack-menu');
+	let attackSlider = document.querySelector('.attack-slider-wrp');
+	let catalysersList = document.querySelector('#catalysers-list');
+	let coresList = document.querySelector('#cores-list');
+	let discoverButton = document.querySelector('#discover');
+	let inventoryButton = document.querySelector('#ops');
+	let invCloseButton = document.querySelector('#inventory__close');
+	let inventoryContent = document.querySelector('.inventory__content');
+	let inventoryPopup = document.querySelector('.inventory.popup');
+	let invTotalSpan = document.querySelector('#self-info__inv');
+	let pointCores = document.querySelector('.i-stat__cores');
+	let pointImage = document.querySelector('#i-image');
+	let pointImageBox = document.querySelector('.i-image-box');
+	let pointEnergySpan = document.querySelector('#i-stat__energy');
+	let pointLevelSpan = document.querySelector('#i-level');
+	let pointOwnerSpan = document.querySelector('#i-stat__owner');
+	let pointTitleSpan = document.querySelector('#i-title');
+	let pointPopup = document.querySelector('.info.popup');
+	let pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
+	let profileNameSpan = document.querySelector('#pr-name');
+	let profilePopup = document.querySelector('.profile.popup');
+	let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
+	let selfExpSpan = document.querySelector('#self-info__exp');
+	let selfLvlSpan = document.querySelector('#self-info__explv');
+	let selfNameSpan = document.querySelector('#self-info__name');
+	let toggleFollow = document.querySelector('#toggle-follow');
+	let xpDiffSpan = document.querySelector('.xp-diff');
+	let zoomContainer = document.querySelector('.ol-zoom');
+
+	let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
+	let isPointPopupOpened = !pointPopup.classList.contains('hidden');
+	let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
+
+	let lastOpenedPoint = {};
+	let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
+
+	let excludedCores = new Set(JSON.parse(localStorage.getItem('sbgcui_excludedCores')));
+
+	let discoverModifier;
+
+	let uniques = { c: new Set(), v: new Set() };
+	let inview = {};
 
 
-		let dragPan;
-		let doubleClickZoomInteraction;
-
-		map.getInteractions().forEach(interaction => {
-			if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
-			if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
-		});
-		dragPan.setActive(localStorage.getItem('follow') == 'false');
-		doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
-
-		let geolocation = new ol.Geolocation({
-			projection: map.getView().getProjection(),
-			tracking: true,
-			trackingOptions: { enableHighAccuracy: true },
-		});
-		let speedSpan = document.createElement('span');
-
-		document.querySelector('.self-info').appendChild(speedSpan);
-		geolocation.on('change:speed', () => {
-			speedSpan.innerText = geolocation.getSpeed();
-		});
+	let numbersConverter = {
+		I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
+		toDecimal(roman) { return this[roman]; },
+		toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
+	};
 
 
-		async function proxiedFetch(url, options) {
-			return new Promise((resolve, reject) => {
-				if (url.match(/\/api\/inview(?!.+?&unique=)/)) {
-					let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
+	let dragPan;
+	let doubleClickZoomInteraction;
 
-					if (uniqsHighlighting) { url += `&unique=${uniqsHighlighting == 'uniqc' ? 'c' : 'v'}`; }
-				}
+	map.getInteractions().forEach(interaction => {
+		if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
+		if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
+	});
+	dragPan.setActive(localStorage.getItem('follow') == 'false');
+	doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
 
-				originalFetch(url, options)
-					.then(async response => {
-						let clonedResponse = response.clone();
-						let path = url.match(/\/api\/(point|deploy|attack2|discover|inview)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
+	let geolocation = new ol.Geolocation({
+		projection: map.getView().getProjection(),
+		tracking: true,
+		trackingOptions: { enableHighAccuracy: true },
+	});
+	let speedSpan = document.createElement('span');
 
-						if (path == null) { resolve(response); return; }
+	document.querySelector('.self-info').appendChild(speedSpan);
+	geolocation.on('change:speed', () => {
+		let speed_mps = geolocation.getSpeed() || 0;
+		speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
+	});
 
-						clonedResponse.json().then(async parsedResponse => {
-							switch (path[1]) {
-								case 'point':
-									if ('data' in parsedResponse && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
-										lastOpenedPoint = new Point(parsedResponse.data);
+
+	async function proxiedFetch(url, options) {
+		return new Promise((resolve, reject) => {
+			if (url.match(/\/api\/inview(?!.+?&unique=)/)) {
+				let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
+
+				if (uniqsHighlighting) { url += `&unique=${uniqsHighlighting == 'uniqc' ? 'c' : 'v'}`; }
+			}
+
+			originalFetch(url, options)
+				.then(async response => {
+					let clonedResponse = response.clone();
+					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
+
+					if (path == null) { resolve(response); return; }
+
+					clonedResponse.json().then(async parsedResponse => {
+						switch (path[1]) {
+							case 'point':
+								if ('data' in parsedResponse && !path[2]) { // path[2] - если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
+									lastOpenedPoint = new Point(parsedResponse.data);
+								}
+								break;
+							case 'deploy':
+								if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
+									lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
+									lastOpenedPoint.selectCore(config.autoSelect.deploy);
+								} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
+									lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
+									lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
+								}
+								break;
+							case 'attack2':
+								lastUsedCatalyser = JSON.parse(options.body).guid;
+								localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
+								break;
+							case 'discover':
+								if ('loot' in parsedResponse && discoverModifier.isActive) {
+									let toDelete = parsedResponse.loot
+										.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3)
+										.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+
+									if (toDelete.length == 0) { return; }
+
+									try {
+										let responses = await deleteItems(toDelete);
+
+										responses.forEach(response => { if ('error' in response) { throw response.error; } });
+										parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
+
+										let body = JSON.stringify(parsedResponse);
+										let options = {
+											status: response.status,
+											statusText: response.statusText,
+											headers: response.headers,
+										};
+										let modifiedResponse = new Response(body, options);
+
+										Object.defineProperty(modifiedResponse, 'url', { value: response.url, enumerable: true, });
+
+										resolve(modifiedResponse);
+									} catch (error) {
+										let toast = createToast('Ошибка при фильтрации лута.');
+										toast.options.className = 'error-toast';
+										toast.showToast();
+
+										console.log('SBG CUI: Ошибка при фильтрации лута.', error);
 									}
-									break;
-								case 'deploy':
-									if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-										lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
-										lastOpenedPoint.selectCore(config.autoSelect.deploy);
-									} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
-										lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
-										lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-									}
-									break;
-								case 'attack2':
-									lastUsedCatalyser = JSON.parse(options.body).guid;
-									localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
-									break;
-								case 'discover':
-									if ('loot' in parsedResponse && discoverModifier.isActive) {
-										let toDelete = parsedResponse.loot
-											.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3)
-											.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+								}
 
-										if (toDelete.length == 0) { return; }
+								if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
+									let dateNow = Date.now();
+									let discoveriesLeft;
 
-										try {
-											let responses = await deleteItems(toDelete);
-
-											responses.forEach(response => { if ('error' in response) { throw response.error; } });
-											parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
-
-											let body = JSON.stringify(parsedResponse);
-											let options = {
-												status: response.status,
-												statusText: response.statusText,
-												headers: response.headers,
-											};
-											let modifiedResponse = new Response(body, options);
-
-											Object.defineProperty(modifiedResponse, 'url', { value: response.url, enumerable: true, });
-
-											resolve(modifiedResponse);
-										} catch (error) {
-											let toast = createToast('Ошибка при фильтрации лута.');
-											toast.options.className = 'error-toast';
-											toast.showToast();
-
-											console.log('SBG CUI: Ошибка при фильтрации лута.', error);
-										}
-									}
-
-									if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
-										let dateNow = Date.now();
-										let discoveriesLeft;
-
-										// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
-										// После выжигания в burnout приходит таймстамп остывания точки.
-										// 20 хаков – с запасом на случай ивентов.
-										if (parsedResponse.burnout <= 20) {
-											discoveriesLeft = parsedResponse.burnout;
-										} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
-											break;
-										}
-
-										let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
-										try {
-											guid = JSON.parse(options.body).guid;
-										} catch {
-											guid = new URLSearchParams(options.body).get('guid');
-										}
-
-										if (guid in favorites) {
-											if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
-											if (favorites[guid].hasActiveCooldown) { break; }
-
-											let cooldown = parsedResponse.burnout || (dateNow + parsedResponse.cooldown * 1000);
-
-											favorites[guid].cooldown = cooldown;
-											favorites.save();
-										}
+									// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
+									// После выжигания в burnout приходит таймстамп остывания точки.
+									// 20 хаков – с запасом на случай ивентов.
+									if (parsedResponse.burnout <= 20) {
+										discoveriesLeft = parsedResponse.burnout;
+									} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
+										break;
 									}
 
-									break;
-								case 'inview':
-									let isUniqueInRequest = path[3] != undefined;
-									let isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-									let inviewPoints = parsedResponse.data?.points;
-
-									if (!inviewPoints) { break; }
-
-									if (isHighlightCoresOrLevel) {
-										let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
-
-										if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
-											let guids = capturedPoints.map(e => e.g) || [];
-
-											guids.forEach(guid => {
-												if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
-
-												getPointData(guid)
-													.then(data => { inview[guid] = { cores: data.co, energy: data.e, level: data.l, timestamp: Date.now() }; })
-													.catch(() => { inview[guid] = { timestamp: Date.now() }; });
-											});
-										}
+									let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
+									try {
+										guid = JSON.parse(options.body).guid;
+									} catch {
+										guid = new URLSearchParams(options.body).get('guid');
 									}
 
-									if (isUniqueInRequest) {
-										inviewPoints?.forEach(point => {
-											if (!point.u) { uniques[path[3]].add(point.g); } else { uniques[path[3]].delete(point.g); }
+									if (guid in favorites) {
+										if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
+										if (favorites[guid].hasActiveCooldown) { break; }
+
+										let cooldown = parsedResponse.burnout || (dateNow + parsedResponse.cooldown * 1000);
+
+										favorites[guid].cooldown = cooldown;
+										favorites.save();
+									}
+								}
+
+								break;
+							case 'inview':
+								let isUniqueInRequest = path[3] != undefined;
+								let isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
+								let inviewPoints = parsedResponse.data?.points;
+
+								if (!inviewPoints) { break; }
+
+								if (isHighlightCoresOrLevel) {
+									let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
+
+									if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
+										let guids = capturedPoints.map(e => e.g) || [];
+
+										guids.forEach(guid => {
+											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
+
+											getPointData(guid)
+												.then(data => { inview[guid] = { cores: data.co, energy: data.e, level: data.l, timestamp: Date.now() }; })
+												.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 										});
 									}
+								}
 
-									break;
-							}
-						}).catch(error => {
-							console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
-						}).finally(() => {
-							resolve(response);
-						});
-					})
-					.catch(error => { reject(error); });
-			});
-		}
+								if (isUniqueInRequest) {
+									inviewPoints?.forEach(point => {
+										if (!point.u) { uniques[path[3]].add(point.g); } else { uniques[path[3]].delete(point.g); }
+									});
+								}
 
-		async function getSelfData() {
-			return fetch('/api/self', {
-				headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
-				method: "GET",
-			})
-				.then(response => response.json().then(parsedResponse => ({
-					version: response.headers.get('SBG-Version'),
-					name: parsedResponse.n,
-					team: parsedResponse.t,
-					exp: parsedResponse.x,
-					lvl: parsedResponse.l,
-					guid: parsedResponse.g,
-				})))
-				.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
-		}
-
-		async function getPlayerData(guid) {
-			return fetch(`/api/profile?guid=${guid}`, {
-				headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
-				method: "GET",
-			})
-				.then(r => r.json())
-				.then(r => r.data)
-				.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
-		}
-
-		async function getPointData(guid) {
-			return fetch(`/api/point?guid=${guid}&status=1`, {
-				headers: { authorization: `Bearer ${player.auth}` },
-				method: 'GET'
-			}).then(r => r.json()).then(r => r.data);
-		}
-
-		async function getInventory() {
-			return fetch('/api/inventory', {
-				headers: { authorization: `Bearer ${player.auth}` },
-				method: 'GET',
-			}).then(r => r.json()).then(r => r.i);
-		}
-
-		async function clearInventory(event, forceClear = false) {
-			let maxAmount = config.maxAmountInBag;
-
-			getInventory()
-				.then(inventory => {
-					let itemsAmount = inventory.reduce((total, e) => total + e.a, 0);
-
-					if (!forceClear && (INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE)) { throw { silent: true }; }
-
-					if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) { return [inventory, []]; } // Если никакие ключи не надо удалять - не запрашиваем данные точек.
-					if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) { return [inventory, []]; } // Если все ключи надо удалить - не запрашиваем данные точек.
-
-					let pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);  // У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
-
-					return Promise.all([inventory, ...pointsData]);
-				})
-				.then(([inventory, ...pointsDataArr]) => {
-					let pointsData = {};
-
-					pointsDataArr.forEach(e => {
-						pointsData[e.g] = { team: e.te };
+								break;
+						}
+					}).catch(error => {
+						console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
+					}).finally(() => {
+						resolve(response);
 					});
-
-					let toDelete = inventory.map(({ t: itemType, l: itemLevel, a: itemAmount, g: itemGuid }) => {
-						if (!itemType in ITEMS_TYPES) { return; };
-
-						let itemMaxAmount = -1;
-						let amountToDelete = 0;
-						let itemName = ITEMS_TYPES[itemType].eng;
-
-						if (itemName == 'refs') {
-							if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) {
-								itemMaxAmount = -1;
-							} else if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) {
-								itemMaxAmount = 0;
-							} else if (Object.keys(pointsData).length) {
-								let pointSide = pointsData[itemLevel].team == player.team ? 'allied' : 'hostile';
-								itemMaxAmount = maxAmount[itemName][pointSide];
-							}
-						} else {
-							itemMaxAmount = maxAmount[itemName][numbersConverter.toRoman(itemLevel)];
-						}
-
-						if (itemMaxAmount != -1 && itemAmount > itemMaxAmount) {
-							amountToDelete = itemAmount - itemMaxAmount;
-						}
-
-						return { guid: itemGuid, type: itemType, amount: amountToDelete };
-					}).filter(i => i?.amount > 0);
-
-					return Promise.all([toDelete, deleteItems(toDelete)]);
 				})
-				.then(([deleted, responses]) => {
-					if (!deleted.length) { return; }
+				.catch(error => { reject(error); });
+		});
+	}
 
-					let invTotal = responses.reduce((total, e) => e.count.total < total ? e.count.total : total, Infinity);
-					if (isFinite(invTotal)) { invTotalSpan.innerText = invTotal; }
+	async function getSelfData() {
+		return fetch('/api/self', {
+			headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+			method: "GET",
+		})
+			.then(response => response.json().then(parsedResponse => ({
+				version: response.headers.get('SBG-Version'),
+				name: parsedResponse.n,
+				team: parsedResponse.t,
+				exp: parsedResponse.x,
+				lvl: parsedResponse.l,
+				guid: parsedResponse.g,
+			})))
+			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
+	}
 
-					if (inventoryButton.style.color.match('accent')) { inventoryButton.style.color = ''; }
+	async function getPlayerData(guid) {
+		return fetch(`/api/profile?guid=${guid}`, {
+			headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+			method: "GET",
+		})
+			.then(r => r.json())
+			.then(r => r.data)
+			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
+	}
 
-					/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
-					deleteFromCache(deleted);
+	async function getPointData(guid) {
+		return fetch(`/api/point?guid=${guid}&status=1`, {
+			headers: { authorization: `Bearer ${player.auth}` },
+			method: 'GET'
+		}).then(r => r.json()).then(r => r.data);
+	}
 
+	async function getInventory() {
+		return fetch('/api/inventory', {
+			headers: { authorization: `Bearer ${player.auth}` },
+			method: 'GET',
+		}).then(r => r.json()).then(r => r.i);
+	}
 
-					deleted = deleted.reduce((total, e) => {
-						if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
-						total[e.type] += e.amount;
-						return total;
-					}, {});
+	async function clearInventory(event, forceClear = false) {
+		let maxAmount = config.maxAmountInBag;
 
-					let message = '';
+		getInventory()
+			.then(inventory => {
+				let itemsAmount = inventory.reduce((total, e) => total + e.a, 0);
 
-					for (let key in deleted) {
-						message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${ITEMS_TYPES[key].eng}`;
+				if (!forceClear && (INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE)) { throw { silent: true }; }
+
+				if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) { return [inventory, []]; } // Если никакие ключи не надо удалять - не запрашиваем данные точек.
+				if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) { return [inventory, []]; } // Если все ключи надо удалить - не запрашиваем данные точек.
+
+				let pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);  // У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
+
+				return Promise.all([inventory, ...pointsData]);
+			})
+			.then(([inventory, ...pointsDataArr]) => {
+				let pointsData = {};
+
+				pointsDataArr.forEach(e => {
+					pointsData[e.g] = { team: e.te };
+				});
+
+				let toDelete = inventory.map(({ t: itemType, l: itemLevel, a: itemAmount, g: itemGuid }) => {
+					if (!itemType in ITEMS_TYPES) { return; };
+
+					let itemMaxAmount = -1;
+					let amountToDelete = 0;
+					let itemName = ITEMS_TYPES[itemType].eng;
+
+					if (itemName == 'refs') {
+						if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) {
+							itemMaxAmount = -1;
+						} else if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) {
+							itemMaxAmount = 0;
+						} else if (Object.keys(pointsData).length) {
+							let pointSide = pointsData[itemLevel].team == player.team ? 'allied' : 'hostile';
+							itemMaxAmount = maxAmount[itemName][pointSide];
+						}
+					} else {
+						itemMaxAmount = maxAmount[itemName][numbersConverter.toRoman(itemLevel)];
 					}
 
-					let toast = createToast(`Удалено: ${message}`);
-					toast.showToast();
-				})
-				.catch(error => {
-					if (error.silent) { return; }
+					if (itemMaxAmount != -1 && itemAmount > itemMaxAmount) {
+						amountToDelete = itemAmount - itemMaxAmount;
+					}
 
-					let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`);
+					return { guid: itemGuid, type: itemType, amount: amountToDelete };
+				}).filter(i => i?.amount > 0);
 
-					toast.options.className = 'error-toast';
-					toast.showToast();
+				return Promise.all([toDelete, deleteItems(toDelete)]);
+			})
+			.then(([deleted, responses]) => {
+				if (!deleted.length) { return; }
 
-					console.log('SBG CUI: Ошибка при удалении предметов.', error);
-				});
-		}
+				let invTotal = responses.reduce((total, e) => e.count.total < total ? e.count.total : total, Infinity);
+				if (isFinite(invTotal)) { invTotalSpan.innerText = invTotal; }
 
-		async function deleteItems(items) {
-			let groupedItems = items.reduce((groups, e) => {
-				if (!groups.hasOwnProperty(e.type)) { groups[e.type] = {}; }
-				groups[e.type][e.guid] = e.amount;
-				return groups;
-			}, {});
+				if (inventoryButton.style.color.match('accent')) { inventoryButton.style.color = ''; }
 
-			return Promise.all(Object.keys(groupedItems).map(async e => {
-				return fetch('/api/inventory', {
-					headers: {
-						authorization: `Bearer ${player.auth}`,
-						'content-type': 'application/json',
-					},
-					body: JSON.stringify({ selection: groupedItems[e], tab: e }),
-					method: 'DELETE'
-				}).then(r => r.json());
-			}));
-		}
+				/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
+				deleteFromCache(deleted);
 
-		async function repairPoint(guid) {
-			return fetch('/api/repair', {
+
+				deleted = deleted.reduce((total, e) => {
+					if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
+					total[e.type] += e.amount;
+					return total;
+				}, {});
+
+				let message = '';
+
+				for (let key in deleted) {
+					message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${ITEMS_TYPES[key].eng}`;
+				}
+
+				let toast = createToast(`Удалено: ${message}`);
+				toast.showToast();
+			})
+			.catch(error => {
+				if (error.silent) { return; }
+
+				let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`);
+
+				toast.options.className = 'error-toast';
+				toast.showToast();
+
+				console.log('SBG CUI: Ошибка при удалении предметов.', error);
+			});
+	}
+
+	async function deleteItems(items) {
+		let groupedItems = items.reduce((groups, e) => {
+			if (!groups.hasOwnProperty(e.type)) { groups[e.type] = {}; }
+			groups[e.type][e.guid] = e.amount;
+			return groups;
+		}, {});
+
+		return Promise.all(Object.keys(groupedItems).map(async e => {
+			return fetch('/api/inventory', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+					'content-type': 'application/json',
 				},
-				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
-				method: 'POST',
+				body: JSON.stringify({ selection: groupedItems[e], tab: e }),
+				method: 'DELETE'
 			}).then(r => r.json());
+		}));
+	}
+
+	async function repairPoint(guid) {
+		return fetch('/api/repair', {
+			headers: {
+				authorization: `Bearer ${player.auth}`,
+				'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+			},
+			body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
+			method: 'POST',
+		}).then(r => r.json());
+	}
+
+	function isMobile() {
+		if ('maxTouchPoints' in window.navigator) {
+			return window.navigator.maxTouchPoints > 0;
+		} else if ('msMaxTouchPoints' in window.navigator) {
+			return window.navigator.msMaxTouchPoints > 0;
+		} else if ('orientation' in window) {
+			return true;
+		} else {
+			return (/\b(BlackBerry|webOS|iPhone|IEMobile|Android|Windows Phone|iPad|iPod)\b/i).test(window.navigator.userAgent);
+		}
+	}
+
+	function deleteFromCache(items) {
+		let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+
+		items.forEach(e => {
+			let cachedItem = cache.find(f => f.g == e.guid);
+			if (cachedItem) { cachedItem.a -= e.amount; }
+		});
+		cache = cache.filter(e => e.a > 0);
+
+		localStorage.setItem('inventory-cache', JSON.stringify(cache));
+	}
+
+	function createSettingsMenu() {
+		function createSection(title, subtitle) {
+			let section = document.createElement('details');
+			section.classList.add('sbgcui_settings-section');
+
+			let sectionTitle = document.createElement('summary');
+			sectionTitle.classList.add('sbgcui_settings-title');
+			sectionTitle.innerText = title;
+
+			let sectionSubTitle = document.createElement('h6');
+			sectionSubTitle.classList.add('sbgcui_settings-subtitle');
+			sectionSubTitle.innerHTML = subtitle;
+
+			section.appendChild(sectionTitle);
+			section.appendChild(sectionSubTitle);
+
+			return section;
 		}
 
-		function isMobile() {
-			if ('maxTouchPoints' in window.navigator) {
-				return window.navigator.maxTouchPoints > 0;
-			} else if ('msMaxTouchPoints' in window.navigator) {
-				return window.navigator.msMaxTouchPoints > 0;
-			} else if ('orientation' in window) {
-				return true;
-			} else {
-				return (/\b(BlackBerry|webOS|iPhone|IEMobile|Android|Windows Phone|iPad|iPod)\b/i).test(window.navigator.userAgent);
+		function createInput(type, name, checked, text, value) {
+			let isCheckbox = type == 'checkbox';
+			let wrapper = document.createElement('div');
+			let label = document.createElement('label');
+			let input = document.createElement('input');
+
+			wrapper.classList.add('sbgcui_settings-input_wrp');
+
+			input.id = isCheckbox ? name : name + Math.random().toString().slice(2);
+			input.name = name;
+			input.type = type;
+			input.value = isCheckbox ? 1 : value;
+			input.checked = checked;
+
+			label.htmlFor = input.id;
+			label.innerText = text;
+
+			if (isCheckbox) {
+				let hiddenInput = document.createElement('input');
+
+				hiddenInput.name = name;
+				hiddenInput.type = 'hidden';
+				hiddenInput.value = 0;
+
+				wrapper.appendChild(hiddenInput);
 			}
+
+			wrapper.append(input, label);
+
+			return wrapper;
 		}
 
-		function deleteFromCache(items) {
-			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+		function createColorPicker(name, value) {
+			let colorPicker = document.createElement('input');
 
-			items.forEach(e => {
-				let cachedItem = cache.find(f => f.g == e.guid);
-				if (cachedItem) { cachedItem.a -= e.amount; }
+			colorPicker.type = 'color';
+			colorPicker.name = name;
+			colorPicker.value = value;
+
+			return colorPicker;
+		}
+
+		function createRadioGroup(title, inputs = []) {
+			let header = document.createElement('h5');
+			let inputsWrp = document.createElement('div');
+			let radioGroup = document.createElement('div');
+
+			header.classList.add('sbgcui_settings-radio_group-title');
+			inputsWrp.classList.add('sbgcui_settings-inputs_group');
+			radioGroup.classList.add('sbgcui_settings-radio_group');
+
+			header.innerText = title;
+
+			inputs.forEach(e => { inputsWrp.appendChild(e); });
+
+			radioGroup.append(header, inputsWrp);
+
+			return radioGroup;
+		}
+
+		function createDropdown(title, options = [], name, value) {
+			let header = document.createElement('h5');
+			let select = document.createElement('select');
+			let selectWrapper = document.createElement('div');
+
+			header.classList.add('sbgcui_settings-dropdown-title');
+			header.innerText = title;
+
+			options.forEach(e => {
+				let option = document.createElement('option');
+
+				option.innerText = e[0];
+				option.value = e[1];
+
+				select.appendChild(option);
 			});
-			cache = cache.filter(e => e.a > 0);
 
-			localStorage.setItem('inventory-cache', JSON.stringify(cache));
+			select.name = name;
+			select.value = value;
+
+			selectWrapper.classList.add('sbgcui_settings-dropdown_wrapper');
+			selectWrapper.append(header, select);
+
+			return selectWrapper;
 		}
 
-		function createSettingsMenu() {
-			function createSection(title, subtitle) {
-				let section = document.createElement('details');
-				section.classList.add('sbgcui_settings-section');
+		function createAutoDeleteSection(maxAmountInBag) {
+			let section = createSection(
+				'Автоудаление',
+				`Когда в инвентаре останется меньше ${MIN_FREE_SPACE} мест, будут удалены предметы, превышающие указанное количество. <br>Значение "-1" предотвращает удаление.`
+			);
+			let forceClearButton = document.createElement('button');
 
-				let sectionTitle = document.createElement('summary');
-				sectionTitle.classList.add('sbgcui_settings-title');
-				sectionTitle.innerText = title;
+			forceClearButton.classList.add('sbgcui_settings-forceclear');
+			forceClearButton.innerText = 'Очистить сейчас';
+			forceClearButton.addEventListener('click', function (event) {
+				event.preventDefault();
 
-				let sectionSubTitle = document.createElement('h6');
-				sectionSubTitle.classList.add('sbgcui_settings-subtitle');
-				sectionSubTitle.innerHTML = subtitle;
+				let result = confirm('Произвести очистку инвентаря согласно настройкам?');
 
-				section.appendChild(sectionTitle);
-				section.appendChild(sectionSubTitle);
+				if (result) { clearInventory(undefined, true); }
+			});
+			section.appendChild(forceClearButton);
 
-				return section;
-			}
-
-			function createInput(type, name, checked, text, value) {
-				let isCheckbox = type == 'checkbox';
-				let wrapper = document.createElement('div');
-				let label = document.createElement('label');
-				let input = document.createElement('input');
-
-				wrapper.classList.add('sbgcui_settings-input_wrp');
-
-				input.id = isCheckbox ? name : name + Math.random().toString().slice(2);
-				input.name = name;
-				input.type = type;
-				input.value = isCheckbox ? 1 : value;
-				input.checked = checked;
-
-				label.htmlFor = input.id;
-				label.innerText = text;
-
-				if (isCheckbox) {
-					let hiddenInput = document.createElement('input');
-
-					hiddenInput.name = name;
-					hiddenInput.type = 'hidden';
-					hiddenInput.value = 0;
-
-					wrapper.appendChild(hiddenInput);
-				}
-
-				wrapper.append(input, label);
-
-				return wrapper;
-			}
-
-			function createColorPicker(name, value) {
-				let colorPicker = document.createElement('input');
-
-				colorPicker.type = 'color';
-				colorPicker.name = name;
-				colorPicker.value = value;
-
-				return colorPicker;
-			}
-
-			function createRadioGroup(title, inputs = []) {
-				let header = document.createElement('h5');
-				let inputsWrp = document.createElement('div');
-				let radioGroup = document.createElement('div');
-
-				header.classList.add('sbgcui_settings-radio_group-title');
-				inputsWrp.classList.add('sbgcui_settings-inputs_group');
-				radioGroup.classList.add('sbgcui_settings-radio_group');
-
-				header.innerText = title;
-
-				inputs.forEach(e => { inputsWrp.appendChild(e); });
-
-				radioGroup.append(header, inputsWrp);
-
-				return radioGroup;
-			}
-
-			function createDropdown(title, options = [], name, value) {
-				let header = document.createElement('h5');
-				let select = document.createElement('select');
-				let selectWrapper = document.createElement('div');
-
-				header.classList.add('sbgcui_settings-dropdown-title');
-				header.innerText = title;
-
-				options.forEach(e => {
-					let option = document.createElement('option');
-
-					option.innerText = e[0];
-					option.value = e[1];
-
-					select.appendChild(option);
-				});
-
-				select.name = name;
-				select.value = value;
-
-				selectWrapper.classList.add('sbgcui_settings-dropdown_wrapper');
-				selectWrapper.append(header, select);
-
-				return selectWrapper;
-			}
-
-			function createAutoDeleteSection(maxAmountInBag) {
-				let section = createSection(
-					'Автоудаление',
-					`Когда в инвентаре останется меньше ${MIN_FREE_SPACE} мест, будут удалены предметы, превышающие указанное количество. <br>Значение "-1" предотвращает удаление.`
-				);
-				let forceClearButton = document.createElement('button');
-
-				forceClearButton.classList.add('sbgcui_settings-forceclear');
-				forceClearButton.innerText = 'Очистить сейчас';
-				forceClearButton.addEventListener('click', function (event) {
-					event.preventDefault();
-
-					let result = confirm('Произвести очистку инвентаря согласно настройкам?');
-
-					if (result) { clearInventory(undefined, true); }
-				});
-				section.appendChild(forceClearButton);
-
-				for (let key in maxAmountInBag) {
-					let subSection = document.createElement('section');
-					let subSectionTitle = document.createElement('h4');
-					let maxAmounts = document.createElement('div');
-
-					subSection.classList.add('sbgcui_settings-subsection');
-					subSectionTitle.classList.add('sbgcui_settings-title');
-					maxAmounts.classList.add('sbgcui_settings-maxamounts');
-
-					subSectionTitle.innerText = (key == 'cores') ? 'Ядра' : (key == 'catalysers') ? 'Катализаторы' : (key == 'refs') ? 'Рефы' : 'N/D';
-
-					for (let type in maxAmountInBag[key]) {
-						let wrapper = document.createElement('div');
-						let label = document.createElement('label');
-						let input = document.createElement('input');
-
-						wrapper.classList.add('sbgcui_settings-amount_input_wrp');
-						label.classList.add('sbgcui_settings-amount_label');
-						input.classList.add('sbgcui_settings-amount_input');
-
-						if (key == 'refs') {
-							label.innerText = (type == 'allied') ? 'Свои:' : 'Чужие:';
-							label.classList.add(`sbgcui_settings-amount_label_${type}`);
-						} else {
-							label.innerText = type + ':';
-							label.style.color = `var(--level-${numbersConverter.toDecimal(type)})`;
-						}
-
-						input.name = `maxAmountInBag_${key}_${type}`;
-						input.type = 'number';
-						input.min = -1;
-						input.value = maxAmountInBag[key][type];
-
-						wrapper.append(label, input);
-
-						maxAmounts.appendChild(wrapper);
-					}
-
-					subSection.append(subSectionTitle, maxAmounts);
-
-					section.appendChild(subSection);
-				}
-
-				return section;
-			}
-
-			function createAutoSelectSection(autoSelect) {
-				let section = createSection(
-					'Автовыбор',
-					'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде. Вы можете исключить конкретное ядро из автовыбора: нажмите на него в карусели и удерживайте 1 секунду до появления уведомления.'
-				);
+			for (let key in maxAmountInBag) {
 				let subSection = document.createElement('section');
-
-				let attackDropdown = createDropdown(
-					'Катализатор при атаке:',
-					[
-						['Самый мощный', 'max'],
-						['Последний использованный', 'latest'],
-					],
-					'autoSelect_attack',
-					autoSelect.attack
-				);
-				let deployDropdown = createDropdown(
-					'Ядро при деплое:',
-					[
-						['Наименьшее', 'min'],
-						['Наибольшее', 'max'],
-						['Вручную', 'off'],
-					],
-					'autoSelect_deploy',
-					autoSelect.deploy
-				);
-				let upgradeDropdown = createDropdown(
-					'Ядро при апгрейде:',
-					[
-						['Наименьшее', 'min'],
-						['Наибольшее', 'max'],
-						['Вручную', 'off'],
-					],
-					'autoSelect_upgrade',
-					autoSelect.upgrade
-				);
+				let subSectionTitle = document.createElement('h4');
+				let maxAmounts = document.createElement('div');
 
 				subSection.classList.add('sbgcui_settings-subsection');
+				subSectionTitle.classList.add('sbgcui_settings-title');
+				maxAmounts.classList.add('sbgcui_settings-maxamounts');
 
-				subSection.append(attackDropdown, deployDropdown, upgradeDropdown);
+				subSectionTitle.innerText = (key == 'cores') ? 'Ядра' : (key == 'catalysers') ? 'Катализаторы' : (key == 'refs') ? 'Рефы' : 'N/D';
 
-				section.appendChild(subSection);
-
-				return section;
-			}
-
-			function createColorSchemeSection(mapFilters) {
-				function setCssVar(cssVar, value) {
-					let filter = cssVar.split('_')[1];
-					let units = (filter == 'blur') ? 'px' : (filter == 'hueRotate') ? 'deg' : '';
-					html.style.setProperty(`--sbgcui-${filter}`, `${value}${units}`);
-				}
-
-				function createInput(type, name, min, max, step, value, text) {
+				for (let type in maxAmountInBag[key]) {
 					let wrapper = document.createElement('div');
 					let label = document.createElement('label');
 					let input = document.createElement('input');
 
-					wrapper.classList.add('sbgcui_settings-mapfilters_input_wrp');
+					wrapper.classList.add('sbgcui_settings-amount_input_wrp');
+					label.classList.add('sbgcui_settings-amount_label');
+					input.classList.add('sbgcui_settings-amount_input');
 
-					input.type = type;
-					input.name = name;
-					input.min = min;
-					input.max = max;
-					input.step = step;
-					input.value = value;
+					if (key == 'refs') {
+						label.innerText = (type == 'allied') ? 'Свои:' : 'Чужие:';
+						label.classList.add(`sbgcui_settings-amount_label_${type}`);
+					} else {
+						label.innerText = type + ':';
+						label.style.color = `var(--level-${numbersConverter.toDecimal(type)})`;
+					}
 
-					label.innerText = text;
-
-					input.addEventListener('input', event => { setCssVar(name, event.target.value); });
+					input.name = `maxAmountInBag_${key}_${type}`;
+					input.type = 'number';
+					input.min = -1;
+					input.value = maxAmountInBag[key][type];
 
 					wrapper.append(label, input);
 
-					return wrapper;
+					maxAmounts.appendChild(wrapper);
 				}
 
-				let section = createSection(
-					'Цветовая схема',
-					'Настройте цвет своей команды и оттенок карты.'
-				);
-				let subSection = document.createElement('section');
-
-				let invert = createInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия');
-				let hueRotate = createInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность');
-				let brightness = createInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость');
-				let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
-				let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
-				let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
-				let branding = createDropdown('Цвет вашей команды:', [['Стандартный', 'default'], ['Собственный', 'custom']], 'mapFilters_branding', mapFilters.branding);
-				let brandingColorPicker = createColorPicker('mapFilters_brandingColor', mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor));
-
-				let brandingSelect = branding.querySelector('select');
-
-				brandingSelect.addEventListener('change', event => {
-					if (event.target.value == 'default') {
-						brandingColorPicker.value = hex326(player.teamColor);
-						html.style.setProperty(`--sbgcui-branding-color`, player.teamColor);
-					} else {
-						brandingColorPicker.value = mapFilters.brandingColor;
-						html.style.setProperty(`--sbgcui-branding-color`, mapFilters.brandingColor);
-					}
-				});
-
-				brandingColorPicker.addEventListener('input', event => {
-					if (brandingSelect.value == 'default') { brandingSelect.value = 'custom' }
-					html.style.setProperty(`--sbgcui-branding-color`, hex623(event.target.value));
-				});
-				brandingColorPicker.addEventListener('change', () => {
-					// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
-					brandingColorPicker.value = hex623(brandingColorPicker.value, false);
-				});
-
-				branding.appendChild(brandingColorPicker);
-
-				subSection.classList.add('sbgcui_settings-subsection');
-
-				subSection.append(branding, invert, hueRotate, brightness, grayscale, sepia, blur);
+				subSection.append(subSectionTitle, maxAmounts);
 
 				section.appendChild(subSection);
-
-				return section;
 			}
 
-			function createTintingSection(tinting) {
-				let section = createSection(
-					'Тонирование',
-					'Интерфейс браузера будет окрашиваться в зависимости от того, что происходит на экране.'
-				);
-				let subSection = document.createElement('section');
+			return section;
+		}
 
-				let mapTinting = createInput('checkbox', 'tinting_map', +tinting.map, 'При просмотре карты');
-				let profileTinting = createInput('checkbox', 'tinting_profile', +tinting.profile, 'При просмотре профиля');
+		function createAutoSelectSection(autoSelect) {
+			let section = createSection(
+				'Автовыбор',
+				'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде. Вы можете исключить конкретное ядро из автовыбора: нажмите на него в карусели и удерживайте 1 секунду до появления уведомления.'
+			);
+			let subSection = document.createElement('section');
 
-				mapTinting.addEventListener('change', e => {
-					if (e.target.checked) {
-						addTinting('map');
-					} else {
-						addTinting('');
-					}
-				});
+			let attackDropdown = createDropdown(
+				'Катализатор при атаке:',
+				[
+					['Самый мощный', 'max'],
+					['Последний использованный', 'latest'],
+				],
+				'autoSelect_attack',
+				autoSelect.attack
+			);
+			let deployDropdown = createDropdown(
+				'Ядро при деплое:',
+				[
+					['Наименьшее', 'min'],
+					['Наибольшее', 'max'],
+					['Вручную', 'off'],
+				],
+				'autoSelect_deploy',
+				autoSelect.deploy
+			);
+			let upgradeDropdown = createDropdown(
+				'Ядро при апгрейде:',
+				[
+					['Наименьшее', 'min'],
+					['Наибольшее', 'max'],
+					['Вручную', 'off'],
+				],
+				'autoSelect_upgrade',
+				autoSelect.upgrade
+			);
 
-				let pointTintingDropdown = createDropdown(
-					'При просмотре точки:',
-					[
-						['Цвет уровня', 'level'],
-						['Цвет команды', 'team'],
-						['Нет', 'off'],
-					],
-					'tinting_point',
-					tinting.point
-				);
+			subSection.classList.add('sbgcui_settings-subsection');
 
-				subSection.classList.add('sbgcui_settings-subsection');
+			subSection.append(attackDropdown, deployDropdown, upgradeDropdown);
 
-				subSection.append(mapTinting, profileTinting, pointTintingDropdown);
+			section.appendChild(subSection);
 
-				section.appendChild(subSection);
+			return section;
+		}
 
-				return section;
+		function createColorSchemeSection(mapFilters) {
+			function setCssVar(cssVar, value) {
+				let filter = cssVar.split('_')[1];
+				let units = (filter == 'blur') ? 'px' : (filter == 'hueRotate') ? 'deg' : '';
+				html.style.setProperty(`--sbgcui-${filter}`, `${value}${units}`);
 			}
 
-			function createVibrationSection(vibration) {
-				let section = createSection(
-					'Вибрация',
-					'Устройство будет откликаться на ваши действия. Может потребоваться выдача соответствующего разрешения в браузере или системе.'
-				);
-				let subSection = document.createElement('section');
+			function createInput(type, name, min, max, step, value, text) {
+				let wrapper = document.createElement('div');
+				let label = document.createElement('label');
+				let input = document.createElement('input');
 
-				let buttonsVibration = createInput('checkbox', 'vibration_buttons', +vibration.buttons, 'При нажатии кнопок');
-				let notificationsVibration = createInput('checkbox', 'vibration_notifications', +vibration.notifications, 'При уведомлениях');
+				wrapper.classList.add('sbgcui_settings-mapfilters_input_wrp');
 
-				subSection.classList.add('sbgcui_settings-subsection');
+				input.type = type;
+				input.name = name;
+				input.min = min;
+				input.max = max;
+				input.step = step;
+				input.value = value;
 
-				subSection.append(buttonsVibration, notificationsVibration);
+				label.innerText = text;
 
-				section.appendChild(subSection);
+				input.addEventListener('input', event => { setCssVar(name, event.target.value); });
 
-				if (!('vibrate' in window.navigator)) { section.classList.add('sbgcui_hidden'); }
+				wrapper.append(label, input);
 
-				return section;
+				return wrapper;
 			}
 
-			function createUISection(ui) {
-				let section = createSection(
-					'Интерфейс',
-					'Некоторые аспекты дизайна можно отключить или изменить для большего удобства.'
-				);
-				let subSection = document.createElement('section');
+			let section = createSection(
+				'Цветовая схема',
+				'Настройте цвет своей команды и оттенок карты.'
+			);
+			let subSection = document.createElement('section');
 
-				let doubleClickZoom = createInput('checkbox', 'ui_doubleClickZoom', +ui.doubleClickZoom, 'Зум карты по двойному нажатию');
-				let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
-				let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
-				let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
-				let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
+			let invert = createInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия');
+			let hueRotate = createInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность');
+			let brightness = createInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость');
+			let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
+			let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
+			let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
+			let branding = createDropdown('Цвет вашей команды:', [['Стандартный', 'default'], ['Собственный', 'custom']], 'mapFilters_branding', mapFilters.branding);
+			let brandingColorPicker = createColorPicker('mapFilters_brandingColor', mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor));
 
-				pointBgImage.addEventListener('click', event => {
-					if (event.target.id == 'ui_pointBgImage') {
-						if (event.target.checked) {
-							pointBgImageBlur.childNodes[1].removeAttribute('disabled');
-						} else {
-							pointBgImageBlur.childNodes[1].checked = 0;
-							pointBgImageBlur.childNodes[1].setAttribute('disabled', '');
-						}
-					}
-				});
+			let brandingSelect = branding.querySelector('select');
 
-
-				subSection.classList.add('sbgcui_settings-subsection');
-
-				subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
-
-				section.appendChild(subSection);
-
-				return section;
-			}
-
-			function createPointHighlightingSection(pointHighlighting) {
-				function switchOff(selects, option) {
-					selects.forEach(select => {
-						switch (option) {
-							case 'uniqc':
-								if (select.value == 'uniqv') { select.value = 'off' }
-								break;
-							case 'uniqv':
-								if (select.value == 'uniqc') { select.value = 'off' }
-								break;
-							default: select.value = 'off';
-						}
-					});
+			brandingSelect.addEventListener('change', event => {
+				if (event.target.value == 'default') {
+					brandingColorPicker.value = hex326(player.teamColor);
+					html.style.setProperty(`--sbgcui-branding-color`, player.teamColor);
+				} else {
+					brandingColorPicker.value = mapFilters.brandingColor;
+					html.style.setProperty(`--sbgcui-branding-color`, mapFilters.brandingColor);
 				}
+			});
 
-				let section = createSection(
-					'Подсветка точек',
-					'Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом. Выберите, что будет обозначать каждый из них.'
-				);
-				let subSection = document.createElement('section');
-				let innerMarkerColorPicker = createColorPicker('pointHighlighting_innerColor', pointHighlighting.innerColor);
-				let outerMarkerColorPicker = createColorPicker('pointHighlighting_outerColor', pointHighlighting.outerColor);
-				let outerTopMarkerColorPicker = createColorPicker('pointHighlighting_outerTopColor', pointHighlighting.outerTopColor);
-				let outerBottomMarkerColorPicker = createColorPicker('pointHighlighting_outerBottomColor', pointHighlighting.outerBottomColor);
+			brandingColorPicker.addEventListener('input', event => {
+				if (brandingSelect.value == 'default') { brandingSelect.value = 'custom' }
+				html.style.setProperty(`--sbgcui-branding-color`, hex623(event.target.value));
+			});
+			brandingColorPicker.addEventListener('change', () => {
+				// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
+				brandingColorPicker.value = hex623(brandingColorPicker.value, false);
+			});
 
-				let markerOptions = [
+			branding.appendChild(brandingColorPicker);
+
+			subSection.classList.add('sbgcui_settings-subsection');
+
+			subSection.append(branding, invert, hueRotate, brightness, grayscale, sepia, blur);
+
+			section.appendChild(subSection);
+
+			return section;
+		}
+
+		function createTintingSection(tinting) {
+			let section = createSection(
+				'Тонирование',
+				'Интерфейс браузера будет окрашиваться в зависимости от того, что происходит на экране.'
+			);
+			let subSection = document.createElement('section');
+
+			let mapTinting = createInput('checkbox', 'tinting_map', +tinting.map, 'При просмотре карты');
+			let profileTinting = createInput('checkbox', 'tinting_profile', +tinting.profile, 'При просмотре профиля');
+
+			mapTinting.addEventListener('change', e => {
+				if (e.target.checked) {
+					addTinting('map');
+				} else {
+					addTinting('');
+				}
+			});
+
+			let pointTintingDropdown = createDropdown(
+				'При просмотре точки:',
+				[
+					['Цвет уровня', 'level'],
+					['Цвет команды', 'team'],
 					['Нет', 'off'],
-					[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
-					['Избранная', 'fav'],
-					['Имеется реф', 'ref'],
-					['Не захвачена', 'uniqc'],
-					['Не исследована', 'uniqv'],
-					['Полностью проставлена', 'cores'],
-				];
+				],
+				'tinting_point',
+				tinting.point
+			);
 
-				let innerMarker = createDropdown('Внутренний маркер (точка):', markerOptions, 'pointHighlighting_inner', pointHighlighting.inner);
-				let outerMarker = createDropdown('Наружный маркер (кольцо):', markerOptions, 'pointHighlighting_outer', pointHighlighting.outer);
-				let outerTopMarker = createDropdown('Наружный маркер (верхнее полукольцо):', markerOptions, 'pointHighlighting_outerTop', pointHighlighting.outerTop);
-				let outerBottomMarker = createDropdown('Наружный маркер (нижнее полукольцо):', markerOptions, 'pointHighlighting_outerBottom', pointHighlighting.outerBottom);
-				let textMarker = createDropdown(
-					'Текстовый маркер:',
-					[
-						['Нет', 'off'],
-						['Уровень', 'level'],
-						['Энергия', 'energy'],
-						['Количество рефов', 'refsAmount'],
-					],
-					'pointHighlighting_text',
-					pointHighlighting.text
-				);
+			subSection.classList.add('sbgcui_settings-subsection');
 
-				let innerMarkerSelect = innerMarker.querySelector('select');
-				let outerMarkerSelect = outerMarker.querySelector('select');
-				let outerTopMarkerSelect = outerTopMarker.querySelector('select');
-				let outerBottomMarkerSelect = outerBottomMarker.querySelector('select');
+			subSection.append(mapTinting, profileTinting, pointTintingDropdown);
 
-				let selects = [innerMarkerSelect, outerMarkerSelect, outerTopMarkerSelect, outerBottomMarkerSelect];
+			section.appendChild(subSection);
 
-				selects.forEach(select => {
-					select.addEventListener('change', event => {
-						switch (event.target) {
-							case outerMarkerSelect:
-								switchOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
-								break;
-							case outerTopMarkerSelect:
-							case outerBottomMarkerSelect:
-								switchOff([outerMarkerSelect]);
-								break;
-						}
+			return section;
+		}
 
-						if (['uniqc', 'uniqv'].includes(event.target.value)) {
-							let selectsToOff = selects.filter(e => e != select);
-							switchOff(selectsToOff, event.target.value);
-						}
-					});
-				});
+		function createVibrationSection(vibration) {
+			let section = createSection(
+				'Вибрация',
+				'Устройство будет откликаться на ваши действия. Может потребоваться выдача соответствующего разрешения в браузере или системе.'
+			);
+			let subSection = document.createElement('section');
 
-				innerMarker.appendChild(innerMarkerColorPicker);
-				outerMarker.appendChild(outerMarkerColorPicker);
-				outerTopMarker.appendChild(outerTopMarkerColorPicker);
-				outerBottomMarker.appendChild(outerBottomMarkerColorPicker);
+			let buttonsVibration = createInput('checkbox', 'vibration_buttons', +vibration.buttons, 'При нажатии кнопок');
+			let notificationsVibration = createInput('checkbox', 'vibration_notifications', +vibration.notifications, 'При уведомлениях');
 
-				subSection.classList.add('sbgcui_settings-subsection');
+			subSection.classList.add('sbgcui_settings-subsection');
 
-				subSection.append(innerMarker, outerMarker, outerTopMarker, outerBottomMarker, textMarker);
+			subSection.append(buttonsVibration, notificationsVibration);
 
-				section.appendChild(subSection);
+			section.appendChild(subSection);
 
-				return section;
-			}
+			if (!('vibrate' in window.navigator)) { section.classList.add('sbgcui_hidden'); }
 
+			return section;
+		}
 
-			let form = document.createElement('form');
-			form.classList.add('sbgcui_settings', 'sbgcui_hidden');
+		function createUISection(ui) {
+			let section = createSection(
+				'Интерфейс',
+				'Некоторые аспекты дизайна можно отключить или изменить для большего удобства.'
+			);
+			let subSection = document.createElement('section');
 
-			let version = document.createElement('span');
-			version.classList.add('sbgcui_settings-version');
-			version.innerText = `v${USERSCRIPT_VERSION}`;
+			let doubleClickZoom = createInput('checkbox', 'ui_doubleClickZoom', +ui.doubleClickZoom, 'Зум карты по двойному нажатию');
+			let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
+			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
+			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
+			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
 
-			let formHeader = document.createElement('h3');
-			formHeader.classList.add('sbgcui_settings-header');
-			formHeader.innerText = 'Настройки';
-
-			let submitButton = document.createElement('button');
-			submitButton.innerText = 'Сохранить';
-
-			let closeButton = document.createElement('button');
-			closeButton.innerText = 'Закрыть';
-
-
-			closeButton.addEventListener('click', event => {
-				event.preventDefault();
-				event.stopPropagation();
-				closeSettingsMenu();
+			pointBgImage.addEventListener('click', event => {
+				if (event.target.id == 'ui_pointBgImage') {
+					if (event.target.checked) {
+						pointBgImageBlur.childNodes[1].removeAttribute('disabled');
+					} else {
+						pointBgImageBlur.childNodes[1].checked = 0;
+						pointBgImageBlur.childNodes[1].setAttribute('disabled', '');
+					}
+				}
 			});
 
 
-			let buttonsWrp = document.createElement('div');
-			buttonsWrp.classList.add('sbgcui_settings-buttons_wrp');
-			buttonsWrp.append(submitButton, closeButton);
+			subSection.classList.add('sbgcui_settings-subsection');
 
+			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
 
-			let sections = [
-				createAutoDeleteSection(config.maxAmountInBag),
-				createAutoSelectSection(config.autoSelect),
-				createColorSchemeSection(config.mapFilters),
-				createTintingSection(config.tinting),
-				createVibrationSection(config.vibration),
-				createUISection(config.ui),
-				createPointHighlightingSection(config.pointHighlighting),
+			section.appendChild(subSection);
+
+			return section;
+		}
+
+		function createPointHighlightingSection(pointHighlighting) {
+			function switchOff(selects, option) {
+				selects.forEach(select => {
+					switch (option) {
+						case 'uniqc':
+							if (select.value == 'uniqv') { select.value = 'off' }
+							break;
+						case 'uniqv':
+							if (select.value == 'uniqc') { select.value = 'off' }
+							break;
+						default: select.value = 'off';
+					}
+				});
+			}
+
+			let section = createSection(
+				'Подсветка точек',
+				'Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом. Выберите, что будет обозначать каждый из них.'
+			);
+			let subSection = document.createElement('section');
+			let innerMarkerColorPicker = createColorPicker('pointHighlighting_innerColor', pointHighlighting.innerColor);
+			let outerMarkerColorPicker = createColorPicker('pointHighlighting_outerColor', pointHighlighting.outerColor);
+			let outerTopMarkerColorPicker = createColorPicker('pointHighlighting_outerTopColor', pointHighlighting.outerTopColor);
+			let outerBottomMarkerColorPicker = createColorPicker('pointHighlighting_outerBottomColor', pointHighlighting.outerBottomColor);
+
+			let markerOptions = [
+				['Нет', 'off'],
+				[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
+				['Избранная', 'fav'],
+				['Имеется реф', 'ref'],
+				['Не захвачена', 'uniqc'],
+				['Не исследована', 'uniqv'],
+				['Полностью проставлена', 'cores'],
 			];
 
-			sections.forEach(e => {
-				e.addEventListener('click', event => {
-					sections.forEach(e => {
-						if (event.currentTarget != e) { e.removeAttribute('open'); }
-					});
+			let innerMarker = createDropdown('Внутренний маркер (точка):', markerOptions, 'pointHighlighting_inner', pointHighlighting.inner);
+			let outerMarker = createDropdown('Наружный маркер (кольцо):', markerOptions, 'pointHighlighting_outer', pointHighlighting.outer);
+			let outerTopMarker = createDropdown('Наружный маркер (верхнее полукольцо):', markerOptions, 'pointHighlighting_outerTop', pointHighlighting.outerTop);
+			let outerBottomMarker = createDropdown('Наружный маркер (нижнее полукольцо):', markerOptions, 'pointHighlighting_outerBottom', pointHighlighting.outerBottom);
+			let textMarker = createDropdown(
+				'Текстовый маркер:',
+				[
+					['Нет', 'off'],
+					['Уровень', 'level'],
+					['Энергия', 'energy'],
+					['Количество рефов', 'refsAmount'],
+				],
+				'pointHighlighting_text',
+				pointHighlighting.text
+			);
+
+			let innerMarkerSelect = innerMarker.querySelector('select');
+			let outerMarkerSelect = outerMarker.querySelector('select');
+			let outerTopMarkerSelect = outerTopMarker.querySelector('select');
+			let outerBottomMarkerSelect = outerBottomMarker.querySelector('select');
+
+			let selects = [innerMarkerSelect, outerMarkerSelect, outerTopMarkerSelect, outerBottomMarkerSelect];
+
+			selects.forEach(select => {
+				select.addEventListener('change', event => {
+					switch (event.target) {
+						case outerMarkerSelect:
+							switchOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
+							break;
+						case outerTopMarkerSelect:
+						case outerBottomMarkerSelect:
+							switchOff([outerMarkerSelect]);
+							break;
+					}
+
+					if (['uniqc', 'uniqv'].includes(event.target.value)) {
+						let selectsToOff = selects.filter(e => e != select);
+						switchOff(selectsToOff, event.target.value);
+					}
 				});
 			});
 
-			form.append(version, formHeader, ...sections, buttonsWrp);
+			innerMarker.appendChild(innerMarkerColorPicker);
+			outerMarker.appendChild(outerMarkerColorPicker);
+			outerTopMarker.appendChild(outerTopMarkerColorPicker);
+			outerBottomMarker.appendChild(outerBottomMarkerColorPicker);
 
-			form.addEventListener('submit', e => {
-				e.preventDefault();
+			subSection.classList.add('sbgcui_settings-subsection');
 
-				try {
-					let formData = new FormData(e.target);
-					let formEntries = Object.fromEntries(formData);
+			subSection.append(innerMarker, outerMarker, outerTopMarker, outerBottomMarker, textMarker);
 
-					for (let key in formEntries) {
-						let path = key.split('_');
-						if (path[0] == 'maxAmountInBag') {
-							config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-						} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting/)) {
-							let value = formEntries[key];
-							config[path[0]][path[1]] = isNaN(+value) ? value : +value;
-						}
+			section.appendChild(subSection);
+
+			return section;
+		}
+
+
+		let form = document.createElement('form');
+		form.classList.add('sbgcui_settings', 'sbgcui_hidden');
+
+		let version = document.createElement('span');
+		version.classList.add('sbgcui_settings-version');
+		version.innerText = `v${USERSCRIPT_VERSION}`;
+
+		let formHeader = document.createElement('h3');
+		formHeader.classList.add('sbgcui_settings-header');
+		formHeader.innerText = 'Настройки';
+
+		let submitButton = document.createElement('button');
+		submitButton.innerText = 'Сохранить';
+
+		let closeButton = document.createElement('button');
+		closeButton.innerText = 'Закрыть';
+
+
+		closeButton.addEventListener('click', event => {
+			event.preventDefault();
+			event.stopPropagation();
+			closeSettingsMenu();
+		});
+
+
+		let buttonsWrp = document.createElement('div');
+		buttonsWrp.classList.add('sbgcui_settings-buttons_wrp');
+		buttonsWrp.append(submitButton, closeButton);
+
+
+		let sections = [
+			createAutoDeleteSection(config.maxAmountInBag),
+			createAutoSelectSection(config.autoSelect),
+			createColorSchemeSection(config.mapFilters),
+			createTintingSection(config.tinting),
+			createVibrationSection(config.vibration),
+			createUISection(config.ui),
+			createPointHighlightingSection(config.pointHighlighting),
+		];
+
+		sections.forEach(e => {
+			e.addEventListener('click', event => {
+				sections.forEach(e => {
+					if (event.currentTarget != e) { e.removeAttribute('open'); }
+				});
+			});
+		});
+
+		form.append(version, formHeader, ...sections, buttonsWrp);
+
+		form.addEventListener('submit', e => {
+			e.preventDefault();
+
+			try {
+				let formData = new FormData(e.target);
+				let formEntries = Object.fromEntries(formData);
+
+				for (let key in formEntries) {
+					let path = key.split('_');
+					if (path[0] == 'maxAmountInBag') {
+						config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
+					} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting/)) {
+						let value = formEntries[key];
+						config[path[0]][path[1]] = isNaN(+value) ? value : +value;
 					}
-
-					localStorage.setItem('sbgcui_config', JSON.stringify(config));
-
-					let toast = createToast('Настройки сохранены');
-					toast.showToast();
-				} catch (error) {
-					let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`);
-
-					toast.options.className = 'error-toast';
-					toast.showToast();
-
-					console.log('SBG CUI: Ошибка при сохранении настроек.', error);
 				}
-			});
 
-			return form;
-		}
-
-		function closeSettingsMenu() {
-			let { mapFilters, ui } = config;
-
-			for (let key in mapFilters) {
-				let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
-				html.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
-			}
-
-			html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
-			html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
-			html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
-			window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
-			window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
-
-			doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
-
-			if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
-
-			document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
-			document.querySelectorAll('.sbgcui_settings > details').forEach(e => { e.open = false; });
-
-			document.querySelectorAll('.sbgcui_settings input:not([type="hidden"]), .sbgcui_settings select').forEach(e => {
-				let path = e.name.split('_');
-				let value = path.reduce((obj, prop) => obj[prop], config);
-
-				switch (e.type) {
-					case 'number':
-					case 'range':
-						e.value = +value;
-						break;
-					case 'color':
-						e.value = value;
-						break;
-					case 'checkbox':
-						e.checked = +value;
-						break;
-					case 'radio':
-						e.checked = e.value == value;
-						break;
-					case 'select-one':
-						e.value = value;
-						break;
-				}
-			});
-		}
-
-		function chooseCatalyser(type) {
-			let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level).sort((a, b) => a.l - b.l);
-			let catalyser;
-
-			switch (type) {
-				case 'latest':
-					catalyser = attackSlider.querySelector(`[data-guid="${lastUsedCatalyser}"]`);
-					if (catalyser) { break; } // Если последний использованный кат не найден - проваливаемся ниже и выбираем максимальный.
-				case 'max':
-					catalyser = attackSlider.querySelector(`[data-guid="${cachedCatalysers[cachedCatalysers.length - 1].g}"]`);
-					break;
-			}
-
-			return catalyser;
-		}
-
-		function click(element) {
-			let mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-			let mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
-			let clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
-
-			element?.dispatchEvent(mouseDownEvent);
-			element?.dispatchEvent(mouseUpEvent);
-			element?.dispatchEvent(clickEvent);
-		}
-
-		function createToast(text = '', position = 'top left', duration = 4000, container = null) {
-			let parts = position.split(/\s+/);
-			let toast = Toastify({
-				text,
-				duration,
-				gravity: parts[0],
-				position: parts[1],
-				escapeMarkup: false,
-				className: 'interaction-toast',
-				selector: container,
-			});
-			toast.options.id = Math.round(Math.random() * 1e5);;
-			toast.options.onClick = () => toast.hideToast();
-			return toast;
-		}
-
-		function updateExpBar(playerExp) {
-			let formatter = new Intl.NumberFormat('en-GB');
-			let totalLvlExp = 0;
-
-			for (let i = 0; i < LEVEL_TARGETS.length; i += 1) {
-				totalLvlExp += LEVEL_TARGETS[i];
-
-				if (totalLvlExp > playerExp) {
-					selfExpSpan.innerText = totalLvlExp != Infinity ?
-						`${formatter.format(playerExp - (totalLvlExp - LEVEL_TARGETS[i]))} / ${formatter.format(LEVEL_TARGETS[i])}` :
-						formatter.format(playerExp);
-
-					selfLvlSpan.innerText = i + 1;
-
-					return;
-				}
-			}
-		}
-
-		function addTinting(type) {
-			function rgb2hex(rgb) {
-				if (!rgb) { return ''; }
-				return `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
-			}
-
-			let color;
-			let yaRegexp = /ya-title=.*?,\sya-dock=.*?(?=,|$)/;
-
-			switch (type) {
-				case 'map':
-					color = getComputedStyle(selfNameSpan).color;
-					break;
-				case 'profile':
-					color = getComputedStyle(profileNameSpan).color;
-					profilePopup.style.borderColor = color;
-					break;
-				case 'point_level':
-					color = getComputedStyle(pointLevelSpan).color;
-					pointPopup.style.borderColor = color;
-					pointTitleSpan.style.color = color;
-					break;
-				case 'point_team':
-					color = getComputedStyle(pointOwnerSpan).color;
-					pointPopup.style.borderColor = color;
-					pointTitleSpan.style.color = color;
-					break;
-				default:
-					color = '';
-					break;
-			}
-
-			color = rgb2hex(color);
-
-			theme.content = color;
-			if (!viewport.content.match(yaRegexp)) {
-				viewport.content += `, ya-title=${color}, ya-dock=${color}`;
-			} else {
-				viewport.content = viewport.content.replace(yaRegexp, `ya-title=${color}, ya-dock=${color}`);
-			}
-		}
-
-		function updateConfigStructure(storedConfig, defaultConfig) {
-			for (let key in defaultConfig) {
-				if (typeof defaultConfig[key] != typeof storedConfig[key]) {
-					storedConfig[key] = defaultConfig[key];
-				} else if (typeof defaultConfig[key] == 'object') {
-					updateConfigStructure(storedConfig[key], defaultConfig[key]);
-				}
-			}
-		}
-
-		function showXp(amount) {
-			let xpSpan = document.createElement('span');
-			xpSpan.classList.add('sbgcui_xpdiff');
-
-			xpSpan.innerText = `+${amount}xp`;
-			xpContainer.appendChild(xpSpan);
-
-			setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
-			setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
-		}
-
-		function hex623(hex, isShort = true) {
-			return isShort ?
-				`#${[...hex].filter((e, i) => i % 2).join('')}` :
-				`#${[...hex].map((e, i, a) => i % 2 ? e : a[i - 1]).join('')}`;
-		}
-
-		function hex326(hex) {
-			return [...hex].map(e => e == '#' ? e : e + e).join('');
-		}
-	
-		function toOLMeters(meters, rate) {
-			rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, map.getView().getCenter(), 'm');
-			return meters * rate;
-		}
-
-
-		/* Данные о себе и версии игры */
-		{
-			var selfData = await getSelfData();
-
-			if (LATEST_KNOWN_VERSION != selfData.version) {
-				let warns = +localStorage.getItem('sbgcui_version_warns');
-
-				if (warns < 2) {
-					let toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
-					toast.options.className = 'error-toast';
-					toast.showToast();
-					localStorage.setItem('sbgcui_version_warns', warns + 1);
-				}
-			} else {
-				localStorage.setItem('sbgcui_version_warns', 0);
-			}
-
-			var player = {
-				name: selfData.name,
-				team: selfData.team,
-				exp: {
-					total: selfData.exp,
-					current: selfData.exp - LEVEL_TARGETS.slice(0, selfData.lvl - 1).reduce((sum, e) => e + sum, 0),
-					goal: LEVEL_TARGETS[selfData.lvl - 1],
-					get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
-					set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
-				},
-				auth: localStorage.getItem('auth'),
-				guid: selfData.guid,
-				feature: playerFeature,
-				teamColor: getComputedStyle(html).getPropertyValue(`--team-${selfData.team}`),
-				get level() { return this._level; },
-				set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
-				_level: selfData.lvl,
-			};
-
-			if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
-				config.maxAmountInBag = {
-					cores: { I: 100, II: 100, III: 100, IV: 100, V: 100, VI: 150, VII: 150, VIII: 120, IX: -1, X: -1 },
-					catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
-					refs: { allied: 20, hostile: 10 },
-				};
 				localStorage.setItem('sbgcui_config', JSON.stringify(config));
+
+				let toast = createToast('Настройки сохранены');
+				toast.showToast();
+			} catch (error) {
+				let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`);
+
+				toast.options.className = 'error-toast';
+				toast.showToast();
+
+				console.log('SBG CUI: Ошибка при сохранении настроек.', error);
 			}
+		});
+
+		return form;
+	}
+
+	function closeSettingsMenu() {
+		let { mapFilters, ui } = config;
+
+		for (let key in mapFilters) {
+			let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
+			html.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
 		}
 
+		html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
+		html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
+		html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
+		window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
+		window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
-		/* Стили */
-		{
-			let { mapFilters, ui } = config;
-			let cssVars = document.createElement('style');
-			let styles = document.createElement('link');
-			let fa = document.createElement('link');
-			let faRegular = document.createElement('link');
-			let faSolid = document.createElement('link');
+		doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
 
-			cssVars.innerHTML = (`
+		if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
+
+		document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
+		document.querySelectorAll('.sbgcui_settings > details').forEach(e => { e.open = false; });
+
+		document.querySelectorAll('.sbgcui_settings input:not([type="hidden"]), .sbgcui_settings select').forEach(e => {
+			let path = e.name.split('_');
+			let value = path.reduce((obj, prop) => obj[prop], config);
+
+			switch (e.type) {
+				case 'number':
+				case 'range':
+					e.value = +value;
+					break;
+				case 'color':
+					e.value = value;
+					break;
+				case 'checkbox':
+					e.checked = +value;
+					break;
+				case 'radio':
+					e.checked = e.value == value;
+					break;
+				case 'select-one':
+					e.value = value;
+					break;
+			}
+		});
+	}
+
+	function chooseCatalyser(type) {
+		let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level).sort((a, b) => a.l - b.l);
+		let catalyser;
+
+		switch (type) {
+			case 'latest':
+				catalyser = attackSlider.querySelector(`[data-guid="${lastUsedCatalyser}"]`);
+				if (catalyser) { break; } // Если последний использованный кат не найден - проваливаемся ниже и выбираем максимальный.
+			case 'max':
+				catalyser = attackSlider.querySelector(`[data-guid="${cachedCatalysers[cachedCatalysers.length - 1].g}"]`);
+				break;
+		}
+
+		return catalyser;
+	}
+
+	function click(element) {
+		let mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+		let mouseUpEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true });
+		let clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+
+		element?.dispatchEvent(mouseDownEvent);
+		element?.dispatchEvent(mouseUpEvent);
+		element?.dispatchEvent(clickEvent);
+	}
+
+	function createToast(text = '', position = 'top left', duration = 4000, container = null) {
+		let parts = position.split(/\s+/);
+		let toast = Toastify({
+			text,
+			duration,
+			gravity: parts[0],
+			position: parts[1],
+			escapeMarkup: false,
+			className: 'interaction-toast',
+			selector: container,
+		});
+		toast.options.id = Math.round(Math.random() * 1e5);;
+		toast.options.onClick = () => toast.hideToast();
+		return toast;
+	}
+
+	function updateExpBar(playerExp) {
+		let formatter = new Intl.NumberFormat('en-GB');
+		let totalLvlExp = 0;
+
+		for (let i = 0; i < LEVEL_TARGETS.length; i += 1) {
+			totalLvlExp += LEVEL_TARGETS[i];
+
+			if (totalLvlExp > playerExp) {
+				selfExpSpan.innerText = totalLvlExp != Infinity ?
+					`${formatter.format(playerExp - (totalLvlExp - LEVEL_TARGETS[i]))} / ${formatter.format(LEVEL_TARGETS[i])}` :
+					formatter.format(playerExp);
+
+				selfLvlSpan.innerText = i + 1;
+
+				return;
+			}
+		}
+	}
+
+	function addTinting(type) {
+		function rgb2hex(rgb) {
+			if (!rgb) { return ''; }
+			return `#${rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/).slice(1).map(n => parseInt(n, 10).toString(16).padStart(2, '0')).join('')}`;
+		}
+
+		let color;
+		let yaRegexp = /ya-title=.*?,\sya-dock=.*?(?=,|$)/;
+
+		switch (type) {
+			case 'map':
+				color = getComputedStyle(selfNameSpan).color;
+				break;
+			case 'profile':
+				color = getComputedStyle(profileNameSpan).color;
+				profilePopup.style.borderColor = color;
+				break;
+			case 'point_level':
+				color = getComputedStyle(pointLevelSpan).color;
+				pointPopup.style.borderColor = color;
+				pointTitleSpan.style.color = color;
+				break;
+			case 'point_team':
+				color = getComputedStyle(pointOwnerSpan).color;
+				pointPopup.style.borderColor = color;
+				pointTitleSpan.style.color = color;
+				break;
+			default:
+				color = '';
+				break;
+		}
+
+		color = rgb2hex(color);
+
+		theme.content = color;
+		if (!viewport.content.match(yaRegexp)) {
+			viewport.content += `, ya-title=${color}, ya-dock=${color}`;
+		} else {
+			viewport.content = viewport.content.replace(yaRegexp, `ya-title=${color}, ya-dock=${color}`);
+		}
+	}
+
+	function updateConfigStructure(storedConfig, defaultConfig) {
+		for (let key in defaultConfig) {
+			if (typeof defaultConfig[key] != typeof storedConfig[key]) {
+				storedConfig[key] = defaultConfig[key];
+			} else if (typeof defaultConfig[key] == 'object') {
+				updateConfigStructure(storedConfig[key], defaultConfig[key]);
+			}
+		}
+	}
+
+	function showXp(amount) {
+		let xpSpan = document.createElement('span');
+		xpSpan.classList.add('sbgcui_xpdiff');
+
+		xpSpan.innerText = `+${amount}xp`;
+		xpContainer.appendChild(xpSpan);
+
+		setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
+		setTimeout(_ => { xpContainer.removeChild(xpSpan); }, 3000);
+	}
+
+	function hex623(hex, isShort = true) {
+		return isShort ?
+			`#${[...hex].filter((e, i) => i % 2).join('')}` :
+			`#${[...hex].map((e, i, a) => i % 2 ? e : a[i - 1]).join('')}`;
+	}
+
+	function hex326(hex) {
+		return [...hex].map(e => e == '#' ? e : e + e).join('');
+	}
+
+	function toOLMeters(meters, rate) {
+		rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, map.getView().getCenter(), 'm');
+		return meters * rate;
+	}
+
+
+	/* Данные о себе и версии игры */
+	{
+		var selfData = await getSelfData();
+
+		if (LATEST_KNOWN_VERSION != selfData.version) {
+			let warns = +localStorage.getItem('sbgcui_version_warns');
+
+			if (warns < 2) {
+				let toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
+				toast.options.className = 'error-toast';
+				toast.showToast();
+				localStorage.setItem('sbgcui_version_warns', warns + 1);
+			}
+		} else {
+			localStorage.setItem('sbgcui_version_warns', 0);
+		}
+
+		var player = {
+			name: selfData.name,
+			team: selfData.team,
+			exp: {
+				total: selfData.exp,
+				current: selfData.exp - LEVEL_TARGETS.slice(0, selfData.lvl - 1).reduce((sum, e) => e + sum, 0),
+				goal: LEVEL_TARGETS[selfData.lvl - 1],
+				get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
+				set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
+			},
+			auth: localStorage.getItem('auth'),
+			guid: selfData.guid,
+			feature: playerFeature,
+			teamColor: getComputedStyle(html).getPropertyValue(`--team-${selfData.team}`),
+			get level() { return this._level; },
+			set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
+			_level: selfData.lvl,
+		};
+
+		if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
+			config.maxAmountInBag = {
+				cores: { I: 100, II: 100, III: 100, IV: 100, V: 100, VI: 150, VII: 150, VIII: 120, IX: -1, X: -1 },
+				catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
+				refs: { allied: 20, hostile: 10 },
+			};
+			localStorage.setItem('sbgcui_config', JSON.stringify(config));
+		}
+	}
+
+
+	/* Стили */
+	{
+		let { mapFilters, ui } = config;
+		let cssVars = document.createElement('style');
+		let styles = document.createElement('link');
+		let fa = document.createElement('link');
+		let faRegular = document.createElement('link');
+		let faSolid = document.createElement('link');
+
+		cssVars.innerHTML = (`
       :root {
         --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
         --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
@@ -1608,562 +1617,562 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
       }
   	`);
 
-			if (mapFilters.branding == 'custom') {
-				window.TeamColors[player.team].fill = mapFilters.brandingColor + '80';
-				window.TeamColors[player.team].stroke = hex623(mapFilters.brandingColor);
+		if (mapFilters.branding == 'custom') {
+			window.TeamColors[player.team].fill = mapFilters.brandingColor + '80';
+			window.TeamColors[player.team].stroke = hex623(mapFilters.brandingColor);
+		}
+
+		[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
+
+		styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles.min.css');
+		fa.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/fontawesome.min.css');
+		faRegular.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/regular.min.css');
+		faSolid.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/solid.min.css');
+
+		document.head.append(cssVars, fa, faRegular, faSolid, styles);
+	}
+
+
+	/* Мутации */
+	{
+		let lvlObserver = new MutationObserver((_, observer) => {
+			observer.disconnect();
+
+			player.level = selfLvlSpan.textContent;
+			selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+
+			observer.observe(selfLvlSpan, { childList: true });
+		});
+		lvlObserver.observe(selfLvlSpan, { childList: true });
+
+
+		let pointLevelObserver = new MutationObserver(records => {
+			let event = new Event('pointLevelChanged', { bubbles: true });
+			pointLevelSpan.dispatchEvent(event);
+		});
+		pointLevelObserver.observe(pointLevelSpan, { childList: true });
+
+
+		let pointOwnerObserver = new MutationObserver(records => {
+			let event = new Event('pointOwnerChanged', { bubbles: true });
+			pointOwnerSpan.dispatchEvent(event);
+		});
+		pointOwnerObserver.observe(pointOwnerSpan, { childList: true });
+
+
+		let pointCoresObserver = new MutationObserver(records => {
+			let event = new Event('pointCoresUpdated', { bubbles: true });
+			pointCores.dispatchEvent(event);
+		});
+		pointCoresObserver.observe(pointCores, { childList: true });
+
+
+		let pointPopupObserver = new MutationObserver(records => {
+			let event;
+
+			if (records[0].target.classList.contains('hidden')) {
+				event = new Event('pointPopupClosed');
+				isPointPopupOpened = false;
+			} else if (records[0].oldValue?.includes('hidden')) {
+				event = new Event('pointPopupOpened');
+				isPointPopupOpened = true;
 			}
 
-			[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
-
-			styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles.min.css');
-			fa.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/fontawesome.min.css');
-			faRegular.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/regular.min.css');
-			faSolid.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/solid.min.css');
-
-			document.head.append(cssVars, fa, faRegular, faSolid, styles);
-		}
+			if (event) { records[0].target.dispatchEvent(event); }
+		});
+		pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
 
 
-		/* Мутации */
-		{
-			let lvlObserver = new MutationObserver((_, observer) => {
-				observer.disconnect();
-
-				player.level = selfLvlSpan.textContent;
-				selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
-
-				observer.observe(selfLvlSpan, { childList: true });
-			});
-			lvlObserver.observe(selfLvlSpan, { childList: true });
+		let profilePopupObserver = new MutationObserver(records => {
+			isProfilePopupOpened = !records[0].target.classList.contains('hidden');
+			let event = new Event(isProfilePopupOpened ? 'profilePopupOpened' : 'profilePopupClosed', { bubbles: true });
+			records[0].target.dispatchEvent(event);
+		});
+		profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
 
 
-			let pointLevelObserver = new MutationObserver(records => {
-				let event = new Event('pointLevelChanged', { bubbles: true });
-				pointLevelSpan.dispatchEvent(event);
-			});
-			pointLevelObserver.observe(pointLevelSpan, { childList: true });
+		let inventoryPopupObserver = new MutationObserver(records => {
+			isInventoryPopupOpened = !records[0].target.classList.contains('hidden');
+			let event = new Event(isInventoryPopupOpened ? 'inventoryPopupOpened' : 'inventoryPopupClosed');
+			records[0].target.dispatchEvent(event);
+		});
+		inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ["class"] });
 
 
-			let pointOwnerObserver = new MutationObserver(records => {
-				let event = new Event('pointOwnerChanged', { bubbles: true });
-				pointOwnerSpan.dispatchEvent(event);
-			});
-			pointOwnerObserver.observe(pointOwnerSpan, { childList: true });
+		let attackSliderObserver = new MutationObserver(records => {
+			let isHidden = records[0].target.classList.contains('hidden');
+			let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
+			records[0].target.dispatchEvent(event);
+		});
+		attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
 
 
-			let pointCoresObserver = new MutationObserver(records => {
-				let event = new Event('pointCoresUpdated', { bubbles: true });
-				pointCores.dispatchEvent(event);
-			});
-			pointCoresObserver.observe(pointCores, { childList: true });
+		let inventoryContentObserver = new MutationObserver(records => {
+			records.forEach(e => {
+				if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
+					let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
+					let isAllied = e.target.querySelector('.inventory__item-title').style.color.indexOf(`team-${player.team}`) > -1;
 
-
-			let pointPopupObserver = new MutationObserver(records => {
-				let event;
-
-				if (records[0].target.classList.contains('hidden')) {
-					event = new Event('pointPopupClosed');
-					isPointPopupOpened = false;
-				} else if (records[0].oldValue?.includes('hidden')) {
-					event = new Event('pointPopupOpened');
-					isPointPopupOpened = true;
-				}
-
-				if (event) { records[0].target.dispatchEvent(event); }
-			});
-			pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
-
-
-			let profilePopupObserver = new MutationObserver(records => {
-				isProfilePopupOpened = !records[0].target.classList.contains('hidden');
-				let event = new Event(isProfilePopupOpened ? 'profilePopupOpened' : 'profilePopupClosed', { bubbles: true });
-				records[0].target.dispatchEvent(event);
-			});
-			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
-
-
-			let inventoryPopupObserver = new MutationObserver(records => {
-				isInventoryPopupOpened = !records[0].target.classList.contains('hidden');
-				let event = new Event(isInventoryPopupOpened ? 'inventoryPopupOpened' : 'inventoryPopupClosed');
-				records[0].target.dispatchEvent(event);
-			});
-			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ["class"] });
-
-
-			let attackSliderObserver = new MutationObserver(records => {
-				let isHidden = records[0].target.classList.contains('hidden');
-				let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
-				records[0].target.dispatchEvent(event);
-			});
-			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
-
-
-			let inventoryContentObserver = new MutationObserver(records => {
-				records.forEach(e => {
-					if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
-						let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
-						let isAllied = e.target.querySelector('.inventory__item-title').style.color.indexOf(`team-${player.team}`) > -1;
-
-						if (isAllied) {
-							e.target.style.setProperty('--sbgcui-energy', `${energy}%`);
-							if (energy < 100) {
-								e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
-							}
+					if (isAllied) {
+						e.target.style.setProperty('--sbgcui-energy', `${energy}%`);
+						if (energy < 100) {
+							e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
 						}
 					}
-				});
-			});
-			inventoryContentObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
-
-
-			let xpDiffSpanObserver = new MutationObserver(records => {
-				let xp = records.find(e => e.addedNodes.length).addedNodes[0].data.match(/\d+/)[0];
-				showXp(xp);
-			});
-			xpDiffSpanObserver.observe(xpDiffSpan, { childList: true });
-
-
-			let refsListObserver = new MutationObserver(() => {
-				let refs = Array.from(document.querySelectorAll('.inventory__content[data-type="3"] > .inventory__item'));
-
-				if (refs.every(e => e.classList.contains('loaded'))) {
-					let event = new Event('refsListLoaded');
-					inventoryContent.dispatchEvent(event);
 				}
 			});
-			refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] });
+		});
+		inventoryContentObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
 
-			let catalysersListObserver = new MutationObserver(records => {
-				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
-					let event = new Event('activeSlideChanged');
-					catalysersList.dispatchEvent(event);
+		let xpDiffSpanObserver = new MutationObserver(records => {
+			let xp = records.find(e => e.addedNodes.length).addedNodes[0].data.match(/\d+/)[0];
+			showXp(xp);
+		});
+		xpDiffSpanObserver.observe(xpDiffSpan, { childList: true });
+
+
+		let refsListObserver = new MutationObserver(() => {
+			let refs = Array.from(document.querySelectorAll('.inventory__content[data-type="3"] > .inventory__item'));
+
+			if (refs.every(e => e.classList.contains('loaded'))) {
+				let event = new Event('refsListLoaded');
+				inventoryContent.dispatchEvent(event);
+			}
+		});
+		refsListObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+
+		let catalysersListObserver = new MutationObserver(records => {
+			if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
+				let event = new Event('activeSlideChanged');
+				catalysersList.dispatchEvent(event);
+			}
+		});
+		catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+	}
+
+
+	/* Прочие события */
+	{
+		discoverButton.addEventListener('click', event => { if (event.target == discoverButton) { clearInventory(); } });
+
+		attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
+
+		pointPopup.addEventListener('pointPopupOpened', () => {
+			let settings = JSON.parse(localStorage.getItem('settings')) || {};
+
+			if (config.ui.pointBgImage) {
+				html.style.setProperty(`--sbgcui-point-image`, settings.imghid ? '' : `url("${lastOpenedPoint.image}")`);
+				pointPopup.classList.add('sbgcui_point-popup-bg');
+				pointImage.classList.add('sbgcui_no_bg_image');
+			} else {
+				html.style.setProperty(`--sbgcui-point-image`, '');
+				pointPopup.style.backgroundImage = '';
+				pointPopup.classList.remove('sbgcui_point-popup-bg');
+				pointImage.classList.remove('sbgcui_no_bg_image');
+			}
+
+			if (config.ui.pointDischargeTimeout) {
+				let timeout = lastOpenedPoint.dischargeTimeout;
+				if (timeout.length != 0) {
+					let span = document.createElement('span');
+
+					span.style.color = 'var(--text-disabled)';
+					span.innerText = ` (${timeout})`;
+					pointEnergySpan.appendChild(span);
+				}
+			}
+		});
+
+		document.addEventListener("backbutton", () => {
+			if (isProfilePopupOpened) {
+				click(pointPopupCloseButton);
+			} else if (isPointPopupOpened) {
+				click(profilePopupCloseButton);
+			}
+			return false;
+		});
+
+		document.querySelector('.inventory__tab[data-type="3"]').addEventListener('click', event => {
+			let counter = document.querySelector('.inventory__tab[data-type="3"] > .inventory__tab-counter');
+			let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
+			let uniqueRefsAmount = inventoryContent.childNodes.length;
+
+			counter.innerText = uniqueRefsAmount;
+			setTimeout(() => { counter.innerText = refsAmount; }, 1000);
+		});
+
+		toggleFollow.addEventListener('touchstart', () => {
+			let touchStartDate = Date.now();
+
+			let timeoutID = setTimeout(() => {
+				map.getView().animate({ center: player.feature.getGeometry().getCoordinates() }, { zoom: 17 });
+			}, 500);
+
+			this.addEventListener('touchend', () => {
+				let touchDuration = Date.now() - touchStartDate;
+				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+			}, { once: true });
+		});
+
+		toggleFollow.addEventListener('click', () => {
+			dragPan.setActive(toggleFollow.dataset.active == 'false');
+		})
+	}
+
+
+	/* Удаление ненужного, переносы, переименования */
+	{
+		let ops = document.querySelector('#ops');
+		let blContainer = document.querySelector('.bottomleft-container');
+		let rotateArrow = document.querySelector('.ol-rotate');
+		let layersButton = document.querySelector('#layers');
+		let attackSliderClose = document.querySelector('#attack-slider-close');
+
+		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
+		document.querySelectorAll('.self-info__entry').forEach(e => {
+			let toDelete = [];
+
+			e.childNodes.forEach(e => {
+				if (e.nodeType == 3) { toDelete.push(e); }
+			});
+
+			toDelete.forEach(e => { e.remove(); });
+		});
+
+		attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
+		attackButton.childNodes[0].remove(); // Надпись Attack.
+
+		invCloseButton.innerText = '[x]';
+
+		layersButton.innerText = '';
+		layersButton.classList.add('fa-solid', 'fa-layer-group');
+
+		zoomContainer.append(rotateArrow, toggleFollow, layersButton);
+
+		toggleFollow.innerText = '';
+		toggleFollow.classList.add('fa-solid', 'fa-location-crosshairs');
+
+		blContainer.appendChild(ops);
+
+		ops.replaceChildren('INVENTORY', invTotalSpan);
+
+		selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+	}
+
+
+	/* Прогресс-бар опыта */
+	{
+		let xpProgressBar = document.createElement('div');
+		let xpProgressBarFiller = document.createElement('div');
+		let selfExpSpan = document.querySelector('#self-info__exp');
+
+		let lvlProgressObserver = new MutationObserver(() => {
+			player.exp.string = selfExpSpan.textContent;
+			html.style.setProperty('--sbgcui-player-exp-percentage', `${player.exp.percentage}%`);
+		});
+		lvlProgressObserver.observe(selfExpSpan, { childList: true });
+
+		xpProgressBar.classList.add('sbgcui_xpProgressBar');
+		xpProgressBarFiller.classList.add('sbgcui_xpProgressBarFiller');
+
+		selfExpSpan.parentElement.prepend(xpProgressBar);
+		xpProgressBar.append(selfExpSpan, xpProgressBarFiller);
+	}
+
+
+	/* Автовыбор */
+	{
+		attackSlider.addEventListener('attackSliderOpened', _ => {
+			click(chooseCatalyser(config.autoSelect.attack));
+		});
+
+		pointPopup.addEventListener('pointPopupOpened', _ => {
+			lastOpenedPoint.selectCore(config.autoSelect.deploy);
+			coresList.childNodes.forEach(coreSlide => {
+				if (excludedCores.has(coreSlide.dataset.guid)) {
+					coreSlide.setAttribute('sbgcui-excluded-core', '');
 				}
 			});
-			catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
-		}
+		});
 
+		pointCores.addEventListener('click', event => {
+			if (event.target.classList.contains('selected')) {
+				let currentLvl = event.target.innerText.match(/^[0-9]{1,2}$/) ? +event.target.innerText : numbersConverter.toDecimal(event.target.innerText);
+				lastOpenedPoint.selectCore(config.autoSelect.upgrade, currentLvl);
+			}
+		});
 
-		/* Прочие события */
-		{
-			discoverButton.addEventListener('click', event => { if (event.target == discoverButton) { clearInventory(); } });
+		coresList.addEventListener('touchstart', event => {
+			let coreSlide = event.target.closest('.is-active.splide__slide');
+			if (coreSlide == null) { return; }
 
-			attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
+			let touchStartDate = Date.now();
+			let guid = coreSlide.dataset.guid;
 
-			pointPopup.addEventListener('pointPopupOpened', () => {
-				let settings = JSON.parse(localStorage.getItem('settings')) || {};
+			let timeoutID = setTimeout(() => {
+				let toast;
 
-				if (config.ui.pointBgImage) {
-					html.style.setProperty(`--sbgcui-point-image`, settings.imghid ? '' : `url("${lastOpenedPoint.image}")`);
-					pointPopup.classList.add('sbgcui_point-popup-bg');
-					pointImage.classList.add('sbgcui_no_bg_image');
+				if (excludedCores.has(guid)) {
+					excludedCores.delete(guid);
+					coreSlide.removeAttribute('sbgcui-excluded-core');
+					toast = createToast('Теперь ядро доступно для автовыбора.');
 				} else {
-					html.style.setProperty(`--sbgcui-point-image`, '');
-					pointPopup.style.backgroundImage = '';
-					pointPopup.classList.remove('sbgcui_point-popup-bg');
-					pointImage.classList.remove('sbgcui_no_bg_image');
+					excludedCores.add(guid);
+					coreSlide.setAttribute('sbgcui-excluded-core', '');
+					toast = createToast('Ядро больше не участвует в автовыборе.');
 				}
 
-				if (config.ui.pointDischargeTimeout) {
-					let timeout = lastOpenedPoint.dischargeTimeout;
-					if (timeout.length != 0) {
-						let span = document.createElement('span');
+				toast.showToast();
+				localStorage.setItem('sbgcui_excludedCores', JSON.stringify([...excludedCores]));
+			}, 1000);
 
-						span.style.color = 'var(--text-disabled)';
-						span.innerText = ` (${timeout})`;
-						pointEnergySpan.appendChild(span);
+			coreSlide.addEventListener('touchend', () => {
+				let touchDuration = Date.now() - touchStartDate;
+				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+			}, { once: true });
+		});
+	}
+
+
+	/* Зарядка из инвентаря */
+	{
+		inventoryContent.addEventListener('click', event => {
+			if (!event.currentTarget.matches('.inventory__content[data-type="3"]')) { return; }
+			if (!event.target.closest('.inventory__item-controls')) { return; }
+			if (!event.target.closest('.inventory__item.loaded')) { return; }
+
+			// Ширина блока кнопок "V M" около 30 px.
+			// Правее них находится кнопка-псевдоэлемент "R".
+			// Если нажато дальше 30px (50 – с запасом на возможное изменение стиля), значит нажата псевдокнопка, если нет – одна из кнопок V/M.
+			// Приходится указывать конкретное число (50), потому что кнопка V при нажатии получает display: none и не имеет offsetWidth.
+			if (event.offsetX < 50) { return; }
+
+			let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
+
+			repairPoint(pointGuid)
+				.then(r => {
+					if (r.error) {
+						throw new Error(r.error);
+					} else if (r.data) {
+						let [pointEnergy, maxEnergy] = r.data.co.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
+						let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
+						let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
+						let percentage = Math.floor(pointEnergy / maxEnergy * 100);
+						let refsCache = JSON.parse(localStorage.getItem('refs-cache'));
+
+						let inventoryItem = event.target.closest('.inventory__item');
+
+						inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
+						inventoryItem.style.setProperty('--sbgcui-display-r-button', (percentage == 100 ? 'none' : 'flex'));
+
+						if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
+
+						updateExpBar(r.xp.cur);
+						showXp(r.xp.diff);
+
+						refsCache[pointGuid].e = percentage;
+						localStorage.setItem('refs-cache', JSON.stringify(refsCache));
 					}
-				}
-			});
-
-			document.addEventListener("backbutton", () => {
-				if (isProfilePopupOpened) {
-					click(pointPopupCloseButton);
-				} else if (isPointPopupOpened) {
-					click(profilePopupCloseButton);
-				}
-				return false;
-			});
-
-			document.querySelector('.inventory__tab[data-type="3"]').addEventListener('click', event => {
-				let counter = document.querySelector('.inventory__tab[data-type="3"] > .inventory__tab-counter');
-				let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
-				let uniqueRefsAmount = inventoryContent.childNodes.length;
-
-				counter.innerText = uniqueRefsAmount;
-				setTimeout(() => { counter.innerText = refsAmount; }, 1000);
-			});
-
-			toggleFollow.addEventListener('touchstart', () => {
-				let touchStartDate = Date.now();
-
-				let timeoutID = setTimeout(() => {
-					map.getView().animate({ center: player.feature.getGeometry().getCoordinates() }, { zoom: 17 });
-				}, 500);
-
-				this.addEventListener('touchend', () => {
-					let touchDuration = Date.now() - touchStartDate;
-					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
-				}, { once: true });
-			});
-
-			toggleFollow.addEventListener('click', () => {
-				dragPan.setActive(toggleFollow.dataset.active == 'false');
-			})
-		}
-
-
-		/* Удаление ненужного, переносы, переименования */
-		{
-			let ops = document.querySelector('#ops');
-			let blContainer = document.querySelector('.bottomleft-container');
-			let rotateArrow = document.querySelector('.ol-rotate');
-			let layersButton = document.querySelector('#layers');
-			let attackSliderClose = document.querySelector('#attack-slider-close');
-
-			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
-			document.querySelectorAll('.self-info__entry').forEach(e => {
-				let toDelete = [];
-
-				e.childNodes.forEach(e => {
-					if (e.nodeType == 3) { toDelete.push(e); }
-				});
-
-				toDelete.forEach(e => { e.remove(); });
-			});
-
-			attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
-			attackButton.childNodes[0].remove(); // Надпись Attack.
-
-			invCloseButton.innerText = '[x]';
-
-			layersButton.innerText = '';
-			layersButton.classList.add('fa-solid', 'fa-layer-group');
-
-			zoomContainer.append(rotateArrow, toggleFollow, layersButton);
-
-			toggleFollow.innerText = '';
-			toggleFollow.classList.add('fa-solid', 'fa-location-crosshairs');
-
-			blContainer.appendChild(ops);
-
-			ops.replaceChildren('INVENTORY', invTotalSpan);
-
-			selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
-		}
-
-
-		/* Прогресс-бар опыта */
-		{
-			let xpProgressBar = document.createElement('div');
-			let xpProgressBarFiller = document.createElement('div');
-			let selfExpSpan = document.querySelector('#self-info__exp');
-
-			let lvlProgressObserver = new MutationObserver(() => {
-				player.exp.string = selfExpSpan.textContent;
-				html.style.setProperty('--sbgcui-player-exp-percentage', `${player.exp.percentage}%`);
-			});
-			lvlProgressObserver.observe(selfExpSpan, { childList: true });
-
-			xpProgressBar.classList.add('sbgcui_xpProgressBar');
-			xpProgressBarFiller.classList.add('sbgcui_xpProgressBarFiller');
-
-			selfExpSpan.parentElement.prepend(xpProgressBar);
-			xpProgressBar.append(selfExpSpan, xpProgressBarFiller);
-		}
-
-
-		/* Автовыбор */
-		{
-			attackSlider.addEventListener('attackSliderOpened', _ => {
-				click(chooseCatalyser(config.autoSelect.attack));
-			});
-
-			pointPopup.addEventListener('pointPopupOpened', _ => {
-				lastOpenedPoint.selectCore(config.autoSelect.deploy);
-				coresList.childNodes.forEach(coreSlide => {
-					if (excludedCores.has(coreSlide.dataset.guid)) {
-						coreSlide.setAttribute('sbgcui-excluded-core', '');
-					}
-				});
-			});
-
-			pointCores.addEventListener('click', event => {
-				if (event.target.classList.contains('selected')) {
-					let currentLvl = event.target.innerText.match(/^[0-9]{1,2}$/) ? +event.target.innerText : numbersConverter.toDecimal(event.target.innerText);
-					lastOpenedPoint.selectCore(config.autoSelect.upgrade, currentLvl);
-				}
-			});
-
-			coresList.addEventListener('touchstart', event => {
-				let coreSlide = event.target.closest('.is-active.splide__slide');
-				if (coreSlide == null) { return; }
-
-				let touchStartDate = Date.now();
-				let guid = coreSlide.dataset.guid;
-
-				let timeoutID = setTimeout(() => {
-					let toast;
-
-					if (excludedCores.has(guid)) {
-						excludedCores.delete(guid);
-						coreSlide.removeAttribute('sbgcui-excluded-core');
-						toast = createToast('Теперь ядро доступно для автовыбора.');
-					} else {
-						excludedCores.add(guid);
-						coreSlide.setAttribute('sbgcui-excluded-core', '');
-						toast = createToast('Ядро больше не участвует в автовыборе.');
-					}
-
-					toast.showToast();
-					localStorage.setItem('sbgcui_excludedCores', JSON.stringify([...excludedCores]));
-				}, 1000);
-
-				coreSlide.addEventListener('touchend', () => {
-					let touchDuration = Date.now() - touchStartDate;
-					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
-				}, { once: true });
-			});
-		}
-
-
-		/* Зарядка из инвентаря */
-		{
-			inventoryContent.addEventListener('click', event => {
-				if (!event.currentTarget.matches('.inventory__content[data-type="3"]')) { return; }
-				if (!event.target.closest('.inventory__item-controls')) { return; }
-				if (!event.target.closest('.inventory__item.loaded')) { return; }
-
-				// Ширина блока кнопок "V M" около 30 px.
-				// Правее них находится кнопка-псевдоэлемент "R".
-				// Если нажато дальше 30px (50 – с запасом на возможное изменение стиля), значит нажата псевдокнопка, если нет – одна из кнопок V/M.
-				// Приходится указывать конкретное число (50), потому что кнопка V при нажатии получает display: none и не имеет offsetWidth.
-				if (event.offsetX < 50) { return; }
-
-				let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
-
-				repairPoint(pointGuid)
-					.then(r => {
-						if (r.error) {
-							throw new Error(r.error);
-						} else if (r.data) {
-							let [pointEnergy, maxEnergy] = r.data.co.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
-							let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
-							let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
-							let percentage = Math.floor(pointEnergy / maxEnergy * 100);
-							let refsCache = JSON.parse(localStorage.getItem('refs-cache'));
-
-							let inventoryItem = event.target.closest('.inventory__item');
-
-							inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
-							inventoryItem.style.setProperty('--sbgcui-display-r-button', (percentage == 100 ? 'none' : 'flex'));
-
-							if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
-
-							updateExpBar(r.xp.cur);
-							showXp(r.xp.diff);
-
-							refsCache[pointGuid].e = percentage;
-							localStorage.setItem('refs-cache', JSON.stringify(refsCache));
-						}
-					})
-					.catch(error => {
-						let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
-
-						toast.options.className = 'error-toast';
-						toast.showToast();
-
-						console.log('SBG CUI: Ошибка при зарядке.', error);
-					});
-			});
-		}
-
-
-		/* Меню настроек */
-		{
-			let gameSettingsPopup = document.querySelector('.settings.popup');
-			let gameSettingsContent = document.querySelector('.settings-content');
-			let userscriptSettingsMenu = createSettingsMenu();
-			document.querySelector('.topleft-container').appendChild(userscriptSettingsMenu);
-
-			let settingsButton = document.createElement('button');
-			settingsButton.classList.add('sbgcui_settings_button');
-			settingsButton.innerText = 'Настройки SBG CUI';
-			settingsButton.addEventListener('click', _ => {
-				gameSettingsPopup.classList.add('hidden');
-				userscriptSettingsMenu.classList.toggle('sbgcui_hidden');
-			});
-			gameSettingsContent.appendChild(settingsButton);
-
-			document.body.addEventListener('click', event => {
-				if (
-					!userscriptSettingsMenu.classList.contains('sbgcui_hidden') &&
-					!event.target.closest('.sbgcui_settings') &&
-					!event.target.closest('.sbgcui_settings_button')
-				) { closeSettingsMenu(); }
-			});
-		}
-
-
-		/* Тонирование интерфейса */
-		{
-			var theme = document.createElement('meta');
-			var viewport = document.querySelector('meta[name="viewport"]')
-
-			theme.name = 'theme-color';
-			document.head.appendChild(theme);
-
-			let tinting = config.tinting;
-
-			if (+tinting.map) { addTinting('map'); }
-
-			profilePopup.addEventListener('profilePopupOpened', _ => {
-				if (+tinting.profile) {
-					addTinting('profile');
-				} else {
-					addTinting('');
-				}
-			});
-
-			pointPopup.addEventListener('pointPopupOpened', _ => {
-				if (tinting.point != 'off') {
-					addTinting(`point_${tinting.point}`);
-				} else {
-					addTinting('');
-				}
-			});
-
-			pointLevelSpan.addEventListener('pointLevelChanged', _ => {
-				if (tinting.point == 'level') { addTinting('point_level'); }
-			});
-
-			pointOwnerSpan.addEventListener('pointOwnerChanged', _ => {
-				if (tinting.point == 'team') { addTinting('point_team'); }
-			});
-
-			pointPopup.addEventListener('pointPopupClosed', _ => {
-				if (isProfilePopupOpened) {
-					if (+tinting.profile) { addTinting('profile'); }
-				} else {
-					if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
-				}
-				pointPopup.style.borderColor = '';
-				pointTitleSpan.style.color = '';
-			});
-
-			profilePopup.addEventListener('profilePopupClosed', _ => {
-				if (isPointPopupOpened) {
-					if (tinting.point != 'off') { addTinting(`point_${tinting.point}`); }
-				} else {
-					if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
-				}
-				profilePopup.style.borderColor = '';
-			});
-		}
-
-
-		/* Всплывающий опыт */
-		{
-			var xpContainer = document.createElement('div');
-			xpContainer.classList.add('sbgcui_xpdiff-wrapper');
-			document.body.appendChild(xpContainer);
-		}
-
-
-		/* Запись статы */
-		{
-			let compareStatsWrp = document.createElement('div');
-			let recordButton = document.createElement('button');
-			let compareButton = document.createElement('button');
-			let timestamp = document.createElement('span');
-			let prStatsDiv = document.querySelector('.pr-stats');
-
-			let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
-
-			recordButton.innerText = 'Записать';
-			compareButton.innerText = 'Сравнить';
-
-			recordButton.addEventListener('click', _ => {
-				if (confirm('Сохранить вашу статистику на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.')) {
-					getPlayerData(player.guid).then(stats => {
-						let date = new Date();
-						localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
-						timestamp.innerText = `Последняя запись: \n${date.toLocaleString()}`;
-					});
-				}
-			});
-
-			compareButton.addEventListener('click', _ => {
-				let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
-
-				if (!previousStats) {
-					let toast = createToast('Вы ещё не сохраняли свою статистику.');
+				})
+				.catch(error => {
+					let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
 
 					toast.options.className = 'error-toast';
 					toast.showToast();
 
-					return;
-				}
+					console.log('SBG CUI: Ошибка при зарядке.', error);
+				});
+		});
+	}
 
-				getPlayerData(player.guid).then(currentStats => {
-					let ms = new Date() - previousStats.date;
-					let dhms1 = [86400000, 3600000, 60000, 1000];
-					let dhms2 = ['day', 'hr', 'min', 'sec'];
-					let since = '';
-					let diffs = '';
 
-					dhms1.forEach((e, i) => {
-						let amount = Math.trunc(ms / e);
+	/* Меню настроек */
+	{
+		let gameSettingsPopup = document.querySelector('.settings.popup');
+		let gameSettingsContent = document.querySelector('.settings-content');
+		let userscriptSettingsMenu = createSettingsMenu();
+		document.querySelector('.topleft-container').appendChild(userscriptSettingsMenu);
 
-						if (!amount) { return; }
+		let settingsButton = document.createElement('button');
+		settingsButton.classList.add('sbgcui_settings_button');
+		settingsButton.innerText = 'Настройки SBG CUI';
+		settingsButton.addEventListener('click', _ => {
+			gameSettingsPopup.classList.add('hidden');
+			userscriptSettingsMenu.classList.toggle('sbgcui_hidden');
+		});
+		gameSettingsContent.appendChild(settingsButton);
 
-						since += `${since.length ? ', ' : ''}${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}`;
-						ms -= amount * e;
-					});
+		document.body.addEventListener('click', event => {
+			if (
+				!userscriptSettingsMenu.classList.contains('sbgcui_hidden') &&
+				!event.target.closest('.sbgcui_settings') &&
+				!event.target.closest('.sbgcui_settings_button')
+			) { closeSettingsMenu(); }
+		});
+	}
 
-					for (let key in currentStats) {
-						let diff = currentStats[key] - previousStats.stats[key];
 
-						if (diff) {
-							let isPositive = diff > 0;
-							let statName;
+	/* Тонирование интерфейса */
+	{
+		var theme = document.createElement('meta');
+		var viewport = document.querySelector('meta[name="viewport"]')
 
-							switch (key) {
-								case 'discoveries':
-								case 'captures':
-								case 'level':
-								case 'cores_deployed':
-								case 'cores_destroyed':
-								case 'lines_destroyed':
-								case 'unique_captures':
-								case 'unique_visits':
-								case 'owned_points':
-									statName = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
-									break;
-								case 'xp':
-									statName = 'XP';
-									break;
-								case 'guard_line':
-									statName = 'Longest line ownership';
-									break;
-								case 'guard_point':
-									statName = 'Longest point ownership';
-									break;
-								case 'lines':
-									statName = 'Lines drawn';
-									break;
-								case 'max_line':
-									statName = 'Longest drawn line (m)';
-									break;
-								case 'neutralizes':
-									statName = 'Points neutralized';
-									break;
-								default:
-									if (!key.match(/created_at|name|player|team/)) { statName = key; }
-							}
+		theme.name = 'theme-color';
+		document.head.appendChild(theme);
 
-							if (statName) {
-								diffs += `
+		let tinting = config.tinting;
+
+		if (+tinting.map) { addTinting('map'); }
+
+		profilePopup.addEventListener('profilePopupOpened', _ => {
+			if (+tinting.profile) {
+				addTinting('profile');
+			} else {
+				addTinting('');
+			}
+		});
+
+		pointPopup.addEventListener('pointPopupOpened', _ => {
+			if (tinting.point != 'off') {
+				addTinting(`point_${tinting.point}`);
+			} else {
+				addTinting('');
+			}
+		});
+
+		pointLevelSpan.addEventListener('pointLevelChanged', _ => {
+			if (tinting.point == 'level') { addTinting('point_level'); }
+		});
+
+		pointOwnerSpan.addEventListener('pointOwnerChanged', _ => {
+			if (tinting.point == 'team') { addTinting('point_team'); }
+		});
+
+		pointPopup.addEventListener('pointPopupClosed', _ => {
+			if (isProfilePopupOpened) {
+				if (+tinting.profile) { addTinting('profile'); }
+			} else {
+				if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
+			}
+			pointPopup.style.borderColor = '';
+			pointTitleSpan.style.color = '';
+		});
+
+		profilePopup.addEventListener('profilePopupClosed', _ => {
+			if (isPointPopupOpened) {
+				if (tinting.point != 'off') { addTinting(`point_${tinting.point}`); }
+			} else {
+				if (+tinting.map) { addTinting('map'); } else { addTinting(''); }
+			}
+			profilePopup.style.borderColor = '';
+		});
+	}
+
+
+	/* Всплывающий опыт */
+	{
+		var xpContainer = document.createElement('div');
+		xpContainer.classList.add('sbgcui_xpdiff-wrapper');
+		document.body.appendChild(xpContainer);
+	}
+
+
+	/* Запись статы */
+	{
+		let compareStatsWrp = document.createElement('div');
+		let recordButton = document.createElement('button');
+		let compareButton = document.createElement('button');
+		let timestamp = document.createElement('span');
+		let prStatsDiv = document.querySelector('.pr-stats');
+
+		let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+		recordButton.innerText = 'Записать';
+		compareButton.innerText = 'Сравнить';
+
+		recordButton.addEventListener('click', _ => {
+			if (confirm('Сохранить вашу статистику на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.')) {
+				getPlayerData(player.guid).then(stats => {
+					let date = new Date();
+					localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
+					timestamp.innerText = `Последняя запись: \n${date.toLocaleString()}`;
+				});
+			}
+		});
+
+		compareButton.addEventListener('click', _ => {
+			let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+
+			if (!previousStats) {
+				let toast = createToast('Вы ещё не сохраняли свою статистику.');
+
+				toast.options.className = 'error-toast';
+				toast.showToast();
+
+				return;
+			}
+
+			getPlayerData(player.guid).then(currentStats => {
+				let ms = new Date() - previousStats.date;
+				let dhms1 = [86400000, 3600000, 60000, 1000];
+				let dhms2 = ['day', 'hr', 'min', 'sec'];
+				let since = '';
+				let diffs = '';
+
+				dhms1.forEach((e, i) => {
+					let amount = Math.trunc(ms / e);
+
+					if (!amount) { return; }
+
+					since += `${since.length ? ', ' : ''}${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}`;
+					ms -= amount * e;
+				});
+
+				for (let key in currentStats) {
+					let diff = currentStats[key] - previousStats.stats[key];
+
+					if (diff) {
+						let isPositive = diff > 0;
+						let statName;
+
+						switch (key) {
+							case 'discoveries':
+							case 'captures':
+							case 'level':
+							case 'cores_deployed':
+							case 'cores_destroyed':
+							case 'lines_destroyed':
+							case 'unique_captures':
+							case 'unique_visits':
+							case 'owned_points':
+								statName = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
+								break;
+							case 'xp':
+								statName = 'XP';
+								break;
+							case 'guard_line':
+								statName = 'Longest line ownership';
+								break;
+							case 'guard_point':
+								statName = 'Longest point ownership';
+								break;
+							case 'lines':
+								statName = 'Lines drawn';
+								break;
+							case 'max_line':
+								statName = 'Longest drawn line (m)';
+								break;
+							case 'neutralizes':
+								statName = 'Points neutralized';
+								break;
+							default:
+								if (!key.match(/created_at|name|player|team/)) { statName = key; }
+						}
+
+						if (statName) {
+							diffs += `
                 <p class="sbgcui_compare_stats-diff-wrp">
                   <span>${statName}:</span>
                   <span class="sbgcui_compare_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
@@ -2171,736 +2180,735 @@ if (!window.navigator.userAgent.toLowerCase().includes('wv')) {
                   </span>
                 </p>
               `;
-							}
 						}
 					}
-
-					let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
-					let toast = createToast(toastText, 'bottom center', 20000);
-
-					toast.options.className = 'sbgcui_compare_stats-toast';
-					toast.showToast();
-				});
-			});
-
-			if (previousStats) {
-				timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
-			}
-
-			timestamp.classList.add('sbgcui_compare_stats-timestamp');
-
-			compareStatsWrp.classList.add('sbgcui_compare_stats');
-			compareStatsWrp.append(timestamp, recordButton, compareButton);
-
-			profilePopup.insertBefore(compareStatsWrp, prStatsDiv);
-
-			profilePopup.addEventListener('profilePopupOpened', _ => {
-				if (profileNameSpan.innerText == player.name) {
-					compareStatsWrp.classList.remove('sbgcui_hidden')
-				} else {
-					compareStatsWrp.classList.add('sbgcui_hidden')
 				}
+
+				let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
+				let toast = createToast(toastText, 'bottom center', 20000);
+
+				toast.options.className = 'sbgcui_compare_stats-toast';
+				toast.showToast();
 			});
+		});
+
+		if (previousStats) {
+			timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
 		}
 
+		timestamp.classList.add('sbgcui_compare_stats-timestamp');
 
-		/* Кнопка обновления страницы */
-		{
-			if (window.navigator.userAgent.toLowerCase().includes('wv')) {
-				let gameMenu = document.querySelector('.game-menu');
-				let reloadButton = document.createElement('button');
+		compareStatsWrp.classList.add('sbgcui_compare_stats');
+		compareStatsWrp.append(timestamp, recordButton, compareButton);
 
-				reloadButton.classList.add('fa-solid', 'fa-rotate');
-				reloadButton.addEventListener('click', _ => { window.location.reload(); });
-				gameMenu.appendChild(reloadButton);
+		profilePopup.insertBefore(compareStatsWrp, prStatsDiv);
+
+		profilePopup.addEventListener('profilePopupOpened', _ => {
+			if (profileNameSpan.innerText == player.name) {
+				compareStatsWrp.classList.remove('sbgcui_hidden')
+			} else {
+				compareStatsWrp.classList.add('sbgcui_hidden')
 			}
+		});
+	}
+
+
+	/* Кнопка обновления страницы */
+	{
+		if (window.navigator.userAgent.toLowerCase().includes('wv')) {
+			let gameMenu = document.querySelector('.game-menu');
+			let reloadButton = document.createElement('button');
+
+			reloadButton.classList.add('fa-solid', 'fa-rotate');
+			reloadButton.addEventListener('click', _ => { window.location.reload(); });
+			gameMenu.appendChild(reloadButton);
 		}
+	}
 
 
-		/* Показ гуида точки */
-		{
-			pointImage.addEventListener('click', _ => {
-				if (pointImage.hasAttribute('sbgcui_clicks')) {
-					let clicks = +pointImage.getAttribute('sbgcui_clicks');
+	/* Показ гуида точки */
+	{
+		pointImage.addEventListener('click', _ => {
+			if (pointImage.hasAttribute('sbgcui_clicks')) {
+				let clicks = +pointImage.getAttribute('sbgcui_clicks');
 
-					if (clicks + 1 == 5) {
-						let iStat = document.querySelector('.i-stat');
-						let guid = document.querySelector('.info.popup').dataset.guid;
-						let guidSpan = document.createElement('span');
+				if (clicks + 1 == 5) {
+					let iStat = document.querySelector('.i-stat');
+					let guid = document.querySelector('.info.popup').dataset.guid;
+					let guidSpan = document.createElement('span');
 
-						guidSpan.innerText = `GUID: ${guid}`;
+					guidSpan.innerText = `GUID: ${guid}`;
 
-						guidSpan.addEventListener('click', _ => {
-							window.navigator.clipboard.writeText(`https://3d.sytes.net/?point=${guid}`).then(_ => {
-								let toast = createToast('Ссылка на точку скопирована в буфер обмена.');
-								toast.showToast();
-							});
+					guidSpan.addEventListener('click', _ => {
+						window.navigator.clipboard.writeText(`https://3d.sytes.net/?point=${guid}`).then(_ => {
+							let toast = createToast('Ссылка на точку скопирована в буфер обмена.');
+							toast.showToast();
 						});
+					});
 
-						iStat.prepend(guidSpan);
+					iStat.prepend(guidSpan);
 
-						pointPopup.addEventListener('pointPopupClosed', _ => {
-							guidSpan.remove();
-							pointImage.setAttribute('sbgcui_clicks', 0);
-						});
-					}
+					pointPopup.addEventListener('pointPopupClosed', _ => {
+						guidSpan.remove();
+						pointImage.setAttribute('sbgcui_clicks', 0);
+					});
+				}
 
-					pointImage.setAttribute('sbgcui_clicks', clicks + 1);
+				pointImage.setAttribute('sbgcui_clicks', clicks + 1);
+			} else {
+				pointImage.setAttribute('sbgcui_clicks', 1);
+			}
+		});
+	}
+
+
+	/* Вибрация */
+	{
+		if ('vibrate' in window.navigator) {
+			document.body.addEventListener('click', event => {
+				if (config.vibration.buttons && event.target.nodeName == 'BUTTON') {
+					window.navigator.vibrate(0);
+					window.navigator.vibrate(50);
+				}
+			});
+		}
+	}
+
+
+	/* Избранные точки */
+	{
+		function reviver(guid, cooldown) {
+			return guid ? new Favorite(guid, cooldown) : cooldown;
+		}
+
+
+		var favorites = JSON.parse(localStorage.getItem('sbgcui_favorites'), reviver) || {};
+		Object.defineProperty(favorites, 'save', {
+			value: function () {
+				let activeFavs = {};
+
+				for (let guid in this) {
+					if (this[guid].isActive) { activeFavs[guid] = this[guid]; }
+				}
+
+				localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
+			},
+		});
+
+
+		/* Старый вариант хранения избранного */
+		{
+			let legacyFavs = JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions'));
+			let legacyReminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
+
+			if (legacyFavs) {
+				for (let guid of legacyFavs) {
+					let cooldown = legacyReminders[guid];
+					favorites[guid] = new Favorite(guid, cooldown);
+				}
+				favorites.save();
+				localStorage.removeItem('sbgcui_pointsSubscriptions');
+				localStorage.removeItem('sbgcui_reminders');
+			}
+		}
+
+
+		/* Звезда на карточке точки */
+		{
+			let star = document.createElement('button');
+			let guid = pointPopup.dataset.guid;
+
+			star.classList.add('sbgcui_button_reset', 'sbgcui_point_star', `fa-${favorites[guid]?.isActive ? 'solid' : 'regular'}`, 'fa-star');
+
+			star.addEventListener('click', _ => {
+				let guid = pointPopup.dataset.guid;
+				let name = pointTitleSpan.innerText;
+
+				if (star.classList.contains('fa-solid')) {
+					favorites[guid].isActive = 0;
+					star.classList.replace('fa-solid', 'fa-regular');
 				} else {
-					pointImage.setAttribute('sbgcui_clicks', 1);
+					if (guid in favorites) {
+						favorites[guid].isActive = 1;
+					} else {
+						let cooldowns = JSON.parse(localStorage.getItem('cooldowns')) || {};
+						let cooldown = (cooldowns[guid]?.c == 0) ? cooldowns[guid].t : null;
+
+						favorites[guid] = new Favorite(guid, cooldown, name);
+					}
+
+					star.classList.replace('fa-regular', 'fa-solid');
+
+					if (!isMobile() && 'Notification' in window && Notification.permission == 'default') {
+						Notification.requestPermission();
+					}
 				}
-			});
-		}
 
-
-		/* Вибрация */
-		{
-			if ('vibrate' in window.navigator) {
-				document.body.addEventListener('click', event => {
-					if (config.vibration.buttons && event.target.nodeName == 'BUTTON') {
-						window.navigator.vibrate(0);
-						window.navigator.vibrate(50);
-					}
-				});
-			}
-		}
-
-
-		/* Избранные точки */
-		{
-			function reviver(guid, cooldown) {
-				return guid ? new Favorite(guid, cooldown) : cooldown;
-			}
-
-
-			var favorites = JSON.parse(localStorage.getItem('sbgcui_favorites'), reviver) || {};
-			Object.defineProperty(favorites, 'save', {
-				value: function () {
-					let activeFavs = {};
-
-					for (let guid in this) {
-						if (this[guid].isActive) { activeFavs[guid] = this[guid]; }
-					}
-
-					localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
-				},
+				favorites.save();
 			});
 
-
-			/* Старый вариант хранения избранного */
-			{
-				let legacyFavs = JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions'));
-				let legacyReminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
-
-				if (legacyFavs) {
-					for (let guid of legacyFavs) {
-						let cooldown = legacyReminders[guid];
-						favorites[guid] = new Favorite(guid, cooldown);
-					}
-					favorites.save();
-					localStorage.removeItem('sbgcui_pointsSubscriptions');
-					localStorage.removeItem('sbgcui_reminders');
-				}
-			}
-
-
-			/* Звезда на карточке точки */
-			{
-				let star = document.createElement('button');
+			pointPopup.addEventListener('pointPopupOpened', _ => {
 				let guid = pointPopup.dataset.guid;
 
-				star.classList.add('sbgcui_button_reset', 'sbgcui_point_star', `fa-${favorites[guid]?.isActive ? 'solid' : 'regular'}`, 'fa-star');
-
-				star.addEventListener('click', _ => {
-					let guid = pointPopup.dataset.guid;
-					let name = pointTitleSpan.innerText;
-
-					if (star.classList.contains('fa-solid')) {
-						favorites[guid].isActive = 0;
-						star.classList.replace('fa-solid', 'fa-regular');
-					} else {
-						if (guid in favorites) {
-							favorites[guid].isActive = 1;
-						} else {
-							let cooldowns = JSON.parse(localStorage.getItem('cooldowns')) || {};
-							let cooldown = (cooldowns[guid]?.c == 0) ? cooldowns[guid].t : null;
-
-							favorites[guid] = new Favorite(guid, cooldown, name);
-						}
-
-						star.classList.replace('fa-regular', 'fa-solid');
-
-						if (!isMobile() && 'Notification' in window && Notification.permission == 'default') {
-							Notification.requestPermission();
-						}
-					}
-
-					favorites.save();
-				});
-
-				pointPopup.addEventListener('pointPopupOpened', _ => {
-					let guid = pointPopup.dataset.guid;
-
-					if (favorites[guid]?.isActive) {
-						star.classList.replace('fa-regular', 'fa-solid');
-					} else {
-						star.classList.replace('fa-solid', 'fa-regular');
-					}
-				});
-
-				pointImageBox.appendChild(star);
-			}
-
-
-			/* Список избранных */
-			{
-				let star = document.createElement('button');
-				let favsList = document.createElement('div');
-				let favsListHeader = document.createElement('h3');
-				let favsListContent = document.createElement('ul');
-				let isFavsListOpened = false;
-
-
-				function fillFavsList() {
-					let favs = [];
-
-					favsListContent.innerHTML = '';
-
-					if (Object.keys(favorites).length == 0) { return; }
-
-					for (let guid in favorites) {
-						if (favorites[guid].isActive) {
-							let li = document.createElement('li');
-							let pointLink = document.createElement('a');
-							let pointName = document.createElement('span');
-							let deleteButton = document.createElement('button');
-							let pointData = document.createElement('div');
-
-							pointName.innerText = favorites[guid].name;
-							pointLink.appendChild(pointName);
-							pointLink.setAttribute('href', `/?point=${guid}`);
-
-							deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa-solid', 'fa-circle-xmark');
-							deleteButton.addEventListener('click', _ => {
-								favorites[guid].isActive = 0;
-								favorites.save();
-								li.removeAttribute('sbgcui_active', '');
-								li.classList.add('sbgcui_hidden');
-							});
-
-							pointData.classList.add('sbgcui_favs-li-data');
-
-							li.classList.add('sbgcui_favs-li');
-							li.setAttribute('sbgcui_active', '');
-
-							let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
-							let discoveriesLeft = favorites[guid].discoveriesLeft;
-
-							if (hasActiveCooldown) {
-								pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-								pointLink.sbgcuiCooldown = favorites[guid].cooldown;
-
-								let intervalID = setInterval(() => {
-									if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
-										pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-									} else {
-										clearInterval(intervalID);
-									}
-								}, 1000);
-							} else if (discoveriesLeft) {
-								pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
-								pointLink.discoveriesLeft = discoveriesLeft;
-							}
-
-							li.append(deleteButton, pointLink, pointData);
-							favs.push(li);
-
-							getPointData(guid)
-								.then(data => {
-									if (!data) { return; }
-									pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
-									pointLink.style.color = data.te == player.team ? 'var(--sbgcui-branding-color)' : `var(--team-${data.te})`;
-									pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
-								});
-						}
-					}
-
-					favs.sort((a, b) => {
-						a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
-						b = b.childNodes[1].sbgcuiCooldown || b.childNodes[1].discoveriesLeft;
-
-						return (a == undefined) ? 1 : (b == undefined) ? -1 : (a - b);
-					});
-					favsListContent.append(...favs);
-				}
-
-
-				favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
-				favsListHeader.classList.add('sbgcui_favs-header');
-				favsListContent.classList.add('sbgcui_favs-content');
-
-				favsListHeader.innerText = 'Избранные точки';
-
-				favsList.append(favsListHeader, favsListContent);
-
-				star.classList.add('sbgcui_button_reset', 'sbgcui_favs_star', 'fa-solid', 'fa-star');
-				star.addEventListener('click', () => {
-					fillFavsList();
-					favsList.classList.toggle('sbgcui_hidden');
-					isFavsListOpened = !isFavsListOpened;
-				});
-
-				document.body.addEventListener('click', event => {
-					if (
-						isFavsListOpened &&
-						!event.target.closest('.sbgcui_favs') &&
-						!event.target.closest('.sbgcui_favs_star')
-					) {
-						favsList.classList.add('sbgcui_hidden');
-						isFavsListOpened = false;
-					}
-				});
-
-				zoomContainer.prepend(star);
-				document.body.appendChild(favsList);
-			}
-		}
-
-
-		/* Ссылка на точку из списка ключей */
-		{
-			inventoryContent.addEventListener('click', event => {
-				if (!event.target.classList.contains('inventory__ic-view')) { return; }
-
-				let guid = event.target.closest('.inventory__item').dataset.ref;
-
-				if (!guid) { return; }
-				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { location.href = `/?point=${guid}`; }
-			});
-		}
-
-
-		/* Дискавер без рефа или предметов */
-		{
-			let noLootSpan = document.createElement('span');
-			let noRefsSpan = document.createElement('span');
-
-			noLootSpan.classList.add('sbgcui_no_loot', 'fa-solid', 'fa-droplet-slash');
-			noRefsSpan.classList.add('sbgcui_no_refs', 'fa-solid', 'fa-link-slash');
-
-			discoverButton.append(noLootSpan, noRefsSpan);
-
-			discoverButton.addEventListener('click', event => {
-				if (event.target == discoverButton) {
-					discoverModifier = new DiscoverModifier(1, 1);
+				if (favorites[guid]?.isActive) {
+					star.classList.replace('fa-regular', 'fa-solid');
 				} else {
-					let isLoot = !event.target.classList.contains('sbgcui_no_loot');
-					let isRefs = !event.target.classList.contains('sbgcui_no_refs');
-
-					discoverModifier = new DiscoverModifier(isLoot, isRefs);
+					star.classList.replace('fa-solid', 'fa-regular');
 				}
 			});
+
+			pointImageBox.appendChild(star);
 		}
 
 
-		/* Сортировка рефов */
+		/* Список избранных */
 		{
-			function isEveryRefLoaded(refsArr) {
-				return refsArr.every(e => e.classList.contains('loaded'));
+			let star = document.createElement('button');
+			let favsList = document.createElement('div');
+			let favsListHeader = document.createElement('h3');
+			let favsListContent = document.createElement('ul');
+			let isFavsListOpened = false;
+
+
+			function fillFavsList() {
+				let favs = [];
+
+				favsListContent.innerHTML = '';
+
+				if (Object.keys(favorites).length == 0) { return; }
+
+				for (let guid in favorites) {
+					if (favorites[guid].isActive) {
+						let li = document.createElement('li');
+						let pointLink = document.createElement('a');
+						let pointName = document.createElement('span');
+						let deleteButton = document.createElement('button');
+						let pointData = document.createElement('div');
+
+						pointName.innerText = favorites[guid].name;
+						pointLink.appendChild(pointName);
+						pointLink.setAttribute('href', `/?point=${guid}`);
+
+						deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa-solid', 'fa-circle-xmark');
+						deleteButton.addEventListener('click', _ => {
+							favorites[guid].isActive = 0;
+							favorites.save();
+							li.removeAttribute('sbgcui_active', '');
+							li.classList.add('sbgcui_hidden');
+						});
+
+						pointData.classList.add('sbgcui_favs-li-data');
+
+						li.classList.add('sbgcui_favs-li');
+						li.setAttribute('sbgcui_active', '');
+
+						let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
+						let discoveriesLeft = favorites[guid].discoveriesLeft;
+
+						if (hasActiveCooldown) {
+							pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+							pointLink.sbgcuiCooldown = favorites[guid].cooldown;
+
+							let intervalID = setInterval(() => {
+								if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
+									pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+								} else {
+									clearInterval(intervalID);
+								}
+							}, 1000);
+						} else if (discoveriesLeft) {
+							pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
+							pointLink.discoveriesLeft = discoveriesLeft;
+						}
+
+						li.append(deleteButton, pointLink, pointData);
+						favs.push(li);
+
+						getPointData(guid)
+							.then(data => {
+								if (!data) { return; }
+								pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
+								pointLink.style.color = data.te == player.team ? 'var(--sbgcui-branding-color)' : `var(--team-${data.te})`;
+								pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
+							});
+					}
+				}
+
+				favs.sort((a, b) => {
+					a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
+					b = b.childNodes[1].sbgcuiCooldown || b.childNodes[1].discoveriesLeft;
+
+					return (a == undefined) ? 1 : (b == undefined) ? -1 : (a - b);
+				});
+				favsListContent.append(...favs);
 			}
 
-			function isEveryRefCached(refsArr) {
-				let cache = JSON.parse(localStorage.getItem('refs-cache')) || {};
 
-				return refsArr.every(e => cache[e.dataset.ref]?.t > Date.now());
+			favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
+			favsListHeader.classList.add('sbgcui_favs-header');
+			favsListContent.classList.add('sbgcui_favs-content');
+
+			favsListHeader.innerText = 'Избранные точки';
+
+			favsList.append(favsListHeader, favsListContent);
+
+			star.classList.add('sbgcui_button_reset', 'sbgcui_favs_star', 'fa-solid', 'fa-star');
+			star.addEventListener('click', () => {
+				fillFavsList();
+				favsList.classList.toggle('sbgcui_hidden');
+				isFavsListOpened = !isFavsListOpened;
+			});
+
+			document.body.addEventListener('click', event => {
+				if (
+					isFavsListOpened &&
+					!event.target.closest('.sbgcui_favs') &&
+					!event.target.closest('.sbgcui_favs_star')
+				) {
+					favsList.classList.add('sbgcui_hidden');
+					isFavsListOpened = false;
+				}
+			});
+
+			zoomContainer.prepend(star);
+			document.body.appendChild(favsList);
+		}
+	}
+
+
+	/* Ссылка на точку из списка ключей */
+	{
+		inventoryContent.addEventListener('click', event => {
+			if (!event.target.classList.contains('inventory__ic-view')) { return; }
+
+			let guid = event.target.closest('.inventory__item').dataset.ref;
+
+			if (!guid) { return; }
+			if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { location.href = `/?point=${guid}`; }
+		});
+	}
+
+
+	/* Дискавер без рефа или предметов */
+	{
+		let noLootSpan = document.createElement('span');
+		let noRefsSpan = document.createElement('span');
+
+		noLootSpan.classList.add('sbgcui_no_loot', 'fa-solid', 'fa-droplet-slash');
+		noRefsSpan.classList.add('sbgcui_no_refs', 'fa-solid', 'fa-link-slash');
+
+		discoverButton.append(noLootSpan, noRefsSpan);
+
+		discoverButton.addEventListener('click', event => {
+			if (event.target == discoverButton) {
+				discoverModifier = new DiscoverModifier(1, 1);
+			} else {
+				let isLoot = !event.target.classList.contains('sbgcui_no_loot');
+				let isRefs = !event.target.classList.contains('sbgcui_no_refs');
+
+				discoverModifier = new DiscoverModifier(isLoot, isRefs);
 			}
+		});
+	}
 
-			function getSortParam(ref, param) {
-				let regex;
+
+	/* Сортировка рефов */
+	{
+		function isEveryRefLoaded(refsArr) {
+			return refsArr.every(e => e.classList.contains('loaded'));
+		}
+
+		function isEveryRefCached(refsArr) {
+			let cache = JSON.parse(localStorage.getItem('refs-cache')) || {};
+
+			return refsArr.every(e => cache[e.dataset.ref]?.t > Date.now());
+		}
+
+		function getSortParam(ref, param) {
+			let regex;
+
+			switch (param) {
+				case 'name':
+					regex = new RegExp(/\(x[0-9]{1,}\)\s(?:"|«)?([\s\S]+)/i);
+					return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+				case 'level':
+					regex = new RegExp(/level-([0-9]{1,2})/);
+					return +ref.querySelector('.inventory__item-descr > span').style.color.match(regex)?.[1] || 0;
+				case 'team':
+					regex = new RegExp(/team-([1-3])/);
+					return +ref.querySelector('.inventory__item-title').style.color.match(regex)?.[1] || 0;
+				case 'energy':
+					return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
+				case 'distance':
+					regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
+					let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent;
+					let [_, value, units] = dist.match(regex);
+
+					value = value.replace(thousandSeparator, '').replace(decimalSeparator, '.');
+
+					return parseFloat(value) / ((['cm', 'см'].includes(units)) ? 100000 : (['m', 'м'].includes(units)) ? 1000 : 1);
+				case 'amount':
+					regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
+					return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+			}
+		}
+
+		function compareNames(a, b) {
+			let aName = getSortParam(a, 'name');
+			let bName = getSortParam(b, 'name');
+
+			return aName.localeCompare(bName);
+		}
+
+		function sortRefsBy(array, param) {
+			array.sort((a, b) => {
+				let aParam = getSortParam(a, param);
+				let bParam = getSortParam(b, param);
 
 				switch (param) {
 					case 'name':
-						regex = new RegExp(/\(x[0-9]{1,}\)\s(?:"|«)?([\s\S]+)/i);
-						return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
-					case 'level':
-						regex = new RegExp(/level-([0-9]{1,2})/);
-						return +ref.querySelector('.inventory__item-descr > span').style.color.match(regex)?.[1] || 0;
+						return aParam.localeCompare(bParam);
 					case 'team':
-						regex = new RegExp(/team-([1-3])/);
-						return +ref.querySelector('.inventory__item-title').style.color.match(regex)?.[1] || 0;
+						if (aParam == bParam) {
+							return compareNames(a, b);
+						} else {
+							return (aParam == player.team) ? -1 : (bParam == player.team) ? 1 : aParam - bParam;
+						}
 					case 'energy':
-						return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
-					case 'distance':
-						regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
-						let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent;
-						let [_, value, units] = dist.match(regex);
+						let aTeam = getSortParam(a, 'team');
+						let bTeam = getSortParam(b, 'team');
 
-						value = value.replace(thousandSeparator, '').replace(decimalSeparator, '.');
-
-						return parseFloat(value) / ((['cm', 'см'].includes(units)) ? 100000 : (['m', 'м'].includes(units)) ? 1000 : 1);
-					case 'amount':
-						regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
-						return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+						if (aTeam == bTeam) {
+							return (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
+						} else {
+							return (aTeam == player.team) ? -1 : (bTeam == player.team) ? 1 : (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
+						}
+					default:
+						return aParam - bParam;
 				}
+			});
+		}
+
+		function onRefsListLoaded() {
+			sortRefsBy(refsArr, sortParam);
+			inventoryContent.replaceChildren(...refsArr);
+			select.removeAttribute('disabled');
+			inventoryContent.classList.remove('sbgcui_refs_list-blur');
+
+			if (isInMeasurementMode) {
+				performance.mark(perfMarkB);
+				console.log(`Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
+
+				let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
+				let duration = +(measure.duration / 1000).toFixed(1);
+				let uniqueRefsAmount = inventoryContent.childNodes.length;
+				let toast;
+
+				toast = createToast(`Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`, 'top left', -1);
+				toast.options.className = 'sbgcui_toast-selection';
+				toast.showToast();
+
+				clearMeasurements();
 			}
+		}
 
-			function compareNames(a, b) {
-				let aName = getSortParam(a, 'name');
-				let bName = getSortParam(b, 'name');
+		function onRefsTabClose(event) {
+			if (!event.isTrusted) { return; }
 
-				return aName.localeCompare(bName);
-			}
+			clearInterval(intervalID);
+			inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
 
-			function sortRefsBy(array, param) {
-				array.sort((a, b) => {
-					let aParam = getSortParam(a, param);
-					let bParam = getSortParam(b, param);
+			select.value = 'none';
+			select.removeAttribute('disabled');
 
-					switch (param) {
-						case 'name':
-							return aParam.localeCompare(bParam);
-						case 'team':
-							if (aParam == bParam) {
-								return compareNames(a, b);
-							} else {
-								return (aParam == player.team) ? -1 : (bParam == player.team) ? 1 : aParam - bParam;
-							}
-						case 'energy':
-							let aTeam = getSortParam(a, 'team');
-							let bTeam = getSortParam(b, 'team');
+			inventoryContent.classList.remove('sbgcui_refs_list-blur');
+		}
 
-							if (aTeam == bTeam) {
-								return (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
-							} else {
-								return (aTeam == player.team) ? -1 : (bTeam == player.team) ? 1 : (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
-							}
-						default:
-							return aParam - bParam;
-					}
-				});
-			}
+		function clearMeasurements() {
+			isInMeasurementMode = false;
+			performance.clearMarks(perfMarkA);
+			performance.clearMarks(perfMarkB);
+			performance.clearMeasures(perfMeasure);
+			invCloseButton.removeAttribute('sbgcui_measurement_mode');
+		}
 
-			function onRefsListLoaded() {
+		let invControls = document.querySelector('.inventory__controls');
+		let invDelete = document.querySelector('#inventory-delete');
+		let select = document.createElement('select');
+		let sortOrderButton = document.createElement('button');
+		let perfMarkA = 'sbgcui_refs_sort_begin';
+		let perfMarkB = 'sbgcui_refs_sort_end';
+		let perfMeasure = 'sbgcui_refs_sort_measure';
+		let isInMeasurementMode = false;
+		let intervalID;
+		let refsArr;
+		let sortParam;
+
+		sortOrderButton.classList.add('fa-solid', 'fa-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
+		select.classList.add('sbgcui_refs-sort-select');
+
+		[
+			['Сортировка', 'none'],
+			['По названию', 'name'],
+			['По уровню', 'level'],
+			['По команде', 'team'],
+			['По заряду', 'energy'],
+			['По дистанции', 'distance'],
+			['По количеству', 'amount'],
+		].forEach(e => {
+			let option = document.createElement('option');
+
+			option.innerText = e[0];
+			option.value = e[1];
+
+			select.appendChild(option);
+		});
+
+		select.addEventListener('change', event => {
+			let scrollEvent = new Event('scroll');
+
+			Object.defineProperty(scrollEvent, 'target', {
+				value: {
+					scrollTop: 0,
+					clientHeight: inventoryContent.clientHeight,
+				}
+			});
+
+			refsArr = Array.from(inventoryContent.children);
+			sortParam = event.target.value;
+
+			if (sortParam == 'none') { return; }
+
+			inventoryContent.scrollTop = 0;
+			inventoryContent.classList.remove('sbgcui_refs-reverse');
+			select.setAttribute('disabled', '');
+
+			if ((sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) && !isInMeasurementMode) {
 				sortRefsBy(refsArr, sortParam);
 				inventoryContent.replaceChildren(...refsArr);
 				select.removeAttribute('disabled');
-				inventoryContent.classList.remove('sbgcui_refs_list-blur');
+			} else {
+				let scrollStep = inventoryContent.offsetHeight * 0.9;
+
+				inventoryContent.classList.add('sbgcui_refs_list-blur');
 
 				if (isInMeasurementMode) {
-					performance.mark(perfMarkB);
-					console.log(`Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
+					// Если все рефы уже подгружены, надо сбросить их – для этого обновляем вкладку:
+					if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-type="3"]')?.click(); }
 
-					let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
-					let duration = +(measure.duration / 1000).toFixed(1);
-					let uniqueRefsAmount = inventoryContent.childNodes.length;
-					let toast;
-
-					toast = createToast(`Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`, 'top left', -1);
-					toast.options.className = 'sbgcui_toast-selection';
-					toast.showToast();
-
-					clearMeasurements();
+					localStorage.removeItem('refs-cache');
+					performance.mark(perfMarkA);
+					console.log(`Загрузка и сортировка рефов начаты: ${new Date().toLocaleTimeString()}`);
 				}
-			}
 
-			function onRefsTabClose(event) {
-				if (!event.isTrusted) { return; }
-
-				clearInterval(intervalID);
-				inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
-
-				select.value = 'none';
-				select.removeAttribute('disabled');
-
-				inventoryContent.classList.remove('sbgcui_refs_list-blur');
-			}
-
-			function clearMeasurements() {
-				isInMeasurementMode = false;
-				performance.clearMarks(perfMarkA);
-				performance.clearMarks(perfMarkB);
-				performance.clearMeasures(perfMeasure);
-				invCloseButton.removeAttribute('sbgcui_measurement_mode');
-			}
-
-			let invControls = document.querySelector('.inventory__controls');
-			let invDelete = document.querySelector('#inventory-delete');
-			let select = document.createElement('select');
-			let sortOrderButton = document.createElement('button');
-			let perfMarkA = 'sbgcui_refs_sort_begin';
-			let perfMarkB = 'sbgcui_refs_sort_end';
-			let perfMeasure = 'sbgcui_refs_sort_measure';
-			let isInMeasurementMode = false;
-			let intervalID;
-			let refsArr;
-			let sortParam;
-
-			sortOrderButton.classList.add('fa-solid', 'fa-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
-			select.classList.add('sbgcui_refs-sort-select');
-
-			[
-				['Сортировка', 'none'],
-				['По названию', 'name'],
-				['По уровню', 'level'],
-				['По команде', 'team'],
-				['По заряду', 'energy'],
-				['По дистанции', 'distance'],
-				['По количеству', 'amount'],
-			].forEach(e => {
-				let option = document.createElement('option');
-
-				option.innerText = e[0];
-				option.value = e[1];
-
-				select.appendChild(option);
-			});
-
-			select.addEventListener('change', event => {
-				let scrollEvent = new Event('scroll');
-
-				Object.defineProperty(scrollEvent, 'target', {
-					value: {
-						scrollTop: 0,
-						clientHeight: inventoryContent.clientHeight,
+				if (isEveryRefCached(refsArr)) {
+					for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
+						scrollEvent.target.scrollTop = i;
+						inventoryContent.dispatchEvent(scrollEvent);
 					}
-				});
-
-				refsArr = Array.from(inventoryContent.children);
-				sortParam = event.target.value;
-
-				if (sortParam == 'none') { return; }
-				
-				inventoryContent.scrollTop = 0;
-				inventoryContent.classList.remove('sbgcui_refs-reverse');
-				select.setAttribute('disabled', '');
-
-				if ((sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) && !isInMeasurementMode) {
-					sortRefsBy(refsArr, sortParam);
-					inventoryContent.replaceChildren(...refsArr);
-					select.removeAttribute('disabled');
 				} else {
-					let scrollStep = inventoryContent.offsetHeight * 0.9;
-
-					inventoryContent.classList.add('sbgcui_refs_list-blur');
-
-					if (isInMeasurementMode) {
-						// Если все рефы уже подгружены, надо сбросить их – для этого обновляем вкладку:
-						if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-type="3"]')?.click(); }
-
-						localStorage.removeItem('refs-cache');
-						performance.mark(perfMarkA);
-						console.log(`Загрузка и сортировка рефов начаты: ${new Date().toLocaleTimeString()}`);
-					}
-					
-					if (isEveryRefCached(refsArr)) {
-						for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
-							scrollEvent.target.scrollTop = i;
+					intervalID = setInterval(() => {
+						if (scrollEvent.target.scrollTop <= inventoryContent.scrollHeight) {
+							scrollEvent.target.scrollTop += scrollStep;
+							inventoryContent.dispatchEvent(scrollEvent);
+						} else {
+							clearInterval(intervalID);
+							scrollEvent.target.scrollTop = inventoryContent.scrollHeight;
 							inventoryContent.dispatchEvent(scrollEvent);
 						}
-					} else {
-						intervalID = setInterval(() => {
-							if (scrollEvent.target.scrollTop <= inventoryContent.scrollHeight) {
-								scrollEvent.target.scrollTop += scrollStep;
-								inventoryContent.dispatchEvent(scrollEvent);
-							} else {
-								clearInterval(intervalID);
-								scrollEvent.target.scrollTop = inventoryContent.scrollHeight;
-								inventoryContent.dispatchEvent(scrollEvent);
-							}
-						}, 10);
-					}
-
-					inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
+					}, 10);
 				}
-			});
 
-			document.querySelector('.inventory__tabs').addEventListener('click', onRefsTabClose);
-			invCloseButton.addEventListener('click', onRefsTabClose);
-			inventoryPopup.addEventListener('inventoryPopupOpened', clearMeasurements);
-			invCloseButton.addEventListener('touchstart', () => {
-				let touchStartDate = Date.now();
+				inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
+			}
+		});
 
-				let timeoutID = setTimeout(() => {
-					let toast;
-					let message = `Режим измерения производительности. <br><br>
+		document.querySelector('.inventory__tabs').addEventListener('click', onRefsTabClose);
+		invCloseButton.addEventListener('click', onRefsTabClose);
+		inventoryPopup.addEventListener('inventoryPopupOpened', clearMeasurements);
+		invCloseButton.addEventListener('touchstart', () => {
+			let touchStartDate = Date.now();
+
+			let timeoutID = setTimeout(() => {
+				let toast;
+				let message = `Режим измерения производительности. <br><br>
 						Выберите тип сортировки для измерения скорости загрузки данных. <br><br>
 						Кэш рефов будет очищен. <br><br>
 						Для отмены операции закройте инвентарь.`;
 
-					toast = createToast(message, 'bottom center', -1);
-					toast.options.className = 'sbgcui_toast-selection';
-					toast.showToast();
+				toast = createToast(message, 'bottom center', -1);
+				toast.options.className = 'sbgcui_toast-selection';
+				toast.showToast();
 
-					isInMeasurementMode = true;
-					invCloseButton.setAttribute('sbgcui_measurement_mode', '');
-				}, 2000);
+				isInMeasurementMode = true;
+				invCloseButton.setAttribute('sbgcui_measurement_mode', '');
+			}, 2000);
 
-				invCloseButton.addEventListener('touchend', () => {
-					let touchDuration = Date.now() - touchStartDate;
-					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
-				}, { once: true });
-			});
+			invCloseButton.addEventListener('touchend', () => {
+				let touchDuration = Date.now() - touchStartDate;
+				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+			}, { once: true });
+		});
 
-			sortOrderButton.addEventListener('click', () => {
-				inventoryContent.classList.toggle('sbgcui_refs-reverse');
-				inventoryContent.scrollTop = -inventoryContent.scrollHeight;
-			});
+		sortOrderButton.addEventListener('click', () => {
+			inventoryContent.classList.toggle('sbgcui_refs-reverse');
+			inventoryContent.scrollTop = -inventoryContent.scrollHeight;
+		});
 
-			invControls.insertBefore(select, invDelete);
-			invControls.appendChild(sortOrderButton);
-		}
+		invControls.insertBefore(select, invDelete);
+		invControls.appendChild(sortOrderButton);
+	}
 
 
-		/* Подсветка точек */
-		{
-			class OlFeature extends ol.Feature {
-				constructor(arg) {
-					super(arg);
+	/* Подсветка точек */
+	{
+		class OlFeature extends ol.Feature {
+			constructor(arg) {
+				super(arg);
 
-					this.addEventListener('change', () => {
-						if (!this.id_ || !this.style_) { return; }
+				this.addEventListener('change', () => {
+					if (!this.id_ || !this.style_) { return; }
 
-						let { inner, outer, outerTop, outerBottom, text } = config.pointHighlighting;
-						let style = this.style_;
+					let { inner, outer, outerTop, outerBottom, text } = config.pointHighlighting;
+					let style = this.style_;
 
-						this.addStyle(style, 'inner', 1, this.isMarkerNeeded(inner));
-						this.addStyle(style, 'outer', 2, this.isMarkerNeeded(outer));
-						this.addStyle(style, 'outerTop', 3, this.isMarkerNeeded(outerTop));
-						this.addStyle(style, 'outerBottom', 4, this.isMarkerNeeded(outerBottom));
-						this.addStyle(style, null, 5, false, this.textToRender(text));
-					});
-				}
+					this.addStyle(style, 'inner', 1, this.isMarkerNeeded(inner));
+					this.addStyle(style, 'outer', 2, this.isMarkerNeeded(outer));
+					this.addStyle(style, 'outerTop', 3, this.isMarkerNeeded(outerTop));
+					this.addStyle(style, 'outerBottom', 4, this.isMarkerNeeded(outerBottom));
+					this.addStyle(style, null, 5, false, this.textToRender(text));
+				});
+			}
 
-				isMarkerNeeded(marker) {
-					switch (marker) {
-						case 'fav': return this.id_ in favorites;
-						case 'ref': return this.cachedRefsGuids.includes(this.id_);
-						case 'uniqc': return uniques.c.has(this.id_);
-						case 'uniqv': return uniques.v.has(this.id_);
-						case 'cores': return inview[this.id_]?.cores == 6;
-						case 'highlevel': return inview[this.id_]?.level >= HIGHLEVEL_MARKER;
-						default: return false;
-					}
-				}
-
-				textToRender(type) {
-					switch (type) {
-						case 'energy':
-							let energy = inview[this.id_]?.energy;
-							return typeof energy == 'number' ? String(Math.round(energy * 10) / 10) : null;
-						case 'level':
-							let level = inview[this.id_]?.level;
-							return typeof level == 'number' ? String(level) : null;
-						case 'refsAmount':
-							let amount = this.cachedRefsAmounts[this.id_];
-							return typeof amount == 'number' ? String(amount) : null;
-						default: return null;
-					}
-				}
-
-				addStyle(style, type, index, isMarkerNeeded, text) {
-					// style[0] – стиль, который вешает игра.
-					// style[1] – стиль внутреннего маркера: точка.
-					// style[2] – стиль внешнего маркера: кольцо.
-					// style[3] – стиль внешнего маркера: верхнее полукольцо.
-					// style[4] – стиль внешнего маркера: нижнее полукольцо.
-					// style[5] – стиль текстового маркера.
-
-					if (isMarkerNeeded == true) {
-						style[index] = style[0].clone();
-						style[index].renderer_ = this[`${type}MarkerRenderer`];
-					} else {
-						style[index] = new ol.style.Style({});
-						style[index].text_ = text ? new ol.style.Text({
-							font: '14px Manrope',
-							offsetY: style[1].renderer_ ? -20 : 0,
-							text,
-							fill: new ol.style.Fill({ color: '#000' }),
-							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
-						}) : undefined;
-					}
-				}
-
-				innerMarkerRenderer(coords, state) {
-					const ctx = state.context;
-					const [[xc, yc], [xe, ye]] = coords;
-					const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
-
-					ctx.fillStyle = config.pointHighlighting.innerColor;
-					ctx.beginPath();
-					ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
-					ctx.fill();
-				}
-
-				outerMarkerRenderer(coords, state) {
-					const ctx = state.context;
-					const [[xc, yc], [xe, ye]] = coords;
-					const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
-
-					ctx.lineWidth = 4;
-					ctx.strokeStyle = config.pointHighlighting.outerColor;
-					ctx.beginPath();
-					ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
-					ctx.stroke();
-				}
-
-				outerTopMarkerRenderer(coords, state) {
-					const ctx = state.context;
-					const [[xc, yc], [xe, ye]] = coords;
-					const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
-
-					ctx.lineWidth = 4;
-					ctx.strokeStyle = config.pointHighlighting.outerTopColor;
-					ctx.beginPath();
-					ctx.arc(xc, yc, radius, 195 * (Math.PI / 180), 345 * (Math.PI / 180));
-					ctx.stroke();
-				}
-
-				outerBottomMarkerRenderer(coords, state) {
-					const ctx = state.context;
-					const [[xc, yc], [xe, ye]] = coords;
-					const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
-
-					ctx.lineWidth = 4;
-					ctx.strokeStyle = config.pointHighlighting.outerBottomColor;
-					ctx.beginPath();
-					ctx.arc(xc, yc, radius, 15 * (Math.PI / 180), 165 * (Math.PI / 180));
-					ctx.stroke();
-				}
-
-				get cachedRefsGuids() {
-					return JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
-				}
-
-				get cachedRefsAmounts() {
-					return Object.fromEntries(JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => [e.l, e.a]));
+			isMarkerNeeded(marker) {
+				switch (marker) {
+					case 'fav': return this.id_ in favorites;
+					case 'ref': return this.cachedRefsGuids.includes(this.id_);
+					case 'uniqc': return uniques.c.has(this.id_);
+					case 'uniqv': return uniques.v.has(this.id_);
+					case 'cores': return inview[this.id_]?.cores == 6;
+					case 'highlevel': return inview[this.id_]?.level >= HIGHLEVEL_MARKER;
+					default: return false;
 				}
 			}
 
-			ol.Feature = OlFeature;
-		}
-
-		/* Показ радиуса катализатора */
-		{
-			function drawBlastRange() {
-				let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
-				let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-				let level = cache.find(e => e.g == activeSlide.dataset.guid).l;
-				let range = window.Catalysers[level].range;
-
-				playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
-				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
-				playerFeature.changed();
+			textToRender(type) {
+				switch (type) {
+					case 'energy':
+						let energy = inview[this.id_]?.energy;
+						return typeof energy == 'number' ? String(Math.round(energy * 10) / 10) : null;
+					case 'level':
+						let level = inview[this.id_]?.level;
+						return typeof level == 'number' ? String(level) : null;
+					case 'refsAmount':
+						let amount = this.cachedRefsAmounts[this.id_];
+						return typeof amount == 'number' ? String(amount) : null;
+					default: return null;
+				}
 			}
 
-			function hideBlastRange() {
-				playerFeature.getStyle()[3].getGeometry().setRadius(0);
-				playerFeature.changed();
+			addStyle(style, type, index, isMarkerNeeded, text) {
+				// style[0] – стиль, который вешает игра.
+				// style[1] – стиль внутреннего маркера: точка.
+				// style[2] – стиль внешнего маркера: кольцо.
+				// style[3] – стиль внешнего маркера: верхнее полукольцо.
+				// style[4] – стиль внешнего маркера: нижнее полукольцо.
+				// style[5] – стиль текстового маркера.
+
+				if (isMarkerNeeded == true) {
+					style[index] = style[0].clone();
+					style[index].renderer_ = this[`${type}MarkerRenderer`];
+				} else {
+					style[index] = new ol.style.Style({});
+					style[index].text_ = text ? new ol.style.Text({
+						font: '14px Manrope',
+						offsetY: style[1].renderer_ ? -20 : 0,
+						text,
+						fill: new ol.style.Fill({ color: '#000' }),
+						stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
+					}) : undefined;
+				}
 			}
 
-			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
-			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
-			attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
+			innerMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) / 3;
+
+				ctx.fillStyle = config.pointHighlighting.innerColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
+				ctx.fill();
+			}
+
+			outerMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
+
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = config.pointHighlighting.outerColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 0, 2 * Math.PI);
+				ctx.stroke();
+			}
+
+			outerTopMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
+
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = config.pointHighlighting.outerTopColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 195 * (Math.PI / 180), 345 * (Math.PI / 180));
+				ctx.stroke();
+			}
+
+			outerBottomMarkerRenderer(coords, state) {
+				const ctx = state.context;
+				const [[xc, yc], [xe, ye]] = coords;
+				const radius = Math.sqrt((xe - xc) ** 2 + (ye - yc) ** 2) * 1.3;
+
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = config.pointHighlighting.outerBottomColor;
+				ctx.beginPath();
+				ctx.arc(xc, yc, radius, 15 * (Math.PI / 180), 165 * (Math.PI / 180));
+				ctx.stroke();
+			}
+
+			get cachedRefsGuids() {
+				return JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => e.l);
+			}
+
+			get cachedRefsAmounts() {
+				return Object.fromEntries(JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 3).map(e => [e.l, e.a]));
+			}
 		}
+
+		ol.Feature = OlFeature;
+	}
+
+	/* Показ радиуса катализатора */
+	{
+		function drawBlastRange() {
+			let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
+			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+			let level = cache.find(e => e.g == activeSlide.dataset.guid).l;
+			let range = window.Catalysers[level].range;
+
+			playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
+			playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
+			playerFeature.changed();
+		}
+
+		function hideBlastRange() {
+			playerFeature.getStyle()[3].getGeometry().setRadius(0);
+			playerFeature.changed();
+		}
+
+		catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
+		attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
+		attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
 	}
 }
