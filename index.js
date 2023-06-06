@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.30
+// @version      1.5.31
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -85,7 +85,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.30';
+	const USERSCRIPT_VERSION = '1.5.31';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -1729,6 +1729,13 @@ async function main() {
 			}
 		});
 		catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+
+
+		let coresListObserver = new MutationObserver(records => {
+			let event = new Event('coresListUpdated');
+			coresList.dispatchEvent(event);
+		});
+		coresListObserver.observe(coresList, { childList: true });
 	}
 
 
@@ -1865,11 +1872,6 @@ async function main() {
 
 		pointPopup.addEventListener('pointPopupOpened', _ => {
 			lastOpenedPoint.selectCore(config.autoSelect.deploy);
-			coresList.childNodes.forEach(coreSlide => {
-				if (excludedCores.has(coreSlide.dataset.guid)) {
-					coreSlide.setAttribute('sbgcui-excluded-core', '');
-				}
-			});
 		});
 
 		pointCores.addEventListener('click', event => {
@@ -1907,6 +1909,14 @@ async function main() {
 				let touchDuration = Date.now() - touchStartDate;
 				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 			}, { once: true });
+		});
+
+		coresList.addEventListener('coresListUpdated', () => {
+			coresList.childNodes.forEach(coreSlide => {
+				if (excludedCores.has(coreSlide.dataset.guid)) {
+					coreSlide.setAttribute('sbgcui-excluded-core', '');
+				}
+			});
 		});
 	}
 
