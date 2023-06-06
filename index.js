@@ -149,7 +149,7 @@ async function main() {
 			outer: 'off',
 			outerTop: 'cores',
 			outerBottom: 'highlevel',
-			text: 'refsAmount', // energy || level || refsAmount || off
+			text: 'refsAmount', // energy || level || lines || refsAmount || off
 			innerColor: '#E87100',
 			outerColor: '#E87100',
 			outerTopColor: '#EB4DBF',
@@ -586,7 +586,19 @@ async function main() {
 											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
 
 											getPointData(guid)
-												.then(data => { inview[guid] = { cores: data.co, energy: data.e, level: data.l, timestamp: Date.now() }; })
+												.then(data => {
+													inview[guid] = {
+														cores: data.co,
+														lines: {
+															in: data.li.i,
+															out: data.li.o,
+															get sum() { return this.in + this.out; },
+														},
+														energy: data.e,
+														level: data.l,
+														timestamp: Date.now()
+													};
+												})
 												.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 										});
 									}
@@ -1225,6 +1237,7 @@ async function main() {
 					['Нет', 'off'],
 					['Уровень', 'level'],
 					['Энергия', 'energy'],
+					['Линии вх. + исх.', 'lines'],
 					['Количество рефов', 'refsAmount'],
 				],
 				'pointHighlighting_text',
@@ -2806,13 +2819,16 @@ async function main() {
 				switch (type) {
 					case 'energy':
 						let energy = inview[this.id_]?.energy;
-						return typeof energy == 'number' ? String(Math.round(energy * 10) / 10) : null;
+						return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
 					case 'level':
 						let level = inview[this.id_]?.level;
 						return typeof level == 'number' ? String(level) : null;
+					case 'lines':
+						let lines = inview[this.id_]?.lines.sum;
+						return lines > 0 ? String(lines) : null;
 					case 'refsAmount':
 						let amount = this.cachedRefsAmounts[this.id_];
-						return typeof amount == 'number' ? String(amount) : null;
+						return amount > 0 ? String(amount) : null;
 					default: return null;
 				}
 			}
