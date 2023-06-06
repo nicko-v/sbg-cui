@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.31
+// @version      1.5.32
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -85,7 +85,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '1.5.31';
+	const USERSCRIPT_VERSION = '1.5.32';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -144,7 +144,7 @@ async function main() {
 			outer: 'off',
 			outerTop: 'cores',
 			outerBottom: 'highlevel',
-			text: 'refsAmount', // energy || level || refsAmount || off
+			text: 'refsAmount', // energy || level || lines || refsAmount || off
 			innerColor: '#E87100',
 			outerColor: '#E87100',
 			outerTopColor: '#EB4DBF',
@@ -565,7 +565,19 @@ async function main() {
 											if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
 
 											getPointData(guid)
-												.then(data => { inview[guid] = { cores: data.co, energy: data.e, level: data.l, timestamp: Date.now() }; })
+												.then(data => {
+													inview[guid] = {
+														cores: data.co,
+														lines: {
+															in: data.li.i,
+															out: data.li.o,
+															get sum() { return this.in + this.out; },
+														},
+														energy: data.e,
+														level: data.l,
+														timestamp: Date.now()
+													};
+												})
 												.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 										});
 									}
@@ -1204,6 +1216,7 @@ async function main() {
 					['Нет', 'off'],
 					['Уровень', 'level'],
 					['Энергия', 'energy'],
+					['Линии вх. + исх.', 'lines'],
 					['Количество рефов', 'refsAmount'],
 				],
 				'pointHighlighting_text',
@@ -2781,13 +2794,16 @@ async function main() {
 				switch (type) {
 					case 'energy':
 						let energy = inview[this.id_]?.energy;
-						return typeof energy == 'number' ? String(Math.round(energy * 10) / 10) : null;
+						return energy > 0 ? String(Math.round(energy * 10) / 10) : null;
 					case 'level':
 						let level = inview[this.id_]?.level;
 						return typeof level == 'number' ? String(level) : null;
+					case 'lines':
+						let lines = inview[this.id_]?.lines.sum;
+						return lines > 0 ? String(lines) : null;
 					case 'refsAmount':
 						let amount = this.cachedRefsAmounts[this.id_];
-						return typeof amount == 'number' ? String(amount) : null;
+						return amount > 0 ? String(amount) : null;
 					default: return null;
 				}
 			}
