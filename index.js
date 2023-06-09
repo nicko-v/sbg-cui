@@ -11,8 +11,6 @@
 // @grant        none
 // ==/UserScript==
 
-if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
-
 let map, playerFeature;
 
 let originalAppend = Element.prototype.append;
