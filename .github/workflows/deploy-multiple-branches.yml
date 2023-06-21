@@ -1,0 +1,27 @@
+name: Deploy from two branches
+
+on:
+  push:
+    branches: [main, unstable]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v3
+      
+      - name: Checkout unstable
+        uses: actions/checkout@v3
+        with:
+          ref: unstable
+          path: /unstable
+          clean: false
+          
+      - run: rm -rf /unstable/.git
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+        
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
