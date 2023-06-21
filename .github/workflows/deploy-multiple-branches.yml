@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, unstable]
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
@@ -18,15 +18,22 @@ jobs:
           clean: false
       
       - run: rm -rf unstable/.git
-      
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-      
+    
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
           path: '.'
       
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
