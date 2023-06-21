@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.5
+// @version      0.0.6
 // @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
@@ -31,48 +31,48 @@ fetch('/script.js')
 					map = this;
 					window.dispatchEvent(new Event('mapReady'));
 				}
-			
+
 				forEachFeatureAtPixel(pixel, callback, options = {}) {
 					options.hitTolerance = 15;
 					super.forEachFeatureAtPixel(pixel, callback, options);
 				}
 			}
-			
+
 			class Feature extends ol.Feature {
 				constructor(geometryOrProperties) {
 					super(geometryOrProperties);
 				}
-			
+
 				setStyle(style) {
 					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
 						let setCenter = style[1].getGeometry().setCenter;
-			
+
 						style[1].getGeometry().setCenter = pos => {
 							setCenter.call(style[1].getGeometry(), pos);
 							style[3].getGeometry().setCenter(pos);
 						};
-			
+
 						style[3] = new ol.style.Style({
 							geometry: new ol.geom.Circle(ol.proj.fromLonLat([0, 0]), 0),
 							stroke: new ol.style.Stroke({ color: '#CCCCCC33', width: 4 }),
 						});
-			
+
 						playerFeature = this;
 					}
-			
+
 					super.setStyle(style);
 				}
 			}
-			
+
 			ol.Map = Map;
 			ol.Feature = Feature;
-	
+
 			let script = document.createElement('script');
-	
+
 			data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 			data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 			data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-	
+
 			script.textContent = data;
 			document.head.appendChild(script);
 		});
@@ -90,7 +90,7 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '0.0.5';
+	const USERSCRIPT_VERSION = '0.0.6';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -286,6 +286,54 @@ async function main() {
 		}
 	}
 
+	class Toolbar extends ol.control.Control {
+		#expandButton = document.createElement('button');
+		#isExpanded = false;
+		#toolbar = document.createElement('div');
+
+		constructor() {
+			let container = document.createElement('div');
+			container.classList.add('ol-unselectable', 'ol-control', 'sbgcui_toolbar-control');
+			super({ element: container });
+
+			this.#expandButton.classList.add('fa-solid', 'fa-angle-up');
+			this.#expandButton.addEventListener('click', this.handleExpand.bind(this));
+
+			this.#toolbar.classList.add('sbgcui_toolbar');
+
+			this.collapse();
+
+			container.append(this.#toolbar, this.#expandButton);
+		}
+
+		addItem(item, order) {
+			item.style.order = order;
+			this.#toolbar.appendChild(item);
+		}
+
+		collapse() {
+			this.#expandButton.classList.remove('fa-rotate-180');
+			this.#expandButton.style.opacity = 1;
+
+			this.#toolbar.classList.add('sbgcui_hidden');
+
+			this.#isExpanded = false;
+		}
+
+		expand() {
+			this.#expandButton.classList.add('fa-rotate-180');
+			this.#expandButton.style.opacity = 0.5;
+
+			this.#toolbar.classList.remove('sbgcui_hidden');
+
+			this.#isExpanded = true;
+		}
+
+		handleExpand() {
+			this.#isExpanded ? this.collapse() : this.expand();
+		}
+	}
+
 	class Favorite {
 		#cooldown;
 
@@ -420,7 +468,6 @@ async function main() {
 	let selfNameSpan = document.querySelector('#self-info__name');
 	let toggleFollow = document.querySelector('#toggle-follow');
 	let xpDiffSpan = document.querySelector('.xp-diff');
-	let zoomContainer = document.querySelector('.ol-zoom');
 
 	let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 	let isPointPopupOpened = !pointPopup.classList.contains('hidden');
@@ -442,30 +489,6 @@ async function main() {
 		toDecimal(roman) { return this[roman]; },
 		toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
 	};
-
-
-	let dragPan;
-	let doubleClickZoomInteraction;
-
-	map.getInteractions().forEach(interaction => {
-		if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
-		if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
-	});
-	dragPan.setActive(localStorage.getItem('follow') == 'false');
-	doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
-
-	let geolocation = new ol.Geolocation({
-		projection: map.getView().getProjection(),
-		tracking: true,
-		trackingOptions: { enableHighAccuracy: true },
-	});
-	let speedSpan = document.createElement('span');
-
-	document.querySelector('.self-info').appendChild(speedSpan);
-	geolocation.on('change:speed', () => {
-		let speed_mps = geolocation.getSpeed() || 0;
-		speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
-	});
 
 
 	async function proxiedFetch(url, options) {
@@ -1383,7 +1406,7 @@ async function main() {
 		window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
 		window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
-		doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
+		doubleClickZoomInteraction?.setActive(Boolean(ui.doubleClickZoom));
 
 		if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1849,6 +1872,7 @@ async function main() {
 		let rotateArrow = document.querySelector('.ol-rotate');
 		let layersButton = document.querySelector('#layers');
 		let attackSliderClose = document.querySelector('#attack-slider-close');
+		let zoomContainer = document.querySelector('.ol-zoom');
 
 		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 		document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -1879,6 +1903,36 @@ async function main() {
 		ops.replaceChildren('INVENTORY', invTotalSpan);
 
 		selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+	}
+
+
+	/* Доработка карты */
+	{
+		var dragPan;
+		var doubleClickZoomInteraction;
+		var toolbar = new Toolbar();
+
+		map.getInteractions().forEach(interaction => {
+			if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
+			if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
+		});
+		dragPan?.setActive(localStorage.getItem('follow') == 'false');
+		doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
+
+		let geolocation = new ol.Geolocation({
+			projection: map.getView().getProjection(),
+			tracking: true,
+			trackingOptions: { enableHighAccuracy: true },
+		});
+		let speedSpan = document.createElement('span');
+
+		document.querySelector('.self-info').appendChild(speedSpan);
+		geolocation.on('change:speed', () => {
+			let speed_mps = geolocation.getSpeed() || 0;
+			speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
+		});
+
+		map.addControl(toolbar);
 	}
 
 
@@ -2013,26 +2067,28 @@ async function main() {
 
 	/* Меню настроек */
 	{
-		let gameSettingsPopup = document.querySelector('.settings.popup');
-		let gameSettingsContent = document.querySelector('.settings-content');
-		let userscriptSettingsMenu = createSettingsMenu();
-		document.querySelector('.topleft-container').appendChild(userscriptSettingsMenu);
+		let isSettingsMenuOpened = false;
+
+		let settingsMenu = createSettingsMenu();
+		document.querySelector('.topleft-container').appendChild(settingsMenu);
 
 		let settingsButton = document.createElement('button');
-		settingsButton.classList.add('sbgcui_settings_button');
-		settingsButton.innerText = 'Настройки SBG CUI';
-		settingsButton.addEventListener('click', _ => {
-			gameSettingsPopup.classList.add('hidden');
-			userscriptSettingsMenu.classList.toggle('sbgcui_hidden');
+		settingsButton.classList.add('fa-solid', 'fa-gears');
+		settingsButton.addEventListener('click', () => {
+			settingsMenu.classList.toggle('sbgcui_hidden');
+			isSettingsMenuOpened = !isSettingsMenuOpened;
 		});
-		gameSettingsContent.appendChild(settingsButton);
+		toolbar.addItem(settingsButton, 1);
 
 		document.body.addEventListener('click', event => {
 			if (
-				!userscriptSettingsMenu.classList.contains('sbgcui_hidden') &&
-				!event.target.closest('.sbgcui_settings') &&
-				!event.target.closest('.sbgcui_settings_button')
-			) { closeSettingsMenu(); }
+				isSettingsMenuOpened &&
+				event.target != settingsButton &&
+				!event.target.closest('.sbgcui_settings')
+			) {
+				closeSettingsMenu();
+				isSettingsMenuOpened = false;
+			}
 		});
 	}
 
@@ -2493,7 +2549,7 @@ async function main() {
 				}
 			});
 
-			zoomContainer.prepend(star);
+			toolbar.addItem(star, 2);
 			document.body.appendChild(favsList);
 		}
 	}
@@ -2915,6 +2971,7 @@ async function main() {
 		ol.Feature = OlFeature;
 	}
 
+
 	/* Показ радиуса катализатора */
 	{
 		function drawBlastRange() {
@@ -2936,5 +2993,20 @@ async function main() {
 		catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
 		attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
 		attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
+	}
+
+
+	/* Перезапрос инвью */
+	{
+		let button = document.createElement('button');
+
+		button.classList.add('fa-solid', 'fa-rotate');
+
+		button.addEventListener('click', () => {
+			map.getView().setCenter([0, 0]);
+			setTimeout(() => map.getView().setCenter(playerFeature.getGeometry().getCoordinates()), 1);
+		});
+
+		toolbar.addItem(button, 3);
 	}
 }

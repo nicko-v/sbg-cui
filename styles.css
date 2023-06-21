@@ -599,12 +599,6 @@ body {
 	display: none;
 }
 
-.sbgcui_settings_button {
-	width: 50%;
-	margin-left: auto;
-	margin-top: 10px;
-}
-
 .sbgcui_settings {
 	display: flex;
 	flex-direction: column;
@@ -801,10 +795,6 @@ body {
 	text-align: center;
 }
 
-.sbgcui_favs_star {
-	margin-bottom: 10px !important;
-}
-
 .sbgcui_favs_star::after {
 	content: attr(sbgcui_timers-min);
 	position: absolute;
@@ -954,6 +944,18 @@ body {
 
 li[sbgcui-excluded-core]>span {
 	color: var(--text-disabled) !important;
+}
+
+.sbgcui_toolbar-control {
+	left: 0.5em;
+	right: initial;
+	bottom: 6em;
+}
+
+.sbgcui_toolbar {
+	display: flex;
+	flex-direction: column-reverse;
+	gap: 5px;
 }
 
 .sbgcui_hidden {
