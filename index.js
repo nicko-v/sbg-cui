@@ -2,8 +2,8 @@
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
 // @version      0.0.6
-// @downloadURL  https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
-// @updateURL    https://raw.githubusercontent.com/nicko-v/sbg-cui/unstable/index.min.js
+// @downloadURL  https://nicko-v.github.io/sbg-cui/unstable/index.min.js
+// @updateURL    https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
 // @author       NV
 // @match        https://3d.sytes.net/*
@@ -92,6 +92,7 @@ async function main() {
 
 	const USERSCRIPT_VERSION = '0.0.6';
 	const LATEST_KNOWN_VERSION = '0.3.0';
+	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui/unstable';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
 	const DISCOVERY_COOLDOWN = 90;
@@ -1660,10 +1661,10 @@ async function main() {
 
 		[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-		styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles.min.css');
-		fa.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/fontawesome.min.css');
-		faRegular.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/regular.min.css');
-		faSolid.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/solid.min.css');
+		styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+		fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fontawesome.min.css`);
+		faRegular.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/regular.min.css`);
+		faSolid.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/solid.min.css`);
 
 		document.head.append(cssVars, fa, faRegular, faSolid, styles);
 	}
