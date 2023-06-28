@@ -3072,6 +3072,7 @@ async function main() {
 			let featuresToDisplay = featuresAtPixel.slice();
 
 			if (featuresToDisplay.length <= 1) {
+				featuresToDisplay[0]?.set('sbgcui_chosenFeature', true, true);
 				originalOnClick(mapClickEvent);
 			} else {
 				if (featuresToDisplay.length > MAX_DISPLAYED_CLUSTER) { // Показываем ограниченное кол-во, чтобы выглядело аккуратно.
