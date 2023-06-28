@@ -958,6 +958,102 @@ li[sbgcui-excluded-core]>span {
 	gap: 5px;
 }
 
+.sbgcui_cluster-overlay {
+	align-items: center;
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	justify-content: center;
+	position: absolute;
+	transition-duration: 200ms;
+	transition-property: backdrop-filter, -webkit-backdrop-filter;
+	transition-timing-function: ease-out;
+	width: 100vw;
+	z-index: 9;
+}
+
+.sbgcui_cluster-overlay-blur {
+	backdrop-filter: blur(6px);
+	-webkit-backdrop-filter: blur(6px);
+}
+
+.sbgcui_cluster-center {
+	align-items: flex-end;
+	background-color: var(--selection);
+	border-radius: 50%;
+	box-shadow: 0 0 10px 3px black;
+	box-sizing: border-box;
+	display: flex;
+	height: 20px;
+	justify-content: center;
+	padding: 10px;
+	width: 20px;
+}
+
+.sbgcui_cluster-close {
+	bottom: 35px;
+	font-size: 40px;
+	position: absolute;
+}
+
+.sbgcui_cluster-iconWrapper {
+	align-items: center;
+	display: flex;
+	flex-direction: column;
+	height: 0;
+	position: absolute;
+	transform-origin: bottom center;
+	transition: height 200ms ease-out;
+}
+
+.sbgcui_cluster-iconWrapper-fullWidth {
+	height: calc(50vw - 10px);
+}
+
+.sbgcui_cluster-icon {
+	align-items: center;
+	background-color: #666;
+	background-size: cover;
+	border-radius: 15%;
+	border-style: solid;
+	border-width: 2px;
+	box-sizing: border-box;
+	display: flex;
+	height: 60px;
+	justify-content: center;
+	transform-origin: center;
+	width: 60px;
+}
+
+.sbgcui_cluster-icon::before {
+	content: "L" var(--sbgcui-point-level);
+	font-size: 0.8em;
+	position: absolute;
+	top: -25px;
+}
+
+.sbgcui_cluster-icon::after {
+	content: var(--sbgcui-point-title);
+	font-size: 0.8em;
+	position: absolute;
+	bottom: -25px;
+	width: calc(100% + 20px);
+	overflow: hidden;
+	text-align: center;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sbgcui_cluster-line {
+	background-color: var(--selection);
+	border-radius: 50%;
+	box-shadow: 0 0 10px 3px black;
+	height: calc(65% - 50px);
+	margin-bottom: 25px;
+	margin-top: auto;
+	width: 4px;
+}
+
 .sbgcui_hidden {
 	display: none;
 }
@@ -992,5 +1088,9 @@ li[sbgcui-excluded-core]>span {
 
 	.sbgcui_attack-menu-rotate::after {
 		transform: rotate(-135deg);
+	}
+
+	.sbgcui_cluster-iconWrapper {
+		height: calc(50vh - 10px);
 	}
 }

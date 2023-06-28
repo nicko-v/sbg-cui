@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.6
+// @version      0.0.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
@@ -30,9 +30,20 @@ fetch('/script.js')
 					window.dispatchEvent(new Event('mapReady'));
 				}
 
-				forEachFeatureAtPixel(pixel, callback, options = {}) {
-					options.hitTolerance = 15;
-					super.forEachFeatureAtPixel(pixel, callback, options);
+				forEachFeatureAtPixel(pixel, callback, options) {
+					const isShowInfoCallback = callback.toString().includes('showInfo(');
+
+					if (isShowInfoCallback) {
+						const proxiedCallback = (feature, layer) => {
+							if (feature.get('sbgcui_chosenFeature')) {
+								callback(feature, layer);
+								feature.unset('sbgcui_chosenFeature', true);
+							}
+						};
+						super.forEachFeatureAtPixel(pixel, proxiedCallback, options);
+					} else {
+						super.forEachFeatureAtPixel(pixel, callback, options);
+					}
 				}
 			}
 
@@ -42,7 +53,7 @@ fetch('/script.js')
 				}
 
 				setStyle(style) {
-					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+					if (style && playerFeature == undefined && style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
 						let setCenter = style[1].getGeometry().setCenter;
 
 						style[1].getGeometry().setCenter = pos => {
@@ -88,12 +99,14 @@ async function main() {
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 
-	const USERSCRIPT_VERSION = '0.0.6';
+	const USERSCRIPT_VERSION = '0.0.7';
 	const LATEST_KNOWN_VERSION = '0.3.0';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui/unstable';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
 	const DISCOVERY_COOLDOWN = 90;
+	const HIT_TOLERANCE = 15;
+	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const HIGHLEVEL_MARKER = 8;
@@ -670,8 +683,8 @@ async function main() {
 			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 	}
 
-	async function getPointData(guid) {
-		return fetch(`/api/point?guid=${guid}&status=1`, {
+	async function getPointData(guid, isCompact = true) {
+		return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
 			headers: { authorization: `Bearer ${player.auth}` },
 			method: 'GET'
 		}).then(r => r.json()).then(r => r.data);
@@ -1859,7 +1872,7 @@ async function main() {
 		});
 
 		toggleFollow.addEventListener('click', () => {
-			dragPan.setActive(toggleFollow.dataset.active == 'false');
+			dragPanInteraction?.setActive(toggleFollow.dataset.active == 'false');
 		})
 	}
 
@@ -1907,15 +1920,21 @@ async function main() {
 
 	/* Доработка карты */
 	{
-		var dragPan;
+		var dragPanInteraction;
 		var doubleClickZoomInteraction;
 		var toolbar = new Toolbar();
 
 		map.getInteractions().forEach(interaction => {
-			if (interaction instanceof ol.interaction.DragPan) { dragPan = interaction; }
-			if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
+			switch (interaction.constructor) {
+				case ol.interaction.DragPan:
+					dragPanInteraction = interaction;
+					break;
+				case ol.interaction.DoubleClickZoom:
+					doubleClickZoomInteraction = interaction;
+					break;
+			}
 		});
-		dragPan?.setActive(localStorage.getItem('follow') == 'false');
+		dragPanInteraction?.setActive(localStorage.getItem('follow') == 'false');
 		doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
 
 		let geolocation = new ol.Geolocation({
@@ -3007,5 +3026,136 @@ async function main() {
 		});
 
 		toolbar.addItem(button, 3);
+	}
+
+
+	/* Выбор точки из кластера */
+	{
+		const closeButton = document.createElement('button');
+		const origin = document.createElement('div');
+		const overlay = document.createElement('div');
+		const originalOnClick = map.getListeners('click')[0];
+		let featuresAtPixel;
+		let isOverlayActive = false;
+		let lastShownCluster = [];
+		let mapClickEvent;
+
+		function featureClickHandler(event) {
+			if (!isOverlayActive) { return; }
+
+			const chosenFeatureGuid = event.target.getAttribute('sbgcui_guid');
+			const chosenFeature = featuresAtPixel.find(feature => feature.getId() == chosenFeatureGuid);
+
+			chosenFeature.set('sbgcui_chosenFeature', true, true);
+			mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
+
+			originalOnClick(mapClickEvent);
+
+			hideOverlay();
+		}
+
+		function hideOverlay() {
+			origin.childNodes.forEach(node => { node.classList.remove('sbgcui_cluster-iconWrapper-fullWidth'); });
+			overlay.classList.remove('sbgcui_cluster-overlay-blur');
+			setTimeout(() => {
+				overlay.classList.add('sbgcui_hidden');
+				isOverlayActive = false;
+			}, 200);
+		}
+
+		function mapClickHandler(event) {
+			mapClickEvent = event;
+			featuresAtPixel = map.getFeaturesAtPixel(mapClickEvent.pixel, {
+				hitTolerance: HIT_TOLERANCE,
+				layerFilter: layer => layer.get('name') == 'points',
+			});
+			let featuresToDisplay = featuresAtPixel.slice();
+
+			if (featuresToDisplay.length <= 1) {
+				originalOnClick(mapClickEvent);
+			} else {
+				if (featuresToDisplay.length > MAX_DISPLAYED_CLUSTER) { // Показываем ограниченное кол-во, чтобы выглядело аккуратно.
+					featuresToDisplay = featuresToDisplay.reduceRight(reduceFeatures, []); // Не выводим показанные в прошлый раз точки если их больше ограничения.
+				}
+
+				spreadFeatures(featuresToDisplay);
+				showOverlay();
+				lastShownCluster = featuresToDisplay;
+			}
+		}
+
+		function reduceFeatures(acc, feature, index) {
+			const isExtraFeatures = MAX_DISPLAYED_CLUSTER - acc.length <= index;
+			const isFreeSlots = acc.length < MAX_DISPLAYED_CLUSTER;
+			const isShownLastTime = lastShownCluster.includes(feature);
+
+			if (!isFreeSlots) { return acc; }
+
+			if (isShownLastTime) {
+				if (!isExtraFeatures) { acc.push(feature); }
+			} else {
+				acc.push(feature);
+			}
+
+			return acc;
+		}
+
+		function showOverlay() {
+			overlay.classList.remove('sbgcui_hidden');
+			setTimeout(() => {
+				overlay.classList.add('sbgcui_cluster-overlay-blur');
+				isOverlayActive = true;
+			}, 10);
+		}
+
+		function spreadFeatures(features) {
+			const angle = 360 / features.length;
+
+			origin.innerHTML = '';
+
+			features.forEach((feature, index) => {
+				const guid = feature.getId();
+				const icon = document.createElement('div');
+				const line = document.createElement('div');
+				const wrapper = document.createElement('div');
+
+				getPointData(guid, false)
+					.then(data => {
+						icon.style.backgroundImage = data.i ? `url("https://lh3.googleusercontent.com/${data.i}=s60")` : 'unset';
+						icon.style.borderColor = `var(--team-${data.te || 0})`;
+						icon.style.boxShadow = `0 0 20px 3px var(--team-${data.te || 0}), 0 0 5px 2px black`;
+						icon.style.setProperty('--sbgcui-point-title', `"${data.t}"`);
+						icon.style.setProperty('--sbgcui-point-level', `"${data.l}"`);
+					});
+
+				wrapper.classList.add('sbgcui_cluster-iconWrapper');
+				icon.classList.add('sbgcui_cluster-icon');
+				line.classList.add('sbgcui_cluster-line');
+
+				wrapper.style.transform = `rotate(${angle * index}deg)`;
+				icon.style.transform = `rotate(${-angle * index}deg)`;
+
+				wrapper.append(icon, line);
+				origin.appendChild(wrapper);
+
+				setTimeout(() => { wrapper.classList.add('sbgcui_cluster-iconWrapper-fullWidth'); }, 10);
+
+				icon.setAttribute('sbgcui_guid', guid);
+
+				icon.addEventListener('click', featureClickHandler);
+			});
+		}
+
+		closeButton.classList.add('sbgcui_button_reset', 'sbgcui_cluster-close', 'fa-solid', 'fa-circle-xmark');
+		origin.classList.add('sbgcui_cluster-center');
+		overlay.classList.add('sbgcui_cluster-overlay', 'sbgcui_hidden');
+
+		overlay.append(origin, closeButton);
+		document.body.appendChild(overlay);
+
+		closeButton.addEventListener('click', hideOverlay);
+
+		map.un('click', originalOnClick);
+		map.on('click', mapClickHandler);
 	}
 }
