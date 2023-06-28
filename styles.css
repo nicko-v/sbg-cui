@@ -1003,6 +1003,7 @@ li[sbgcui-excluded-core]>span {
 	display: flex;
 	flex-direction: column;
 	height: 0;
+	max-height: 200px;
 	position: absolute;
 	transform-origin: bottom center;
 	transition: height 200ms ease-out;
