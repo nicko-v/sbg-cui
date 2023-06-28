@@ -3035,6 +3035,7 @@ async function main() {
 		const origin = document.createElement('div');
 		const overlay = document.createElement('div');
 		const originalOnClick = map.getListeners('click')[0];
+		const overlayTransitionsTime = 200;
 		let featuresAtPixel;
 		let isOverlayActive = false;
 		let lastShownCluster = [];
@@ -3049,9 +3050,8 @@ async function main() {
 			chosenFeature.set('sbgcui_chosenFeature', true, true);
 			mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
 
-			originalOnClick(mapClickEvent);
-
 			hideOverlay();
+			setTimeout(() => { originalOnClick(mapClickEvent) }, overlayTransitionsTime);
 		}
 
 		function hideOverlay() {
@@ -3060,7 +3060,7 @@ async function main() {
 			setTimeout(() => {
 				overlay.classList.add('sbgcui_hidden');
 				isOverlayActive = false;
-			}, 200);
+			}, overlayTransitionsTime);
 		}
 
 		function mapClickHandler(event) {
