@@ -962,13 +962,13 @@ li[sbgcui-excluded-core]>span {
 	align-items: center;
 	display: flex;
 	flex-direction: column;
-	height: 100vh;
+	height: 100%;
 	justify-content: center;
 	position: absolute;
 	transition-duration: 200ms;
 	transition-property: backdrop-filter, -webkit-backdrop-filter;
 	transition-timing-function: ease-out;
-	width: 100vw;
+	width: 100%;
 	z-index: 9;
 }
 
