@@ -964,7 +964,9 @@ li[sbgcui-excluded-core]>span {
 	flex-direction: column;
 	height: 100%;
 	justify-content: center;
+	left: 0;
 	position: absolute;
+	top: 0;
 	transition-duration: 200ms;
 	transition-property: backdrop-filter, -webkit-backdrop-filter;
 	transition-timing-function: ease-out;
