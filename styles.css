@@ -1092,7 +1092,23 @@ li[sbgcui-excluded-core]>span {
 		transform: rotate(-135deg);
 	}
 
+	.sbgcui_cluster-center:has(> :nth-child(8)) .sbgcui_cluster-icon::before {
+		top: -20px;
+	}
+
+	.sbgcui_cluster-center:has(> :nth-child(8)) .sbgcui_cluster-icon::after {
+		bottom: -20px;
+	}
+
+	.sbgcui_cluster-close {
+		right: 35px;
+	}
+
 	.sbgcui_cluster-iconWrapper {
-		height: calc(50vh - 10px);
+		height: calc(50vh - 25px);
+	}
+
+	.sbgcui_cluster-line {
+		height: calc(60% - 50px);
 	}
 }
