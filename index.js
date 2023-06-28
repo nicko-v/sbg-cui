@@ -67,6 +67,7 @@ const DEFAULT_CONFIG = {
 		pointBtnsRtl: 0,
 		pointBgImageBlur: 1,
 		pointDischargeTimeout: 1,
+		speedometer: 1,
 	},
 	pointHighlighting: {
 		inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
@@ -1206,6 +1207,7 @@ async function main() {
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
 			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
+			let speedometer = createInput('checkbox', 'ui_speedometer', +ui.speedometer, 'Показывать скорость движения');
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -1221,7 +1223,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
+			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout, speedometer);
 
 			section.appendChild(subSection);
 
@@ -1415,6 +1417,7 @@ async function main() {
 
 		html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
 		html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
+		html.style.setProperty('--sbgcui-show-speedometer', ui.speedometer);
 		html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
 		window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
 		window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
@@ -1661,6 +1664,7 @@ async function main() {
         --sbgcui-point-image: '';
         --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
         --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
+				--sbgcui-show-speedometer: ${ui.speedometer};
 				--sbgcui-branding-color: ${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor};
 				--team-${player.team}: var(--sbgcui-branding-color);
       }
@@ -1937,19 +1941,6 @@ async function main() {
 		});
 		dragPanInteraction?.setActive(localStorage.getItem('follow') == 'false');
 		doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
-
-		let geolocation = new ol.Geolocation({
-			projection: map.getView().getProjection(),
-			tracking: true,
-			trackingOptions: { enableHighAccuracy: true },
-		});
-		let speedSpan = document.createElement('span');
-
-		document.querySelector('.self-info').appendChild(speedSpan);
-		geolocation.on('change:speed', () => {
-			let speed_mps = geolocation.getSpeed() || 0;
-			speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
-		});
 
 		map.addControl(toolbar);
 	}
@@ -3027,6 +3018,25 @@ async function main() {
 		});
 
 		toolbar.addItem(button, 3);
+	}
+
+
+	/* Показ скорости */
+	{
+		const geolocation = new ol.Geolocation({
+			projection: map.getView().getProjection(),
+			tracking: true,
+			trackingOptions: { enableHighAccuracy: true },
+		});
+		const speedSpan = document.createElement('span');
+
+		speedSpan.classList.add('sbgcui_speed');
+		document.querySelector('.self-info').appendChild(speedSpan);
+
+		geolocation.on('change:speed', () => {
+			const speed_mps = geolocation.getSpeed() || 0;
+			speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
+		});
 	}
 
 

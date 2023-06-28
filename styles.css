@@ -958,6 +958,10 @@ li[sbgcui-excluded-core]>span {
 	gap: 5px;
 }
 
+.sbgcui_speed {
+	opacity: var(--sbgcui-show-speedometer);
+}
+
 .sbgcui_cluster-overlay {
 	align-items: center;
 	display: flex;
