@@ -9,12 +9,15 @@ jobs:
     steps:
       - name: Checkout main
         uses: actions/checkout@v3
+        with:
+          ref: main
+          path: ./
       
       - name: Checkout unstable
         uses: actions/checkout@v3
         with:
           ref: unstable
-          path: unstable
+          path: ./unstable
           clean: false
       
       - run: rm -rf unstable/.git
