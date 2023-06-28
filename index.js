@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.7
+// @version      0.0.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
@@ -10,6 +10,76 @@
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
+
+const USERSCRIPT_VERSION = '0.0.8';
+const LATEST_KNOWN_VERSION = '0.3.0';
+const HOME_DIR = 'https://nicko-v.github.io/sbg-cui/unstable';
+const INVENTORY_LIMIT = 3000;
+const MIN_FREE_SPACE = 100;
+const DISCOVERY_COOLDOWN = 90;
+const HIT_TOLERANCE = 15;
+const MAX_DISPLAYED_CLUSTER = 8;
+const INVIEW_POINTS_DATA_TTL = 7000;
+const INVIEW_POINTS_LIMIT = 100;
+const HIGHLEVEL_MARKER = 8;
+const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
+const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
+const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
+const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+const ITEMS_TYPES = {
+	1: { eng: 'cores', rus: 'ядра' },
+	2: { eng: 'catalysers', rus: 'катализаторы' },
+	3: { eng: 'refs', rus: 'рефы' }
+};
+const DEFAULT_CONFIG = {
+	maxAmountInBag: {
+		cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+		catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+		refs: { allied: -1, hostile: -1 },
+	},
+	autoSelect: {
+		deploy: 'max',  // min || max || off
+		upgrade: 'min', // min || max || off
+		attack: 'latest',  // max || latest
+	},
+	mapFilters: {
+		invert: IS_DARK ? 1 : 0,
+		hueRotate: IS_DARK ? 180 : 0,
+		brightness: IS_DARK ? 0.75 : 1,
+		grayscale: IS_DARK ? 1 : 0,
+		sepia: 1,
+		blur: 0,
+		branding: 'default', // default || custom
+		brandingColor: '#CCCCCC',
+	},
+	tinting: {
+		map: 1,
+		point: 'level', // level || team || off
+		profile: 1,
+	},
+	vibration: {
+		buttons: 1,
+		notifications: 1,
+	},
+	ui: {
+		doubleClickZoom: 0,
+		pointBgImage: 1,
+		pointBtnsRtl: 0,
+		pointBgImageBlur: 1,
+		pointDischargeTimeout: 1,
+	},
+	pointHighlighting: {
+		inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+		outer: 'off',
+		outerTop: 'cores',
+		outerBottom: 'highlevel',
+		text: 'refsAmount', // energy || level || lines || refsAmount || off
+		innerColor: '#E87100',
+		outerColor: '#E87100',
+		outerTopColor: '#EB4DBF',
+		outerBottomColor: '#28C4F4',
+	},
+};
 
 let map, playerFeature;
 
@@ -30,8 +100,10 @@ fetch('/script.js')
 					window.dispatchEvent(new Event('mapReady'));
 				}
 
-				forEachFeatureAtPixel(pixel, callback, options) {
+				forEachFeatureAtPixel(pixel, callback, options = {}) {
 					const isShowInfoCallback = callback.toString().includes('showInfo(');
+
+					options.hitTolerance = HIT_TOLERANCE;
 
 					if (isShowInfoCallback) {
 						const proxiedCallback = (feature, layer) => {
@@ -97,77 +169,6 @@ async function main() {
 	'use strict';
 
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
-
-
-	const USERSCRIPT_VERSION = '0.0.7';
-	const LATEST_KNOWN_VERSION = '0.3.0';
-	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui/unstable';
-	const INVENTORY_LIMIT = 3000;
-	const MIN_FREE_SPACE = 100;
-	const DISCOVERY_COOLDOWN = 90;
-	const HIT_TOLERANCE = 15;
-	const MAX_DISPLAYED_CLUSTER = 8;
-	const INVIEW_POINTS_DATA_TTL = 7000;
-	const INVIEW_POINTS_LIMIT = 100;
-	const HIGHLEVEL_MARKER = 8;
-	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
-	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
-	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
-	const ITEMS_TYPES = {
-		1: { eng: 'cores', rus: 'ядра' },
-		2: { eng: 'catalysers', rus: 'катализаторы' },
-		3: { eng: 'refs', rus: 'рефы' }
-	};
-	const DEFAULT_CONFIG = {
-		maxAmountInBag: {
-			cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			refs: { allied: -1, hostile: -1 },
-		},
-		autoSelect: {
-			deploy: 'max',  // min || max || off
-			upgrade: 'min', // min || max || off
-			attack: 'latest',  // max || latest
-		},
-		mapFilters: {
-			invert: IS_DARK ? 1 : 0,
-			hueRotate: IS_DARK ? 180 : 0,
-			brightness: IS_DARK ? 0.75 : 1,
-			grayscale: IS_DARK ? 1 : 0,
-			sepia: 1,
-			blur: 0,
-			branding: 'default', // default || custom
-			brandingColor: '#CCCCCC',
-		},
-		tinting: {
-			map: 1,
-			point: 'level', // level || team || off
-			profile: 1,
-		},
-		vibration: {
-			buttons: 1,
-			notifications: 1,
-		},
-		ui: {
-			doubleClickZoom: 0,
-			pointBgImage: 1,
-			pointBtnsRtl: 0,
-			pointBgImageBlur: 1,
-			pointDischargeTimeout: 1,
-		},
-		pointHighlighting: {
-			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-			outer: 'off',
-			outerTop: 'cores',
-			outerBottom: 'highlevel',
-			text: 'refsAmount', // energy || level || lines || refsAmount || off
-			innerColor: '#E87100',
-			outerColor: '#E87100',
-			outerTopColor: '#EB4DBF',
-			outerBottomColor: '#28C4F4',
-		},
-	};
 
 	const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
 	const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
