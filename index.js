@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI [U]
 // @namespace    https://3d.sytes.net/
-// @version      0.0.8
+// @version      0.0.9
 // @downloadURL  https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/unstable/index.min.js
 // @description  SBG Custom UI [Unstable]
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '0.0.8';
+const USERSCRIPT_VERSION = '0.0.9';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui/unstable';
 const INVENTORY_LIMIT = 3000;
@@ -3136,7 +3136,7 @@ async function main() {
 						icon.style.backgroundImage = data.i ? `url("https://lh3.googleusercontent.com/${data.i}=s60")` : 'unset';
 						icon.style.borderColor = `var(--team-${data.te || 0})`;
 						icon.style.boxShadow = `0 0 20px 3px var(--team-${data.te || 0}), 0 0 5px 2px black`;
-						icon.style.setProperty('--sbgcui-point-title', `"${data.t}"`);
+						icon.style.setProperty('--sbgcui-point-title', `"${data.t.replaceAll('"', '\\22 ')}"`);
 						icon.style.setProperty('--sbgcui-point-level', `"${data.l}"`);
 					});
 
