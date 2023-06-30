@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.6.0
+// @version      1.6.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.6.0';
+const USERSCRIPT_VERSION = '1.6.1';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -79,6 +79,9 @@ const DEFAULT_CONFIG = {
 		outerColor: '#E87100',
 		outerTopColor: '#EB4DBF',
 		outerBottomColor: '#28C4F4',
+	},
+	drawing: {
+		maxDistance: -1,
 	},
 };
 
@@ -516,7 +519,7 @@ async function main() {
 			originalFetch(url, options)
 				.then(async response => {
 					let clonedResponse = response.clone();
-					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
+					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview|draw)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
 
 					if (path == null) { resolve(response); return; }
 
@@ -549,20 +552,12 @@ async function main() {
 									if (toDelete.length == 0) { return; }
 
 									try {
-										let responses = await deleteItems(toDelete);
+										const responses = await deleteItems(toDelete);
 
 										responses.forEach(response => { if ('error' in response) { throw response.error; } });
 										parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
 
-										let body = JSON.stringify(parsedResponse);
-										let options = {
-											status: response.status,
-											statusText: response.statusText,
-											headers: response.headers,
-										};
-										let modifiedResponse = new Response(body, options);
-
-										Object.defineProperty(modifiedResponse, 'url', { value: response.url, enumerable: true, });
+										const modifiedResponse = createResponse(parsedResponse, response);
 
 										resolve(modifiedResponse);
 									} catch (error) {
@@ -647,6 +642,14 @@ async function main() {
 									});
 								}
 
+								break;
+							case 'draw':
+								const maxDistance = config.drawing.maxDistance;
+								if ('data' in parsedResponse && maxDistance != -1) {
+									parsedResponse.data = parsedResponse.data.filter(point => point.d <= maxDistance);
+									const modifiedResponse = createResponse(parsedResponse, response);
+									resolve(modifiedResponse);
+								}
 								break;
 						}
 					}).catch(error => {
@@ -820,6 +823,20 @@ async function main() {
 		}).then(r => r.json());
 	}
 
+	function createResponse(obj, originalResponse) {
+		const body = JSON.stringify(obj);
+		const options = {
+			status: originalResponse.status,
+			statusText: originalResponse.statusText,
+			headers: originalResponse.headers,
+		};
+		const response = new Response(body, options);
+
+		Object.defineProperty(response, 'url', { value: originalResponse.url, enumerable: true, });
+
+		return response;
+	}
+
 	function isMobile() {
 		if ('maxTouchPoints' in window.navigator) {
 			return window.navigator.maxTouchPoints > 0;
@@ -947,6 +964,25 @@ async function main() {
 			selectWrapper.append(header, select);
 
 			return selectWrapper;
+		}
+
+		function createTextField(title, name, value) {
+			let header = document.createElement('h5');
+			let input = document.createElement('input');
+			let wrapper = document.createElement('div');
+
+			header.classList.add('sbgcui_settings-textfield-title');
+			header.innerText = title;
+
+			input.name = name;
+			input.type = 'number';
+			input.min = -1;
+			input.value = value;
+
+			wrapper.classList.add('sbgcui_settings-textfield_wrapper');
+			wrapper.append(header, input);
+
+			return wrapper;
 		}
 
 		function createAutoDeleteSection(maxAmountInBag) {
@@ -1322,6 +1358,23 @@ async function main() {
 			return section;
 		}
 
+		function createDrawingSection(drawing) {
+			const section = createSection(
+				'Рисование',
+				`Настройки, касающиеся рисования линий. Значение "-1" в текстовом поле отключает ограничение.`
+			);
+			const subSection = document.createElement('section');
+			const maxDistanceTextField = createTextField('Скрывать рефы дальше, чем (м):', 'drawing_maxDistance', drawing.maxDistance);
+
+			subSection.classList.add('sbgcui_settings-subsection');
+
+			subSection.append(maxDistanceTextField);
+
+			section.appendChild(subSection);
+
+			return section;
+		}
+
 
 		let form = document.createElement('form');
 		form.classList.add('sbgcui_settings', 'sbgcui_hidden');
@@ -1361,6 +1414,7 @@ async function main() {
 			createVibrationSection(config.vibration),
 			createUISection(config.ui),
 			createPointHighlightingSection(config.pointHighlighting),
+			createDrawingSection(config.drawing)
 		];
 
 		sections.forEach(e => {
@@ -1384,7 +1438,7 @@ async function main() {
 					let path = key.split('_');
 					if (path[0] == 'maxAmountInBag') {
 						config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-					} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting/)) {
+					} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting|drawing/)) {
 						let value = formEntries[key];
 						config[path[0]][path[1]] = isNaN(+value) ? value : +value;
 					}

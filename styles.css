@@ -706,7 +706,8 @@ body {
 	padding-left: 15px;
 }
 
-.sbgcui_settings-dropdown_wrapper {
+.sbgcui_settings-dropdown_wrapper,
+.sbgcui_settings-textfield_wrapper {
 	display: flex;
 	flex-wrap: wrap;
 }
@@ -719,7 +720,8 @@ body {
 	margin-right: 10px;
 }
 
-.sbgcui_settings-dropdown-title {
+.sbgcui_settings-dropdown-title,
+.sbgcui_settings-textfield-title {
 	margin: 0;
 	margin-bottom: 5px;
 	font-weight: normal;
