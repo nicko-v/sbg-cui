@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.5.32
+// @version      1.6.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -10,6 +10,77 @@
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
+
+const USERSCRIPT_VERSION = '1.6.0';
+const LATEST_KNOWN_VERSION = '0.3.0';
+const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
+const INVENTORY_LIMIT = 3000;
+const MIN_FREE_SPACE = 100;
+const DISCOVERY_COOLDOWN = 90;
+const HIT_TOLERANCE = 15;
+const MAX_DISPLAYED_CLUSTER = 8;
+const INVIEW_POINTS_DATA_TTL = 7000;
+const INVIEW_POINTS_LIMIT = 100;
+const HIGHLEVEL_MARKER = 8;
+const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
+const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
+const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
+const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+const ITEMS_TYPES = {
+	1: { eng: 'cores', rus: 'ядра' },
+	2: { eng: 'catalysers', rus: 'катализаторы' },
+	3: { eng: 'refs', rus: 'рефы' }
+};
+const DEFAULT_CONFIG = {
+	maxAmountInBag: {
+		cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+		catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+		refs: { allied: -1, hostile: -1 },
+	},
+	autoSelect: {
+		deploy: 'max',  // min || max || off
+		upgrade: 'min', // min || max || off
+		attack: 'latest',  // max || latest
+	},
+	mapFilters: {
+		invert: IS_DARK ? 1 : 0,
+		hueRotate: IS_DARK ? 180 : 0,
+		brightness: IS_DARK ? 0.75 : 1,
+		grayscale: IS_DARK ? 1 : 0,
+		sepia: 1,
+		blur: 0,
+		branding: 'default', // default || custom
+		brandingColor: '#CCCCCC',
+	},
+	tinting: {
+		map: 1,
+		point: 'level', // level || team || off
+		profile: 1,
+	},
+	vibration: {
+		buttons: 1,
+		notifications: 1,
+	},
+	ui: {
+		doubleClickZoom: 0,
+		pointBgImage: 1,
+		pointBtnsRtl: 0,
+		pointBgImageBlur: 1,
+		pointDischargeTimeout: 1,
+		speedometer: 1,
+	},
+	pointHighlighting: {
+		inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+		outer: 'off',
+		outerTop: 'cores',
+		outerBottom: 'highlevel',
+		text: 'refsAmount', // energy || level || lines || refsAmount || off
+		innerColor: '#E87100',
+		outerColor: '#E87100',
+		outerTopColor: '#EB4DBF',
+		outerBottomColor: '#28C4F4',
+	},
+};
 
 let map, playerFeature;
 
@@ -29,43 +100,61 @@ fetch('/script.js')
 					map = this;
 					window.dispatchEvent(new Event('mapReady'));
 				}
+
+				forEachFeatureAtPixel(pixel, callback, options = {}) {
+					const isShowInfoCallback = callback.toString().includes('showInfo(');
+
+					options.hitTolerance = HIT_TOLERANCE;
+
+					if (isShowInfoCallback) {
+						const proxiedCallback = (feature, layer) => {
+							if (feature.get('sbgcui_chosenFeature')) {
+								callback(feature, layer);
+								feature.unset('sbgcui_chosenFeature', true);
+							}
+						};
+						super.forEachFeatureAtPixel(pixel, proxiedCallback, options);
+					} else {
+						super.forEachFeatureAtPixel(pixel, callback, options);
+					}
+				}
 			}
-			
+
 			class Feature extends ol.Feature {
 				constructor(geometryOrProperties) {
 					super(geometryOrProperties);
 				}
-			
+
 				setStyle(style) {
-					if (style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+					if (style && playerFeature == undefined && style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
 						let setCenter = style[1].getGeometry().setCenter;
-			
+
 						style[1].getGeometry().setCenter = pos => {
 							setCenter.call(style[1].getGeometry(), pos);
 							style[3].getGeometry().setCenter(pos);
 						};
-			
+
 						style[3] = new ol.style.Style({
 							geometry: new ol.geom.Circle(ol.proj.fromLonLat([0, 0]), 0),
 							stroke: new ol.style.Stroke({ color: '#CCCCCC33', width: 4 }),
 						});
-			
+
 						playerFeature = this;
 					}
-			
+
 					super.setStyle(style);
 				}
 			}
-			
+
 			ol.Map = Map;
 			ol.Feature = Feature;
-	
+
 			let script = document.createElement('script');
-	
+
 			data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 			data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 			data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-	
+
 			script.textContent = data;
 			document.head.appendChild(script);
 		});
@@ -81,74 +170,6 @@ async function main() {
 	'use strict';
 
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
-
-
-	const USERSCRIPT_VERSION = '1.5.32';
-	const LATEST_KNOWN_VERSION = '0.3.0';
-	const INVENTORY_LIMIT = 3000;
-	const MIN_FREE_SPACE = 100;
-	const DISCOVERY_COOLDOWN = 90;
-	const INVIEW_POINTS_DATA_TTL = 7000;
-	const INVIEW_POINTS_LIMIT = 100;
-	const HIGHLEVEL_MARKER = 8;
-	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
-	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
-	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
-	const ITEMS_TYPES = {
-		1: { eng: 'cores', rus: 'ядра' },
-		2: { eng: 'catalysers', rus: 'катализаторы' },
-		3: { eng: 'refs', rus: 'рефы' }
-	};
-	const DEFAULT_CONFIG = {
-		maxAmountInBag: {
-			cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			refs: { allied: -1, hostile: -1 },
-		},
-		autoSelect: {
-			deploy: 'max',  // min || max || off
-			upgrade: 'min', // min || max || off
-			attack: 'latest',  // max || latest
-		},
-		mapFilters: {
-			invert: IS_DARK ? 1 : 0,
-			hueRotate: IS_DARK ? 180 : 0,
-			brightness: IS_DARK ? 0.75 : 1,
-			grayscale: IS_DARK ? 1 : 0,
-			sepia: 1,
-			blur: 0,
-			branding: 'default', // default || custom
-			brandingColor: '#CCCCCC',
-		},
-		tinting: {
-			map: 1,
-			point: 'level', // level || team || off
-			profile: 1,
-		},
-		vibration: {
-			buttons: 1,
-			notifications: 1,
-		},
-		ui: {
-			doubleClickZoom: 0,
-			pointBgImage: 1,
-			pointBtnsRtl: 0,
-			pointBgImageBlur: 1,
-			pointDischargeTimeout: 1,
-		},
-		pointHighlighting: {
-			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-			outer: 'off',
-			outerTop: 'cores',
-			outerBottom: 'highlevel',
-			text: 'refsAmount', // energy || level || lines || refsAmount || off
-			innerColor: '#E87100',
-			outerColor: '#E87100',
-			outerTopColor: '#EB4DBF',
-			outerBottomColor: '#28C4F4',
-		},
-	};
 
 	const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
 	const decimalSeparator = Intl.NumberFormat(i18next.language).formatToParts(1.1)[1].value;
@@ -276,6 +297,54 @@ async function main() {
 			}
 
 			click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
+		}
+	}
+
+	class Toolbar extends ol.control.Control {
+		#expandButton = document.createElement('button');
+		#isExpanded = false;
+		#toolbar = document.createElement('div');
+
+		constructor() {
+			let container = document.createElement('div');
+			container.classList.add('ol-unselectable', 'ol-control', 'sbgcui_toolbar-control');
+			super({ element: container });
+
+			this.#expandButton.classList.add('fa-solid', 'fa-angle-up');
+			this.#expandButton.addEventListener('click', this.handleExpand.bind(this));
+
+			this.#toolbar.classList.add('sbgcui_toolbar');
+
+			this.collapse();
+
+			container.append(this.#toolbar, this.#expandButton);
+		}
+
+		addItem(item, order) {
+			item.style.order = order;
+			this.#toolbar.appendChild(item);
+		}
+
+		collapse() {
+			this.#expandButton.classList.remove('fa-rotate-180');
+			this.#expandButton.style.opacity = 1;
+
+			this.#toolbar.classList.add('sbgcui_hidden');
+
+			this.#isExpanded = false;
+		}
+
+		expand() {
+			this.#expandButton.classList.add('fa-rotate-180');
+			this.#expandButton.style.opacity = 0.5;
+
+			this.#toolbar.classList.remove('sbgcui_hidden');
+
+			this.#isExpanded = true;
+		}
+
+		handleExpand() {
+			this.#isExpanded ? this.collapse() : this.expand();
 		}
 	}
 
@@ -413,7 +482,6 @@ async function main() {
 	let selfNameSpan = document.querySelector('#self-info__name');
 	let toggleFollow = document.querySelector('#toggle-follow');
 	let xpDiffSpan = document.querySelector('.xp-diff');
-	let zoomContainer = document.querySelector('.ol-zoom');
 
 	let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 	let isPointPopupOpened = !pointPopup.classList.contains('hidden');
@@ -435,14 +503,6 @@ async function main() {
 		toDecimal(roman) { return this[roman]; },
 		toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
 	};
-
-
-	let doubleClickZoomInteraction;
-
-	map.getInteractions().forEach(interaction => {
-		if (interaction instanceof ol.interaction.DoubleClickZoom) { doubleClickZoomInteraction = interaction; }
-	});
-	doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
 
 
 	async function proxiedFetch(url, options) {
@@ -625,8 +685,8 @@ async function main() {
 			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 	}
 
-	async function getPointData(guid) {
-		return fetch(`/api/point?guid=${guid}&status=1`, {
+	async function getPointData(guid, isCompact = true) {
+		return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
 			headers: { authorization: `Bearer ${player.auth}` },
 			method: 'GET'
 		}).then(r => r.json()).then(r => r.data);
@@ -1147,6 +1207,7 @@ async function main() {
 			let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
 			let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
 			let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
+			let speedometer = createInput('checkbox', 'ui_speedometer', +ui.speedometer, 'Показывать скорость движения');
 
 			pointBgImage.addEventListener('click', event => {
 				if (event.target.id == 'ui_pointBgImage') {
@@ -1162,7 +1223,7 @@ async function main() {
 
 			subSection.classList.add('sbgcui_settings-subsection');
 
-			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout);
+			subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout, speedometer);
 
 			section.appendChild(subSection);
 
@@ -1356,11 +1417,12 @@ async function main() {
 
 		html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
 		html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
+		html.style.setProperty('--sbgcui-show-speedometer', ui.speedometer);
 		html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
 		window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
 		window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
-		doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
+		doubleClickZoomInteraction?.setActive(Boolean(ui.doubleClickZoom));
 
 		if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -1602,6 +1664,7 @@ async function main() {
         --sbgcui-point-image: '';
         --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
         --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
+				--sbgcui-show-speedometer: ${ui.speedometer};
 				--sbgcui-branding-color: ${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor};
 				--team-${player.team}: var(--sbgcui-branding-color);
       }
@@ -1614,10 +1677,10 @@ async function main() {
 
 		[styles, fa, faRegular, faSolid].forEach(e => e.setAttribute('rel', 'stylesheet'));
 
-		styles.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/styles.min.css');
-		fa.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/fontawesome.min.css');
-		faRegular.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/regular.min.css');
-		faSolid.setAttribute('href', 'https://nicko-v.github.io/sbg-cui/assets/fontawesome/css/solid.min.css');
+		styles.setAttribute('href', `${HOME_DIR}/styles.min.css`);
+		fa.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/fontawesome.min.css`);
+		faRegular.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/regular.min.css`);
+		faSolid.setAttribute('href', `${HOME_DIR}/assets/fontawesome/css/solid.min.css`);
 
 		document.head.append(cssVars, fa, faRegular, faSolid, styles);
 	}
@@ -1812,6 +1875,10 @@ async function main() {
 				if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 			}, { once: true });
 		});
+
+		toggleFollow.addEventListener('click', () => {
+			dragPanInteraction?.setActive(toggleFollow.dataset.active == 'false');
+		})
 	}
 
 
@@ -1822,6 +1889,7 @@ async function main() {
 		let rotateArrow = document.querySelector('.ol-rotate');
 		let layersButton = document.querySelector('#layers');
 		let attackSliderClose = document.querySelector('#attack-slider-close');
+		let zoomContainer = document.querySelector('.ol-zoom');
 
 		document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 		document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -1852,6 +1920,29 @@ async function main() {
 		ops.replaceChildren('INVENTORY', invTotalSpan);
 
 		selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+	}
+
+
+	/* Доработка карты */
+	{
+		var dragPanInteraction;
+		var doubleClickZoomInteraction;
+		var toolbar = new Toolbar();
+
+		map.getInteractions().forEach(interaction => {
+			switch (interaction.constructor) {
+				case ol.interaction.DragPan:
+					dragPanInteraction = interaction;
+					break;
+				case ol.interaction.DoubleClickZoom:
+					doubleClickZoomInteraction = interaction;
+					break;
+			}
+		});
+		dragPanInteraction?.setActive(localStorage.getItem('follow') == 'false');
+		doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
+
+		map.addControl(toolbar);
 	}
 
 
@@ -1986,26 +2077,28 @@ async function main() {
 
 	/* Меню настроек */
 	{
-		let gameSettingsPopup = document.querySelector('.settings.popup');
-		let gameSettingsContent = document.querySelector('.settings-content');
-		let userscriptSettingsMenu = createSettingsMenu();
-		document.querySelector('.topleft-container').appendChild(userscriptSettingsMenu);
+		let isSettingsMenuOpened = false;
+
+		let settingsMenu = createSettingsMenu();
+		document.querySelector('.topleft-container').appendChild(settingsMenu);
 
 		let settingsButton = document.createElement('button');
-		settingsButton.classList.add('sbgcui_settings_button');
-		settingsButton.innerText = 'Настройки SBG CUI';
-		settingsButton.addEventListener('click', _ => {
-			gameSettingsPopup.classList.add('hidden');
-			userscriptSettingsMenu.classList.toggle('sbgcui_hidden');
+		settingsButton.classList.add('fa-solid', 'fa-gears');
+		settingsButton.addEventListener('click', () => {
+			settingsMenu.classList.toggle('sbgcui_hidden');
+			isSettingsMenuOpened = !isSettingsMenuOpened;
 		});
-		gameSettingsContent.appendChild(settingsButton);
+		toolbar.addItem(settingsButton, 1);
 
 		document.body.addEventListener('click', event => {
 			if (
-				!userscriptSettingsMenu.classList.contains('sbgcui_hidden') &&
-				!event.target.closest('.sbgcui_settings') &&
-				!event.target.closest('.sbgcui_settings_button')
-			) { closeSettingsMenu(); }
+				isSettingsMenuOpened &&
+				event.target != settingsButton &&
+				!event.target.closest('.sbgcui_settings')
+			) {
+				closeSettingsMenu();
+				isSettingsMenuOpened = false;
+			}
 		});
 	}
 
@@ -2466,7 +2559,7 @@ async function main() {
 				}
 			});
 
-			zoomContainer.prepend(star);
+			toolbar.addItem(star, 2);
 			document.body.appendChild(favsList);
 		}
 	}
@@ -2888,6 +2981,7 @@ async function main() {
 		ol.Feature = OlFeature;
 	}
 
+
 	/* Показ радиуса катализатора */
 	{
 		function drawBlastRange() {
@@ -2909,5 +3003,171 @@ async function main() {
 		catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
 		attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
 		attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
+	}
+
+
+	/* Перезапрос инвью */
+	{
+		let button = document.createElement('button');
+
+		button.classList.add('fa-solid', 'fa-rotate');
+
+		button.addEventListener('click', () => {
+			map.getView().setCenter([0, 0]);
+			setTimeout(() => map.getView().setCenter(playerFeature.getGeometry().getCoordinates()), 1);
+		});
+
+		toolbar.addItem(button, 3);
+	}
+
+
+	/* Показ скорости */
+	{
+		const geolocation = new ol.Geolocation({
+			projection: map.getView().getProjection(),
+			tracking: true,
+			trackingOptions: { enableHighAccuracy: true },
+		});
+		const speedSpan = document.createElement('span');
+
+		speedSpan.classList.add('sbgcui_speed');
+		document.querySelector('.self-info').appendChild(speedSpan);
+
+		geolocation.on('change:speed', () => {
+			const speed_mps = geolocation.getSpeed() || 0;
+			speedSpan.innerText = (speed_mps * 3.6).toFixed(2) + ' km/h';
+		});
+	}
+
+
+	/* Выбор точки из кластера */
+	{
+		const closeButton = document.createElement('button');
+		const origin = document.createElement('div');
+		const overlay = document.createElement('div');
+		const originalOnClick = map.getListeners('click')[0];
+		const overlayTransitionsTime = 200;
+		let featuresAtPixel;
+		let isOverlayActive = false;
+		let lastShownCluster = [];
+		let mapClickEvent;
+
+		function featureClickHandler(event) {
+			if (!isOverlayActive) { return; }
+
+			const chosenFeatureGuid = event.target.getAttribute('sbgcui_guid');
+			const chosenFeature = featuresAtPixel.find(feature => feature.getId() == chosenFeatureGuid);
+
+			chosenFeature.set('sbgcui_chosenFeature', true, true);
+			mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
+
+			hideOverlay();
+			setTimeout(() => { originalOnClick(mapClickEvent) }, overlayTransitionsTime);
+		}
+
+		function hideOverlay() {
+			origin.childNodes.forEach(node => { node.classList.remove('sbgcui_cluster-iconWrapper-fullWidth'); });
+			overlay.classList.remove('sbgcui_cluster-overlay-blur');
+			setTimeout(() => {
+				overlay.classList.add('sbgcui_hidden');
+				isOverlayActive = false;
+			}, overlayTransitionsTime);
+		}
+
+		function mapClickHandler(event) {
+			mapClickEvent = event;
+			featuresAtPixel = map.getFeaturesAtPixel(mapClickEvent.pixel, {
+				hitTolerance: HIT_TOLERANCE,
+				layerFilter: layer => layer.get('name') == 'points',
+			});
+			let featuresToDisplay = featuresAtPixel.slice();
+
+			if (featuresToDisplay.length <= 1) {
+				featuresToDisplay[0]?.set('sbgcui_chosenFeature', true, true);
+				originalOnClick(mapClickEvent);
+			} else {
+				if (featuresToDisplay.length > MAX_DISPLAYED_CLUSTER) { // Показываем ограниченное кол-во, чтобы выглядело аккуратно.
+					featuresToDisplay = featuresToDisplay.reduceRight(reduceFeatures, []); // Не выводим показанные в прошлый раз точки если их больше ограничения.
+				}
+
+				spreadFeatures(featuresToDisplay);
+				showOverlay();
+				lastShownCluster = featuresToDisplay;
+			}
+		}
+
+		function reduceFeatures(acc, feature, index) {
+			const isExtraFeatures = MAX_DISPLAYED_CLUSTER - acc.length <= index;
+			const isFreeSlots = acc.length < MAX_DISPLAYED_CLUSTER;
+			const isShownLastTime = lastShownCluster.includes(feature);
+
+			if (!isFreeSlots) { return acc; }
+
+			if (isShownLastTime) {
+				if (!isExtraFeatures) { acc.push(feature); }
+			} else {
+				acc.push(feature);
+			}
+
+			return acc;
+		}
+
+		function showOverlay() {
+			overlay.classList.remove('sbgcui_hidden');
+			setTimeout(() => {
+				overlay.classList.add('sbgcui_cluster-overlay-blur');
+				isOverlayActive = true;
+			}, 10);
+		}
+
+		function spreadFeatures(features) {
+			const angle = 360 / features.length;
+
+			origin.innerHTML = '';
+
+			features.forEach((feature, index) => {
+				const guid = feature.getId();
+				const icon = document.createElement('div');
+				const line = document.createElement('div');
+				const wrapper = document.createElement('div');
+
+				getPointData(guid, false)
+					.then(data => {
+						icon.style.backgroundImage = data.i ? `url("https://lh3.googleusercontent.com/${data.i}=s60")` : 'unset';
+						icon.style.borderColor = `var(--team-${data.te || 0})`;
+						icon.style.boxShadow = `0 0 20px 3px var(--team-${data.te || 0}), 0 0 5px 2px black`;
+						icon.style.setProperty('--sbgcui-point-title', `"${data.t.replaceAll('"', '\\22 ')}"`);
+						icon.style.setProperty('--sbgcui-point-level', `"${data.l}"`);
+					});
+
+				wrapper.classList.add('sbgcui_cluster-iconWrapper');
+				icon.classList.add('sbgcui_cluster-icon');
+				line.classList.add('sbgcui_cluster-line');
+
+				wrapper.style.transform = `rotate(${angle * index}deg)`;
+				icon.style.transform = `rotate(${-angle * index}deg)`;
+
+				wrapper.append(icon, line);
+				origin.appendChild(wrapper);
+
+				setTimeout(() => { wrapper.classList.add('sbgcui_cluster-iconWrapper-fullWidth'); }, 10);
+
+				icon.setAttribute('sbgcui_guid', guid);
+
+				icon.addEventListener('click', featureClickHandler);
+			});
+		}
+
+		closeButton.classList.add('sbgcui_button_reset', 'sbgcui_cluster-close', 'fa-solid', 'fa-circle-xmark');
+		origin.classList.add('sbgcui_cluster-center');
+		overlay.classList.add('sbgcui_cluster-overlay', 'sbgcui_hidden');
+
+		overlay.append(origin, closeButton);
+		document.body.appendChild(overlay);
+
+		closeButton.addEventListener('click', hideOverlay);
+
+		map.un('click', originalOnClick);
+		map.on('click', mapClickHandler);
 	}
 }
