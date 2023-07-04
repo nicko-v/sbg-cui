@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.6.1
+// @version      1.6.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.6.1';
+const USERSCRIPT_VERSION = '1.6.2';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -480,6 +480,7 @@ async function main() {
 	let profileNameSpan = document.querySelector('#pr-name');
 	let profilePopup = document.querySelector('.profile.popup');
 	let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
+	let regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
 	let selfExpSpan = document.querySelector('#self-info__exp');
 	let selfLvlSpan = document.querySelector('#self-info__explv');
 	let selfNameSpan = document.querySelector('#self-info__name');
@@ -519,7 +520,7 @@ async function main() {
 			originalFetch(url, options)
 				.then(async response => {
 					let clonedResponse = response.clone();
-					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview|draw)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
+					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview|draw|profile)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
 
 					if (path == null) { resolve(response); return; }
 
@@ -649,6 +650,14 @@ async function main() {
 									parsedResponse.data = parsedResponse.data.filter(point => point.d <= maxDistance);
 									const modifiedResponse = createResponse(parsedResponse, response);
 									resolve(modifiedResponse);
+								}
+								break;
+							case 'profile':
+								if ('data' in parsedResponse) {
+									const regDate = Date.parse(parsedResponse.data.created_at);
+									const dateNow = Date.now();
+									const days = Math.trunc((dateNow - regDate) / 1000 / 60 / 60 / 24);
+									regDateSpan.style.setProperty('--sbgcui-reg-date', days);
 								}
 								break;
 						}

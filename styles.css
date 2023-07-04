@@ -443,6 +443,19 @@ body {
 	width: 100%;
 }
 
+.pr-stat__age > .pr-stat-val {
+	position: relative;
+}
+
+.pr-stat__age > .pr-stat-val::after {
+	bottom: -1.2em;
+	color: var(--text-disabled);
+	content: "(" counter(sbgcui-reg-date) " d)";
+	counter-reset: sbgcui-reg-date var(--sbgcui-reg-date);
+	position: absolute;
+	right: 0;
+}
+
 .toastify:nth-child(n+4) {
 	display: none;
 }
