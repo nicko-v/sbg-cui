@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.6.2
+// @version      1.6.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.6.2';
+const USERSCRIPT_VERSION = '1.6.3';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3106,6 +3106,11 @@ async function main() {
 	/* Выбор точки из кластера */
 	{
 		const closeButton = document.createElement('button');
+		const cooldownGradient = `conic-gradient(
+			#0000 var(--sbgcui-cluster-cooldown, 100%),
+			var(--sbgcui-cluster-team, #000) var(--sbgcui-cluster-cooldown, 100%) calc(var(--sbgcui-cluster-cooldown, 100%) + 1%),
+			#0007 var(--sbgcui-cluster-cooldown, 100%) 100%
+			)`;
 		const origin = document.createElement('div');
 		const overlay = document.createElement('div');
 		const originalOnClick = map.getListeners('click')[0];
@@ -3114,6 +3119,7 @@ async function main() {
 		let isOverlayActive = false;
 		let lastShownCluster = [];
 		let mapClickEvent;
+		let cooldownProgressBarIntervals = [];
 
 		function featureClickHandler(event) {
 			if (!isOverlayActive) { return; }
@@ -3133,6 +3139,7 @@ async function main() {
 			overlay.classList.remove('sbgcui_cluster-overlay-blur');
 			setTimeout(() => {
 				overlay.classList.add('sbgcui_hidden');
+				cooldownProgressBarIntervals.forEach(interval => { clearInterval(interval); });
 				isOverlayActive = false;
 			}, overlayTransitionsTime);
 		}
@@ -3181,6 +3188,7 @@ async function main() {
 				overlay.classList.add('sbgcui_cluster-overlay-blur');
 				isOverlayActive = true;
 			}, 10);
+			cooldownProgressBarIntervals = [];
 		}
 
 		function spreadFeatures(features) {
@@ -3194,13 +3202,33 @@ async function main() {
 				const line = document.createElement('div');
 				const wrapper = document.createElement('div');
 
+				const cooldownTimestamp = JSON.parse(localStorage.getItem('cooldowns'))?.[guid]?.t;
+				if (cooldownTimestamp) {
+					const interval = setInterval(() => {
+						const cooldownSec = (cooldownTimestamp - Date.now()) / 1000;
+						const gradientPercentage = Math.trunc(100 - cooldownSec / DISCOVERY_COOLDOWN * 100);
+						
+						if (cooldownSec <= DISCOVERY_COOLDOWN && cooldownSec >= 0) {
+							icon.style.setProperty('--sbgcui-cluster-cooldown', `${gradientPercentage}%`);
+						} else {
+							clearInterval(interval);
+							icon.style.removeProperty('--sbgcui-cluster-cooldown');
+						}
+					}, 1000);
+					cooldownProgressBarIntervals.push(interval);
+					icon.style.backgroundImage = cooldownGradient;
+				}
+
 				getPointData(guid, false)
 					.then(data => {
-						icon.style.backgroundImage = data.i ? `url("https://lh3.googleusercontent.com/${data.i}=s60")` : 'unset';
+						const bgImage = `url("https://lh3.googleusercontent.com/${data.i}=s60")`;
+						icon.style.backgroundImage += icon.style.backgroundImage.length ? ', ' : '';
+						icon.style.backgroundImage += bgImage;
 						icon.style.borderColor = `var(--team-${data.te || 0})`;
 						icon.style.boxShadow = `0 0 20px 3px var(--team-${data.te || 0}), 0 0 5px 2px black`;
 						icon.style.setProperty('--sbgcui-point-title', `"${data.t.replaceAll('"', '\\22 ')}"`);
 						icon.style.setProperty('--sbgcui-point-level', `"${data.l}"`);
+						icon.style.setProperty('--sbgcui-cluster-team', `var(--team-${data.te})`);
 					});
 
 				wrapper.classList.add('sbgcui_cluster-iconWrapper');
