@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.6.3
+// @version      1.6.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.6.3';
+const USERSCRIPT_VERSION = '1.6.4';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3139,7 +3139,7 @@ async function main() {
 			overlay.classList.remove('sbgcui_cluster-overlay-blur');
 			setTimeout(() => {
 				overlay.classList.add('sbgcui_hidden');
-				cooldownProgressBarIntervals.forEach(interval => { clearInterval(interval); });
+				cooldownProgressBarIntervals.forEach(intervalID => { clearInterval(intervalID); });
 				isOverlayActive = false;
 			}, overlayTransitionsTime);
 		}
@@ -3204,18 +3204,9 @@ async function main() {
 
 				const cooldownTimestamp = JSON.parse(localStorage.getItem('cooldowns'))?.[guid]?.t;
 				if (cooldownTimestamp) {
-					const interval = setInterval(() => {
-						const cooldownSec = (cooldownTimestamp - Date.now()) / 1000;
-						const gradientPercentage = Math.trunc(100 - cooldownSec / DISCOVERY_COOLDOWN * 100);
-						
-						if (cooldownSec <= DISCOVERY_COOLDOWN && cooldownSec >= 0) {
-							icon.style.setProperty('--sbgcui-cluster-cooldown', `${gradientPercentage}%`);
-						} else {
-							clearInterval(interval);
-							icon.style.removeProperty('--sbgcui-cluster-cooldown');
-						}
-					}, 1000);
-					cooldownProgressBarIntervals.push(interval);
+					updateCooldown(icon, cooldownTimestamp)
+					const intervalID = setInterval(() => { updateCooldown(icon, cooldownTimestamp, intervalID); }, 1000);
+					cooldownProgressBarIntervals.push(intervalID);
 					icon.style.backgroundImage = cooldownGradient;
 				}
 
@@ -3247,6 +3238,18 @@ async function main() {
 
 				icon.addEventListener('click', featureClickHandler);
 			});
+		}
+
+		function updateCooldown(icon, cooldownTimestamp, intervalID) {
+			const cooldownSec = (cooldownTimestamp - Date.now()) / 1000;
+			const gradientPercentage = Math.trunc(100 - cooldownSec / DISCOVERY_COOLDOWN * 100);
+
+			if (cooldownSec <= DISCOVERY_COOLDOWN && cooldownSec >= 0) {
+				icon.style.setProperty('--sbgcui-cluster-cooldown', `${gradientPercentage}%`);
+			} else {
+				clearInterval(intervalID);
+				icon.style.removeProperty('--sbgcui-cluster-cooldown');
+			}
 		}
 
 		closeButton.classList.add('sbgcui_button_reset', 'sbgcui_cluster-close', 'fa-solid', 'fa-circle-xmark');
