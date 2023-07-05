@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.6.4
+// @version      1.7.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.6.4';
+const USERSCRIPT_VERSION = '1.7.0';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -491,6 +491,9 @@ async function main() {
 	let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 	let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 
+	let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
+	let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
+
 	let lastOpenedPoint = {};
 	let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
 
@@ -646,11 +649,48 @@ async function main() {
 								break;
 							case 'draw':
 								const maxDistance = config.drawing.maxDistance;
-								if ('data' in parsedResponse && maxDistance != -1) {
-									parsedResponse.data = parsedResponse.data.filter(point => point.d <= maxDistance);
+								if (!'data' in parsedResponse) { break; }
+
+								if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid) {
+									const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+									const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+
+									parsedResponse.data = targetPoint ? [targetPoint] : [];
+
+									if (hiddenPoints > 0) {
+										const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																		из списка, так как вы находитесь в режиме рисования "Звезда".`;
+										const toast = createToast(message, 'top left');
+
+										toast.options.className = 'sbgcui_toast-selection';
+										toast.showToast();
+									}
+
+									const modifiedResponse = createResponse(parsedResponse, response);
+									resolve(modifiedResponse);
+
+									break;
+								}
+
+								if (maxDistance != -1) {
+									const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance);
+									const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
+
+									if (hiddenPoints > 0) {
+										const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																		из списка согласно настройкам максимальной длины линии (${config.drawing.maxDistance} м).`;
+										const toast = createToast(message, 'top left');
+
+										toast.options.className = 'sbgcui_toast-selection';
+										toast.showToast();
+
+										parsedResponse.data = suitablePoints;
+									}
+
 									const modifiedResponse = createResponse(parsedResponse, response);
 									resolve(modifiedResponse);
 								}
+
 								break;
 							case 'profile':
 								if ('data' in parsedResponse) {
@@ -1543,7 +1583,7 @@ async function main() {
 		element?.dispatchEvent(clickEvent);
 	}
 
-	function createToast(text = '', position = 'top left', duration = 4000, container = null) {
+	function createToast(text = '', position = 'top left', duration = 3000, container = null) {
 		let parts = position.split(/\s+/);
 		let toast = Toastify({
 			text,
@@ -3263,5 +3303,71 @@ async function main() {
 
 		map.un('click', originalOnClick);
 		map.on('click', mapClickHandler);
+	}
+
+
+	/* Режим рисования звезды */
+	{
+		const starModeButton = document.createElement('button');
+
+		function toggleStarMode() {
+			const confirmMessage = `Использовать предыдущую сохранённую точку "${starModeTarget?.name}" в качестве центра звезды?`;
+			let toastMessage;
+
+			isStarMode = !isStarMode;
+			localStorage.setItem('sbgcui_isStarMode', +isStarMode);
+
+			if (isStarMode) {
+				starModeButton.style.opacity = 1;
+				starModeButton.classList.add('fa-fade');
+
+				if (starModeTarget && confirm(confirmMessage)) {
+					starModeButton.classList.remove('fa-fade');
+					toastMessage = `Включён режим рисования "Звезда". <br /><br />
+										Точка "<span style="color: var(--selection)">${starModeTarget.name}</span>" будет считаться центром звезды. <br /><br />
+										Рефы от прочих точек будут скрыты в списке рисования.`;
+				} else {
+					pointPopup.addEventListener('pointPopupOpened', onPointPopupOpened, { once: true });
+					toastMessage = `Включён режим рисования "Звезда". <br /><br />
+									Следующая открытая точка будет считаться центром звезды. <br /><br />
+									Рефы от прочих точек будут скрыты в списке рисования.`;
+				}
+			} else {
+				starModeButton.style.opacity = 0.5;
+				starModeButton.classList.remove('fa-fade');
+
+				pointPopup.removeEventListener('pointPopupOpened', onPointPopupOpened);
+
+				toastMessage = 'Режим рисования "Звезда" отключён.';
+			}
+
+			const toast = createToast(toastMessage, 'top left', isStarMode ? 6000 : undefined);
+
+			toast.options.className = 'sbgcui_toast-selection';
+			toast.showToast();
+		}
+
+		function onPointPopupOpened() {
+			starModeTarget = {
+				guid: pointPopup.dataset.guid,
+				name: pointTitleSpan.innerText
+			};
+			localStorage.setItem('sbgcui_starModeTarget', JSON.stringify(starModeTarget));
+
+			starModeButton.classList.remove('fa-fade');
+
+			const message = `Точка "<span style="color: var(--selection)">${pointTitleSpan.innerText}</span>" выбрана центром для рисования звезды.`;
+			const toast = createToast(message, 'top left');
+
+			toast.options.className = 'sbgcui_toast-selection';
+			toast.showToast();
+		}
+
+
+		starModeButton.classList.add('fa-solid', 'fa-asterisk');
+		starModeButton.style.opacity = isStarMode ? 1 : 0.5;
+		starModeButton.addEventListener('click', toggleStarMode);
+
+		toolbar.addItem(starModeButton, 4);
 	}
 }
