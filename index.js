@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.7.0
+// @version      1.7.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.7.0';
+const USERSCRIPT_VERSION = '1.7.1';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -781,7 +781,7 @@ async function main() {
 					let amountToDelete = 0;
 					let itemName = ITEMS_TYPES[itemType].eng;
 
-					if (itemName == 'refs') {
+					if (itemName == 'refs' && !(isStarMode && itemGuid == starModeTarget?.guid)) {
 						if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) {
 							itemMaxAmount = -1;
 						} else if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) {
@@ -3362,7 +3362,6 @@ async function main() {
 			toast.options.className = 'sbgcui_toast-selection';
 			toast.showToast();
 		}
-
 
 		starModeButton.classList.add('fa-solid', 'fa-asterisk');
 		starModeButton.style.opacity = isStarMode ? 1 : 0.5;
