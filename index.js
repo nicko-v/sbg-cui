@@ -1739,10 +1739,13 @@ async function main() {
 
 		if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
 			config.maxAmountInBag = {
-				cores: { I: 100, II: 100, III: 100, IV: 100, V: 100, VI: 150, VII: 150, VIII: 120, IX: -1, X: -1 },
+				cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 150, VII: 150, VIII: 120, IX: -1, X: -1 },
 				catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
 				refs: { allied: 20, hostile: 10 },
 			};
+			config.autoSelect.upgrade = 'max';
+			config.mapFilters.branding = 'custom';
+			config.mapFilters.brandingColor = '#4433DD';
 			localStorage.setItem('sbgcui_config', JSON.stringify(config));
 		}
 	}
