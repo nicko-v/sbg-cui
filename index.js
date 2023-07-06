@@ -1673,12 +1673,12 @@ async function main() {
 	}
 
 	function showXp(amount) {
-		// if (amount == 0) { return; }
+		if (amount == 0) { return; }
 
 		let xpSpan = document.createElement('span');
 		xpSpan.classList.add('sbgcui_xpdiff');
 
-		xpSpan.innerText = amount == 0 ? 'ВЕРНИ ЭКСПУ, КОТ' : `+${amount}xp`;
+		xpSpan.innerText = `+${amount}xp`;
 		xpContainer.appendChild(xpSpan);
 
 		setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
