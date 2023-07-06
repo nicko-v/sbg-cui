@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.7.2
+// @version      1.7.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.7.2';
+const USERSCRIPT_VERSION = '1.7.3';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -1673,10 +1673,12 @@ async function main() {
 	}
 
 	function showXp(amount) {
+		// if (amount == 0) { return; }
+
 		let xpSpan = document.createElement('span');
 		xpSpan.classList.add('sbgcui_xpdiff');
 
-		xpSpan.innerText = `+${amount}xp`;
+		xpSpan.innerText = amount == 0 ? 'ВЕРНИ ЭКСПУ, КОТ' : `+${amount}xp`;
 		xpContainer.appendChild(xpSpan);
 
 		setTimeout(_ => { xpSpan.classList.add('sbgcui_xpdiff-out'); }, 100);
@@ -2169,6 +2171,8 @@ async function main() {
 					}
 				})
 				.catch(error => {
+					if (error.message.match(/полностью|fully/)) { return; }
+					
 					let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
 
 					toast.options.className = 'error-toast';
