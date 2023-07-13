@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.7.3
+// @version      1.7.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.7.3';
+const USERSCRIPT_VERSION = '1.7.4';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3177,10 +3177,12 @@ async function main() {
 			const chosenFeature = featuresAtPixel.find(feature => feature.getId() == chosenFeatureGuid);
 
 			chosenFeature.set('sbgcui_chosenFeature', true, true);
-			mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
 
 			hideOverlay();
-			setTimeout(() => { originalOnClick(mapClickEvent) }, overlayTransitionsTime);
+			setTimeout(() => {
+				mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
+				originalOnClick(mapClickEvent);
+			}, overlayTransitionsTime);
 		}
 
 		function hideOverlay() {
