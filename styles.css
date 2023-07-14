@@ -1079,8 +1079,25 @@ li[sbgcui-excluded-core]>span {
 	width: 4px;
 }
 
+.sbgcui_swipe-cards-arrow {
+	animation-duration: 2000ms;
+	animation-iteration-count: infinite;
+	animation-name: move-left-fade-out;
+	animation-timing-function: ease-out;
+	bottom: 10px;
+	color: var(--text-disabled);
+	font-size: 2em;
+	position: absolute;
+	right: 10px;
+}
+
 .sbgcui_hidden {
 	display: none;
+}
+
+@keyframes move-left-fade-out {
+	from { transform: translateX(0); opacity: 1; }
+	to   { transform: translateX(-40px); opacity: 0; }
 }
 
 @media (orientation: portrait) {

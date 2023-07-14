@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.7.4
+// @version      1.8.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,12 +11,13 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.7.4';
+const USERSCRIPT_VERSION = '1.8.0';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
 const MIN_FREE_SPACE = 100;
 const DISCOVERY_COOLDOWN = 90;
+const PLAYER_RANGE = 45;
 const HIT_TOLERANCE = 15;
 const MAX_DISPLAYED_CLUSTER = 8;
 const INVIEW_POINTS_DATA_TTL = 7000;
@@ -101,13 +102,13 @@ fetch('/script.js')
 				constructor(options) {
 					super(options);
 					map = this;
-					window.dispatchEvent(new Event('mapReady'));
+					setTimeout(() => { window.dispatchEvent(new Event('mapReady')); }, 100);
 				}
 
 				forEachFeatureAtPixel(pixel, callback, options = {}) {
 					const isShowInfoCallback = callback.toString().includes('showInfo(');
 
-					options.hitTolerance = HIT_TOLERANCE;
+					options.hitTolerance = isFinite(options.hitTolerance) ? options.hitTolerance : HIT_TOLERANCE;
 
 					if (isShowInfoCallback) {
 						const proxiedCallback = (feature, layer) => {
@@ -780,7 +781,7 @@ async function main() {
 					let itemMaxAmount = -1;
 					let amountToDelete = 0;
 					let itemName = ITEMS_TYPES[itemType].eng;
-					
+
 					if (itemName == 'refs') {
 						if (isStarMode && (itemLevel == starModeTarget?.guid)) {
 							itemMaxAmount = -1;
@@ -2175,7 +2176,7 @@ async function main() {
 				})
 				.catch(error => {
 					if (error.message.match(/полностью|fully/)) { return; }
-					
+
 					let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
 
 					toast.options.className = 'error-toast';
@@ -3203,7 +3204,7 @@ async function main() {
 			});
 			let featuresToDisplay = featuresAtPixel.slice();
 
-			if (featuresToDisplay.length <= 1) {
+			if (featuresToDisplay.length <= 1 || mapClickEvent.isSilent) { // isSilent: такой эвент генерируется при свайпе между карточками точек.
 				featuresToDisplay[0]?.set('sbgcui_chosenFeature', true, true);
 				originalOnClick(mapClickEvent);
 			} else {
@@ -3379,5 +3380,123 @@ async function main() {
 		starModeButton.addEventListener('click', toggleStarMode);
 
 		toolbar.addItem(starModeButton, 4);
+	}
+
+
+	/* Переключение между точками */
+	{
+		const arrow = document.createElement('i');
+		const shownPoints = new Set();
+		const view = map.getView();
+		let touchMoveCoords = [];
+
+		function isPointInRange(point) {
+			const playerCoords = playerFeature.getGeometry().getCoordinates();
+			const pointCoords = point.getGeometry().getCoordinates();
+			const distanceToPlayer = Math.sqrt(Math.pow(pointCoords[0] - playerCoords[0], 2) + Math.pow(pointCoords[1] - playerCoords[1], 2));
+
+			return distanceToPlayer < toOLMeters(PLAYER_RANGE);
+		}
+
+		function getPointsInRange() {
+			const playerCoords = playerFeature.getGeometry().getCoordinates();
+			const playerPixel = map.getPixelFromCoordinate(playerCoords);
+			const resolution = view.getResolution();
+			const hitTolerance = toOLMeters(PLAYER_RANGE) / resolution;
+
+			const pointsHit = map.getFeaturesAtPixel(playerPixel, {
+				hitTolerance,
+				layerFilter: layer => layer.get('name') == 'points',
+			});
+
+			const pointsInRange = pointsHit.filter(isPointInRange);
+
+			return pointsInRange;
+		}
+
+		function pointPopupCloseHandler() {
+			playerFeature.un('change', toggleArrowVisibility);
+		}
+
+		function pointPopupOpenHandler() {
+			toggleArrowVisibility();
+			playerFeature.on('change', toggleArrowVisibility);
+		}
+
+		function toggleArrowVisibility() {
+			if (getPointsInRange().length > 1) {
+				arrow.classList.remove('sbgcui_hidden');
+			} else {
+				arrow.classList.add('sbgcui_hidden');
+			}
+		}
+
+		function touchEndHandler() {
+			if (touchMoveCoords.length == 0) { return; }
+
+			const isRtlSwipe = touchMoveCoords.every((coords, i, arr) => coords.x <= arr[i - 1]?.x || i == 0);
+			if (!isRtlSwipe) { return; }
+
+			const xCoords = touchMoveCoords.map(coords => coords.x);
+			const yCoords = touchMoveCoords.map(coords => coords.y);
+			const minX = Math.min(...xCoords);
+			const maxX = Math.max(...xCoords);
+			const minY = Math.min(...yCoords);
+			const maxY = Math.max(...yCoords);
+			if (maxY - minY > 70) { return; }
+			if (maxX - minX < 50) { return; }
+
+
+			const pointsInRange = getPointsInRange();
+
+			if (pointsInRange.every(point => shownPoints.has(point.getId()))) { shownPoints.clear(); }
+			if (pointsInRange.every(point => !shownPoints.has(point.getId()))) { shownPoints.clear(); }
+
+			const nextPoint = pointsInRange.find(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
+
+			if (nextPoint == undefined) { return; }
+
+			shownPoints.add(nextPoint.getId());
+
+
+			const fakeEvent = {};
+
+			fakeEvent.type = 'click';
+			fakeEvent.pixel = map.getPixelFromCoordinate(nextPoint.getGeometry().getCoordinates());
+			fakeEvent.originalEvent = {};
+			fakeEvent.isSilent = true; // Такой эвент будет проигнорирован функцией показа ромашки для кластера.
+
+			nextPoint.set('sbgcui_chosenFeature', true, true);
+			pointPopup.classList.add('hidden');
+			map.dispatchEvent(fakeEvent);
+		}
+
+		function touchMoveHandler(event) {
+			if (event.touches.length > 1 || event.touches.item(0).target.closest('.deploy-slider-wrp') !== null) {
+				Object.seal(touchMoveCoords);
+				return;
+			}
+
+			if (Object.isSealed(touchMoveCoords)) { return; }
+
+			const { clientX: x, clientY: y } = event.touches.item(0);
+
+			touchMoveCoords.push({ x, y });
+		}
+
+		function touchStartHandler() {
+			touchMoveCoords = [];
+		}
+
+		arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa-solid', 'fa-angles-left');
+		pointPopup.appendChild(arrow);
+
+		pointPopup.addEventListener('pointPopupOpened', pointPopupOpenHandler);
+		pointPopup.addEventListener('pointPopupClosed', pointPopupCloseHandler);
+
+
+		pointPopup.addEventListener('touchstart', touchStartHandler);
+		pointPopup.addEventListener('touchmove', touchMoveHandler);
+		pointPopup.addEventListener('touchend', touchEndHandler);
 	}
 }
