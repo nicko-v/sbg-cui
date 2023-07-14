@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.1
+// @version      1.8.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.1';
+const USERSCRIPT_VERSION = '1.8.2';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3487,7 +3487,7 @@ async function main() {
 		}
 
 		arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa-solid', 'fa-angles-left');
-		pointPopup.appendChild(arrow);
+		document.querySelector('.i-stat').appendChild(arrow);
 
 		pointPopup.addEventListener('pointPopupOpened', pointPopupOpenHandler);
 		pointPopup.addEventListener('pointPopupClosed', pointPopupCloseHandler);

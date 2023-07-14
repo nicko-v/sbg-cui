@@ -258,6 +258,10 @@ body {
 	box-shadow: 0 0 2px var(--shadow);
 }
 
+.i-stat {
+	position: relative;
+}
+
 .info.popup>.popup-close {
 	font-size: 1.75em;
 }
@@ -1084,11 +1088,11 @@ li[sbgcui-excluded-core]>span {
 	animation-iteration-count: infinite;
 	animation-name: move-left-fade-out;
 	animation-timing-function: ease-out;
-	bottom: 10px;
 	color: var(--text-disabled);
 	font-size: 2em;
 	position: absolute;
 	right: 10px;
+	top: 0;
 }
 
 .sbgcui_hidden {
