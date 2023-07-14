@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.0
+// @version      1.8.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.0';
+const USERSCRIPT_VERSION = '1.8.1';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3432,7 +3432,7 @@ async function main() {
 		}
 
 		function touchEndHandler() {
-			if (touchMoveCoords.length == 0) { return; }
+			if (Object.isSealed(touchMoveCoords) || touchMoveCoords.length == 0) { return; }
 
 			const isRtlSwipe = touchMoveCoords.every((coords, i, arr) => coords.x <= arr[i - 1]?.x || i == 0);
 			if (!isRtlSwipe) { return; }
@@ -3472,11 +3472,6 @@ async function main() {
 		}
 
 		function touchMoveHandler(event) {
-			if (event.touches.length > 1 || event.touches.item(0).target.closest('.deploy-slider-wrp') !== null) {
-				Object.seal(touchMoveCoords);
-				return;
-			}
-
 			if (Object.isSealed(touchMoveCoords)) { return; }
 
 			const { clientX: x, clientY: y } = event.touches.item(0);
@@ -3484,8 +3479,11 @@ async function main() {
 			touchMoveCoords.push({ x, y });
 		}
 
-		function touchStartHandler() {
+		function touchStartHandler(event) {
 			touchMoveCoords = [];
+			if (event.touches.length > 1 || event.touches.item(0).target.closest('.deploy-slider-wrp') !== null) {
+				Object.seal(touchMoveCoords);
+			}
 		}
 
 		arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa-solid', 'fa-angles-left');
