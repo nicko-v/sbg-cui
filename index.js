@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.3
+// @version      1.8.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.3';
+const USERSCRIPT_VERSION = '1.8.4';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3494,6 +3494,8 @@ async function main() {
 			const statTitles = document.querySelectorAll('.pr-stat-title');
 
 			compareButton.toggleAttribute('sbgcui_self_stats');
+			compareButton.classList.toggle('fa-scale-unbalanced');
+			compareButton.classList.toggle('fa-scale-unbalanced-flip');
 
 			statTitles.forEach(span => {
 				const title = span.innerText;
@@ -3549,6 +3551,7 @@ async function main() {
 		function reset() {
 			const statValues = document.querySelectorAll('.pr-stat-val');
 			compareButton.removeAttribute('sbgcui_self_stats');
+			compareButton.classList.replace('fa-scale-unbalanced-flip', 'fa-scale-unbalanced');
 			statValues.forEach(span => {
 				span.style.removeProperty('--sbgcui-diff-color');
 			});
