@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.4
+// @version      1.8.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.4';
+const USERSCRIPT_VERSION = '1.8.5';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -1583,7 +1583,7 @@ async function main() {
 		element?.dispatchEvent(clickEvent);
 	}
 
-	function createToast(text = '', position = 'top left', duration = 3000, container = null) {
+	function createToast(text = '', position = 'top left', duration = 3000, className = 'interaction-toast') {
 		let parts = position.split(/\s+/);
 		let toast = Toastify({
 			text,
@@ -1591,8 +1591,8 @@ async function main() {
 			gravity: parts[0],
 			position: parts[1],
 			escapeMarkup: false,
-			className: 'interaction-toast',
-			selector: container,
+			className,
+			style,
 		});
 		toast.options.id = Math.round(Math.random() * 1e5);;
 		toast.options.onClick = () => toast.hideToast();
@@ -2363,10 +2363,10 @@ async function main() {
 				let toastText = diffs.length ?
 					`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` :
 					'Ничего не изменилось с прошлого сохранения.';
-				let toast = createToast(toastText, 'bottom center', -1);
+				let toast = createToast(toastText, 'bottom center', -1, 'sbgcui_compare_stats-toast');
 
-				toast.options.className = 'sbgcui_compare_stats-toast';
 				toast.showToast();
+				toast.toastElement.style.setProperty('--sbgcui-toast-color', `var(--team-${currentStats.team})`);
 			});
 		}
 

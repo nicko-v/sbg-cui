@@ -500,11 +500,18 @@ body {
 	color: var(--text);
 }
 
-.sbgcui_toast-team,
-.sbgcui_compare_stats-toast {
+.sbgcui_toast-team {
 	border: 1px var(--sbgcui-branding-color) solid;
 	border-color: var(--sbgcui-branding-color);
 	box-shadow: 0 0 15px var(--sbgcui-branding-color);
+	background: var(--background);
+	color: var(--text);
+}
+
+.sbgcui_compare_stats-toast {
+	border: 1px var(--sbgcui-toast-color) solid;
+	border-color: var(--sbgcui-toast-color);
+	box-shadow: 0 0 15px var(--sbgcui-toast-color);
 	background: var(--background);
 	color: var(--text);
 }
