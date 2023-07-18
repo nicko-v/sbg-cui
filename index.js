@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.2
+// @version      1.8.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.2';
+const USERSCRIPT_VERSION = '1.8.3';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -695,10 +695,7 @@ async function main() {
 								break;
 							case 'profile':
 								if ('data' in parsedResponse) {
-									const regDate = Date.parse(parsedResponse.data.created_at);
-									const dateNow = Date.now();
-									const days = Math.trunc((dateNow - regDate) / 1000 / 60 / 60 / 24);
-									regDateSpan.style.setProperty('--sbgcui-reg-date', days);
+									regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.data.created_at));
 								}
 								break;
 						}
@@ -728,8 +725,8 @@ async function main() {
 			.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 	}
 
-	async function getPlayerData(guid) {
-		return fetch(`/api/profile?guid=${guid}`, {
+	async function getPlayerData(guid, name) {
+		return fetch(`/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`, {
 			headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
 			method: "GET",
 		})
@@ -1701,6 +1698,14 @@ async function main() {
 		return meters * rate;
 	}
 
+	function calcPlayingTime(regDateString) {
+		const regDate = Date.parse(regDateString);
+		const dateNow = Date.now();
+		const days = Math.trunc((dateNow - regDate) / 1000 / 60 / 60 / 24);
+
+		return days;
+	}
+
 
 	/* Данные о себе и версии игры */
 	{
@@ -2283,32 +2288,27 @@ async function main() {
 
 	/* Запись статы */
 	{
-		let compareStatsWrp = document.createElement('div');
-		let recordButton = document.createElement('button');
-		let compareButton = document.createElement('button');
-		let timestamp = document.createElement('span');
-		let prStatsDiv = document.querySelector('.pr-stats');
+		function recordStats() {
+			const playerName = profileNameSpan.innerText;
+			const isSelf = playerName == player.name;
+			const confirmMsg = `Сохранить ${isSelf ? 'вашу ' : ''}статистику ${isSelf ? '' : 'игрока '}на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.`;
 
-		let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
-
-		recordButton.innerText = 'Записать';
-		compareButton.innerText = 'Сравнить';
-
-		recordButton.addEventListener('click', _ => {
-			if (confirm('Сохранить вашу статистику на текущий момент? \nЭто действие перезапишет сохранённую ранее статистику.')) {
-				getPlayerData(player.guid).then(stats => {
-					let date = new Date();
-					localStorage.setItem('sbgcui_stats', JSON.stringify({ date, stats }));
-					timestamp.innerText = `Последняя запись: \n${date.toLocaleString()}`;
+			if (confirm(confirmMsg)) {
+				getPlayerData(null, playerName).then(stats => {
+					const date = new Date();
+					localStorage.setItem(`sbgcui_stats_${playerName}`, JSON.stringify({ date, stats }));
+					timestamp.innerText = `Последнее сохранение: \n${date.toLocaleString()}`;
 				});
 			}
-		});
+		}
 
-		compareButton.addEventListener('click', _ => {
-			let previousStats = JSON.parse(localStorage.getItem('sbgcui_stats'), (key, value) => key == 'date' ? new Date(value) : value);
+		function compareStats() {
+			const playerName = profileNameSpan.innerText;
+			const isSelf = playerName == player.name;
+			const previousStats = JSON.parse(localStorage.getItem(`sbgcui_stats_${playerName}`), (key, value) => key == 'date' ? new Date(value) : value);
 
 			if (!previousStats) {
-				let toast = createToast('Вы ещё не сохраняли свою статистику.');
+				const toast = createToast(`Вы ещё не сохраняли ${isSelf ? 'свою ' : ''}статистику${isSelf ? '' : ' этого игрока'}.`);
 
 				toast.options.className = 'error-toast';
 				toast.showToast();
@@ -2316,7 +2316,7 @@ async function main() {
 				return;
 			}
 
-			getPlayerData(player.guid).then(currentStats => {
+			getPlayerData(null, playerName).then(currentStats => {
 				let ms = new Date() - previousStats.date;
 				let dhms1 = [86400000, 3600000, 60000, 1000];
 				let dhms2 = ['day', 'hr', 'min', 'sec'];
@@ -2339,38 +2339,12 @@ async function main() {
 						let isPositive = diff > 0;
 						let statName;
 
-						switch (key) {
-							case 'discoveries':
-							case 'captures':
-							case 'level':
-							case 'cores_deployed':
-							case 'cores_destroyed':
-							case 'lines_destroyed':
-							case 'unique_captures':
-							case 'unique_visits':
-							case 'owned_points':
-								statName = key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' ');
-								break;
-							case 'xp':
-								statName = 'XP';
-								break;
-							case 'guard_line':
-								statName = 'Longest line ownership';
-								break;
-							case 'guard_point':
-								statName = 'Longest point ownership';
-								break;
-							case 'lines':
-								statName = 'Lines drawn';
-								break;
-							case 'max_line':
-								statName = 'Longest drawn line (m)';
-								break;
-							case 'neutralizes':
-								statName = 'Points neutralized';
-								break;
-							default:
-								if (!key.match(/created_at|name|player|team/)) { statName = key; }
+						if (!key.match(/created_at|name|player|team|xp|level/)) {
+							statName = i18next.t(`profile.stats.${key}`);
+						} else if (key == 'xp') {
+							statName = i18next.t('profile.stats.total-xp');
+						} else if (key == 'level') {
+							statName = i18next.t('profile.level');
 						}
 
 						if (statName) {
@@ -2386,17 +2360,30 @@ async function main() {
 					}
 				}
 
-				let toastText = diffs.length ? `Ваша статистика с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` : 'Ничего не изменилось с прошлого сохранения.';
-				let toast = createToast(toastText, 'bottom center', 20000);
+				let toastText = diffs.length ?
+					`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` :
+					'Ничего не изменилось с прошлого сохранения.';
+				let toast = createToast(toastText, 'bottom center', -1);
 
 				toast.options.className = 'sbgcui_compare_stats-toast';
 				toast.showToast();
 			});
-		});
-
-		if (previousStats) {
-			timestamp.innerText = `Последнее сохранение: \n${previousStats.date.toLocaleString()}`;
 		}
+
+		function updateTimestamp() {
+			const playerName = profileNameSpan.innerText;
+			const previousStats = JSON.parse(localStorage.getItem(`sbgcui_stats_${playerName}`), (key, value) => key == 'date' ? new Date(value) : value);
+			timestamp.innerText = previousStats ? `Последнее сохранение: \n${previousStats.date.toLocaleString()}` : '';
+		}
+
+		let compareStatsWrp = document.createElement('div');
+		let recordButton = document.createElement('button');
+		let compareButton = document.createElement('button');
+		let timestamp = document.createElement('span');
+		let prStatsDiv = document.querySelector('.pr-stats');
+
+		recordButton.innerText = 'Записать';
+		compareButton.innerText = 'Сравнить';
 
 		timestamp.classList.add('sbgcui_compare_stats-timestamp');
 
@@ -2405,13 +2392,9 @@ async function main() {
 
 		profilePopup.insertBefore(compareStatsWrp, prStatsDiv);
 
-		profilePopup.addEventListener('profilePopupOpened', _ => {
-			if (profileNameSpan.innerText == player.name) {
-				compareStatsWrp.classList.remove('sbgcui_hidden')
-			} else {
-				compareStatsWrp.classList.add('sbgcui_hidden')
-			}
-		});
+		recordButton.addEventListener('click', recordStats);
+		compareButton.addEventListener('click', compareStats);
+		profilePopup.addEventListener('profilePopupOpened', updateTimestamp);
 	}
 
 
@@ -3496,5 +3479,87 @@ async function main() {
 		pointPopup.addEventListener('touchstart', touchStartHandler);
 		pointPopup.addEventListener('touchmove', touchMoveHandler);
 		pointPopup.addEventListener('touchend', touchEndHandler);
+	}
+
+
+	/* Сравнение статы со своей */
+	{
+		const bottomButtons = document.querySelector('.pr-buttons');
+		const compareButton = document.createElement('button');
+
+		async function toggleValues() {
+			const playerStats = await getPlayerData(null, profileNameSpan.innerText);
+			const selfStats = await getPlayerData(player.guid);
+			const i18nextStats = i18next.getResourceBundle(i18next.resolvedLanguage).profile.stats;
+			const statTitles = document.querySelectorAll('.pr-stat-title');
+
+			compareButton.toggleAttribute('sbgcui_self_stats');
+
+			statTitles.forEach(span => {
+				const title = span.innerText;
+				let key = Object.entries(i18nextStats).find(e => e[1] == title)[0];
+
+				key = key.replace('total-xp', 'xp').replace('playing-since', 'created_at');
+
+				if (compareButton.hasAttribute('sbgcui_self_stats')) {
+					const diff = key == 'created_at' ? (Date.parse(selfStats[key]) - Date.parse(playerStats[key])) : (playerStats[key] - selfStats[key]);
+					const diffColor = diff > 0 ? 'red' : diff < 0 ? 'green' : '';
+
+					span.nextSibling.innerText = formatStatValue(key, selfStats[key]);
+					span.nextSibling.style.setProperty('--sbgcui-diff-color', diffColor);
+				} else {
+					span.nextSibling.innerText = formatStatValue(key, playerStats[key]);
+					span.nextSibling.style.removeProperty('--sbgcui-diff-color');
+				}
+			});
+
+			regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(compareButton.hasAttribute('sbgcui_self_stats') ? selfStats.created_at : playerStats.created_at));
+		}
+
+		function formatStatValue(key, value) {
+			const lang = i18next.resolvedLanguage;
+			const formatter = new Intl.NumberFormat(lang);
+
+			if (/^guard_/.test(key)) {
+				return i18next.t('units.n-days', { count: value });
+			}
+
+			switch (key) {
+				case 'max_line':
+					return value < 1000 ? i18next.t('units.m', { count: value }) : i18next.t('units.km', { count: value / 1000 });
+				case 'xp':
+					return `${formatter.format(value)} ${i18next.t('units.pts-xp')}`;
+				case 'created_at':
+					return new Date(value).toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' });
+				default:
+					return formatter.format(value);
+			}
+		}
+
+		function profileOpenHandler() {
+			if (player.name == profileNameSpan.innerText) {
+				compareButton.classList.add('sbgcui_hidden');
+			} else {
+				compareButton.classList.remove('sbgcui_hidden');
+			}
+
+			compareButton.removeAttribute('sbgcui_self_stats');
+		}
+
+		function reset() {
+			const statValues = document.querySelectorAll('.pr-stat-val');
+			compareButton.removeAttribute('sbgcui_self_stats');
+			statValues.forEach(span => {
+				span.style.removeProperty('--sbgcui-diff-color');
+			});
+		}
+
+		compareButton.classList.add('fa-solid', 'fa-scale-unbalanced', 'sbgcui_profile-compare');
+
+		compareButton.addEventListener('click', toggleValues);
+		profilePopup.addEventListener('profilePopupOpened', profileOpenHandler);
+		profilePopup.addEventListener('profilePopupClosed', reset);
+
+		bottomButtons.appendChild(compareButton);
 	}
 }

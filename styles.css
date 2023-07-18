@@ -424,6 +424,11 @@ body {
 	font-weight: bold;
 }
 
+.pr-buttons {
+	display: flex;
+	gap: 5px;
+}
+
 .self-info {
 	color: var(--sbgcui-branding-color);
 	font-weight: bold;
@@ -453,11 +458,15 @@ body {
 
 .pr-stat__age > .pr-stat-val::after {
 	bottom: -1.2em;
-	color: var(--text-disabled);
+	color: var(--sbgcui-diff-color, var(--text-disabled));
 	content: "(" counter(sbgcui-reg-date) " d)";
 	counter-reset: sbgcui-reg-date var(--sbgcui-reg-date);
 	position: absolute;
 	right: 0;
+}
+
+.pr-stat-val {
+	color: var(--sbgcui-diff-color, initial);
 }
 
 .toastify:nth-child(n+4) {
@@ -1093,6 +1102,11 @@ li[sbgcui-excluded-core]>span {
 	position: absolute;
 	right: 10px;
 	top: 0;
+}
+
+.sbgcui_profile-compare {
+	font-size: 1.2em;
+	margin-left: auto;
 }
 
 .sbgcui_hidden {
