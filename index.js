@@ -3489,7 +3489,7 @@ async function main() {
 
 		async function toggleValues() {
 			const playerStats = await getPlayerData(null, profileNameSpan.innerText);
-			const selfStats = await getPlayerData(player.guid);
+			const selfStats = await getPlayerData(null, player.name);
 			const i18nextStats = i18next.getResourceBundle(i18next.resolvedLanguage).profile.stats;
 			const statTitles = document.querySelectorAll('.pr-stat-title');
 
