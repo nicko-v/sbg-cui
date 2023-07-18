@@ -466,7 +466,7 @@ body {
 }
 
 .pr-stat-val {
-	color: var(--sbgcui-diff-color, initial);
+	color: var(--sbgcui-diff-color, var(--text));
 }
 
 .toastify:nth-child(n+4) {
