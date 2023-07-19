@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.5
+// @version      1.8.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.5';
+const USERSCRIPT_VERSION = '1.8.6';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -1592,7 +1592,6 @@ async function main() {
 			position: parts[1],
 			escapeMarkup: false,
 			className,
-			style,
 		});
 		toast.options.id = Math.round(Math.random() * 1e5);;
 		toast.options.onClick = () => toast.hideToast();
