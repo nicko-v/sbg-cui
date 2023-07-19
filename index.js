@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.6
+// @version      1.8.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.6';
+const USERSCRIPT_VERSION = '1.8.7';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -3190,6 +3190,7 @@ async function main() {
 				featuresToDisplay[0]?.set('sbgcui_chosenFeature', true, true);
 				originalOnClick(mapClickEvent);
 			} else {
+				sortFeaturesByAngle(featuresToDisplay);
 				if (featuresToDisplay.length > MAX_DISPLAYED_CLUSTER) { // Показываем ограниченное кол-во, чтобы выглядело аккуратно.
 					featuresToDisplay = featuresToDisplay.reduceRight(reduceFeatures, []); // Не выводим показанные в прошлый раз точки если их больше ограничения.
 				}
@@ -3223,6 +3224,31 @@ async function main() {
 				isOverlayActive = true;
 			}, 10);
 			cooldownProgressBarIntervals = [];
+		}
+
+		function sortFeaturesByAngle(features) {
+			function angleComparator(a, b) {
+				const aCoords = a.getGeometry().getCoordinates();
+				const bCoords = b.getGeometry().getCoordinates();
+				let aAngle = Math.atan2((aCoords[1] - center[1]), (aCoords[0] - center[0]));
+				let bAngle = Math.atan2((bCoords[1] - center[1]), (bCoords[0] - center[0]));
+
+				if (aAngle < 0) { aAngle += 2 * Math.PI; }
+				if (bAngle < 0) { bAngle += 2 * Math.PI; }
+
+				// Math.PI * 2.5 - это целый круг + сектор 90 гр., т.к. точки в ромашке выводятся по часовой стрелке начиная с 12 часов.
+				aAngle = (Math.PI * 2.5 - aAngle) % (Math.PI * 2);
+				bAngle = (Math.PI * 2.5 - bAngle) % (Math.PI * 2);
+				
+				return aAngle - bAngle;
+			}
+
+			const featuresCoords = features.map(f => f.getGeometry().getCoordinates());
+			const avgX = featuresCoords.reduce((acc, coords) => acc + coords[0], 0) / featuresCoords.length;
+			const avgY = featuresCoords.reduce((acc, coords) => acc + coords[1], 0) / featuresCoords.length;
+			const center = [avgX, avgY];
+
+			features.sort(angleComparator);
 		}
 
 		function spreadFeatures(features) {
