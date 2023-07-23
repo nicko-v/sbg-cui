@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.7
+// @version      1.8.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.7';
+const USERSCRIPT_VERSION = '1.8.8';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -652,7 +652,7 @@ async function main() {
 								const maxDistance = config.drawing.maxDistance;
 								if (!'data' in parsedResponse) { break; }
 
-								if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid) {
+								if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
 									const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
 									const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
 
