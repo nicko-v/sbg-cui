@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.10
+// @version      1.8.11
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.10';
+const USERSCRIPT_VERSION = '1.8.11';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -30,7 +30,8 @@ const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 
 const ITEMS_TYPES = {
 	1: { eng: 'cores', rus: 'ядра' },
 	2: { eng: 'catalysers', rus: 'катализаторы' },
-	3: { eng: 'refs', rus: 'рефы' }
+	3: { eng: 'refs', rus: 'рефы' },
+	4: { eng: 'brooms', rus: 'веники' },
 };
 const DEFAULT_CONFIG = {
 	maxAmountInBag: {
