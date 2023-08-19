@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.12
+// @version      1.8.13
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.12';
+const USERSCRIPT_VERSION = '1.8.13';
 const LATEST_KNOWN_VERSION = '0.4.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -506,6 +506,8 @@ async function main() {
 	let uniques = { c: new Set(), v: new Set() };
 	let inview = {};
 
+	let view = map.getView();
+
 
 	let numbersConverter = {
 		I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -519,13 +521,17 @@ async function main() {
 			if (url.match(/\/api\/inview(?!.+?&unique=)/)) {
 				let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
 
-				if (uniqsHighlighting) { url += `&unique=${uniqsHighlighting == 'uniqc' ? 'c' : 'v'}`; }
+				if (uniqsHighlighting) {
+					const modifiedUrl = new URL(url, 'https://3d.sytes.net/');
+					modifiedUrl.searchParams.set('h', uniqsHighlighting == 'uniqc' ? 4 : 2);
+					url = modifiedUrl.pathname + modifiedUrl.search;
+				}
 			}
 
 			originalFetch(url, options)
 				.then(async response => {
 					let clonedResponse = response.clone();
-					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview|draw|profile)(?:.*?&(status=1))?(?:.*?&unique=(c|v))?/);
+					let path = url.match(/\/api\/(point|deploy|attack2|discover|inview|draw|profile)(?:.*?&(status=1))?(?:.*?&h=(2|4))?/);
 
 					if (path == null) { resolve(response); return; }
 
@@ -610,7 +616,7 @@ async function main() {
 							case 'inview':
 								let isUniqueInRequest = path[3] != undefined;
 								let isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-								let inviewPoints = parsedResponse.data?.points;
+								let inviewPoints = parsedResponse.p;
 
 								if (!inviewPoints) { break; }
 
@@ -644,7 +650,12 @@ async function main() {
 
 								if (isUniqueInRequest) {
 									inviewPoints?.forEach(point => {
-										if (!point.u) { uniques[path[3]].add(point.g); } else { uniques[path[3]].delete(point.g); }
+										const type = path[3] == 4 ? 'c' : 'v';
+										if (point.h) {
+											uniques[type].add(point.g);
+										} else {
+											uniques[type].delete(point.g);
+										}
 									});
 								}
 
@@ -1694,7 +1705,7 @@ async function main() {
 	}
 
 	function toOLMeters(meters, rate) {
-		rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, map.getView().getCenter(), 'm');
+		rate = rate || 1 / ol.proj.getPointResolution('EPSG:3857', 1, view.getCenter(), 'm');
 		return meters * rate;
 	}
 
@@ -1983,7 +1994,9 @@ async function main() {
 			let touchStartDate = Date.now();
 
 			let timeoutID = setTimeout(() => {
-				map.getView().animate({ center: player.feature.getGeometry().getCoordinates() }, { zoom: 17 });
+				view.animate(
+					{ center: ol.coordinate.add(player.feature.getGeometry().getCoordinates(), view.getProperties().offset) },
+					{ zoom: 17 });
 			}, 500);
 
 			this.addEventListener('touchend', () => {
@@ -3120,8 +3133,11 @@ async function main() {
 		button.classList.add('fa-solid', 'fa-rotate');
 
 		button.addEventListener('click', () => {
-			map.getView().setCenter([0, 0]);
-			setTimeout(() => map.getView().setCenter(playerFeature.getGeometry().getCoordinates()), 1);
+			view.setCenter([0, 0]);
+			setTimeout(() => {
+				view.setCenter(playerFeature.getGeometry().getCoordinates());
+				view.adjustCenter(view.getProperties().offset);
+			}, 1);
 		});
 
 		toolbar.addItem(button, 3);
@@ -3131,7 +3147,7 @@ async function main() {
 	/* Показ скорости */
 	{
 		const geolocation = new ol.Geolocation({
-			projection: map.getView().getProjection(),
+			projection: view.getProjection(),
 			tracking: true,
 			trackingOptions: { enableHighAccuracy: true },
 		});
@@ -3407,7 +3423,6 @@ async function main() {
 	{
 		const arrow = document.createElement('i');
 		const shownPoints = new Set();
-		const view = map.getView();
 		let touchMoveCoords = [];
 
 		function isPointInRange(point) {
