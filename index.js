@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.8';
+const USERSCRIPT_VERSION = '1.8.9';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -1901,7 +1901,7 @@ async function main() {
 
 
 		let refsListObserver = new MutationObserver(() => {
-			let refs = Array.from(document.querySelectorAll('.inventory__content[data-type="3"] > .inventory__item'));
+			let refs = Array.from(document.querySelectorAll('.inventory__content[data-tab="3"] > .inventory__item'));
 
 			if (refs.every(e => e.classList.contains('loaded'))) {
 				let event = new Event('refsListLoaded');
@@ -1969,8 +1969,8 @@ async function main() {
 			return false;
 		});
 
-		document.querySelector('.inventory__tab[data-type="3"]').addEventListener('click', event => {
-			let counter = document.querySelector('.inventory__tab[data-type="3"] > .inventory__tab-counter');
+		document.querySelector('.inventory__tab[data-tab="3"]').addEventListener('click', event => {
+			let counter = document.querySelector('.inventory__tab[data-tab="3"] > .inventory__tab-counter');
 			let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
 			let uniqueRefsAmount = inventoryContent.childNodes.length;
 
@@ -2141,7 +2141,7 @@ async function main() {
 	/* Зарядка из инвентаря */
 	{
 		inventoryContent.addEventListener('click', event => {
-			if (!event.currentTarget.matches('.inventory__content[data-type="3"]')) { return; }
+			if (!event.currentTarget.matches('.inventory__content[data-tab="3"]')) { return; }
 			if (!event.target.closest('.inventory__item-controls')) { return; }
 			if (!event.target.closest('.inventory__item.loaded')) { return; }
 
@@ -2878,7 +2878,7 @@ async function main() {
 
 				if (isInMeasurementMode) {
 					// Если все рефы уже подгружены, надо сбросить их – для этого обновляем вкладку:
-					if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-type="3"]')?.click(); }
+					if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-tab="3"]')?.click(); }
 
 					localStorage.removeItem('refs-cache');
 					performance.mark(perfMarkA);
@@ -3082,8 +3082,9 @@ async function main() {
 		function drawBlastRange() {
 			let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
 			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-			let level = cache.find(e => e.g == activeSlide.dataset.guid).l;
-			let range = window.Catalysers[level].range;
+			let item = cache.find(e => e.g == activeSlide.dataset.guid);
+			let level = item.l;
+			let range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
 
 			playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 			playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
