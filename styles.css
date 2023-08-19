@@ -564,8 +564,15 @@ body {
 
 .sbgcui_compare_stats-diff-wrp {
 	display: flex;
+	gap: 10px;
 	justify-content: space-between;
 	margin: 0;
+}
+
+.sbgcui_compare_stats-diff-wrp > span:first-child {
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sbgcui_compare_stats-diff-valuePos {

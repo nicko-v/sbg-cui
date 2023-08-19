@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.9
+// @version      1.8.10
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.9';
+const USERSCRIPT_VERSION = '1.8.10';
 const LATEST_KNOWN_VERSION = '0.3.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -2174,8 +2174,10 @@ async function main() {
 						updateExpBar(r.xp.cur);
 						showXp(r.xp.diff);
 
-						refsCache[pointGuid].e = percentage;
-						localStorage.setItem('refs-cache', JSON.stringify(refsCache));
+						if (refsCache[pointGuid]) {
+							refsCache[pointGuid].e = percentage;
+							localStorage.setItem('refs-cache', JSON.stringify(refsCache));
+						}
 					}
 				})
 				.catch(error => {
@@ -2338,12 +2340,20 @@ async function main() {
 						let isPositive = diff > 0;
 						let statName;
 
-						if (!key.match(/created_at|name|player|team|xp|level/)) {
-							statName = i18next.t(`profile.stats.${key}`);
-						} else if (key == 'xp') {
-							statName = i18next.t('profile.stats.total-xp');
-						} else if (key == 'level') {
-							statName = i18next.t('profile.level');
+						switch (key) {
+							case 'max_region':
+							case 'regions_area':
+								statName = i18next.t(`profile.stats.${key}`);
+								diff = diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : i18next.t('units.sqkm', { count: diff });
+								break;
+							case 'xp':
+								statName = i18next.t(`profile.stats.${key}`);
+								break;
+							case 'level':
+								statName = i18next.t('profile.level');
+								break;
+							default: 
+								statName = i18next.t(`profile.stats.${key}`);
 						}
 
 						if (statName) {
@@ -3555,6 +3565,9 @@ async function main() {
 			switch (key) {
 				case 'max_line':
 					return value < 1000 ? i18next.t('units.m', { count: value }) : i18next.t('units.km', { count: value / 1000 });
+				case 'max_region':
+				case 'regions_area':
+					return value < 1 ? i18next.t('units.sqm', { count: value * 1e6 }) : i18next.t('units.sqkm', { count: value });
 				case 'xp':
 					return `${formatter.format(value)} ${i18next.t('units.pts-xp')}`;
 				case 'created_at':
