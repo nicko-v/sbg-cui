@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.11
+// @version      1.8.12
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,8 +11,8 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.11';
-const LATEST_KNOWN_VERSION = '0.3.0';
+const USERSCRIPT_VERSION = '1.8.12';
+const LATEST_KNOWN_VERSION = '0.4.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
 const MIN_FREE_SPACE = 100;
@@ -792,7 +792,7 @@ async function main() {
 							itemMaxAmount = maxAmount[itemName][pointSide];
 						}
 					} else {
-						itemMaxAmount = maxAmount[itemName][numbersConverter.toRoman(itemLevel)];
+						itemMaxAmount = maxAmount[itemName]?.[numbersConverter.toRoman(itemLevel)];
 					}
 
 					if (itemMaxAmount != -1 && itemAmount > itemMaxAmount) {
