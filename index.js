@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.13
+// @version      1.8.14
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.13';
+const USERSCRIPT_VERSION = '1.8.14';
 const LATEST_KNOWN_VERSION = '0.4.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -2361,7 +2361,7 @@ async function main() {
 								diff = diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : i18next.t('units.sqkm', { count: diff });
 								break;
 							case 'xp':
-								statName = i18next.t(`profile.stats.${key}`);
+								statName = i18next.t(`profile.stats.total-xp`);
 								break;
 							case 'level':
 								statName = i18next.t('profile.level');
