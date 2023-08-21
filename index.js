@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.8.14
+// @version      1.8.15
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -11,7 +11,7 @@
 // @grant        none
 // ==/UserScript==
 
-const USERSCRIPT_VERSION = '1.8.14';
+const USERSCRIPT_VERSION = '1.8.15';
 const LATEST_KNOWN_VERSION = '0.4.0';
 const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 const INVENTORY_LIMIT = 3000;
@@ -159,6 +159,9 @@ fetch('/script.js')
 			data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 			data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 			data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
+			/* Удалить когда отключат */
+			data = data.replace('const ViewOffsets', 'window.ViewOffsets');
+			/* */
 
 			script.textContent = data;
 			document.head.appendChild(script);
@@ -2049,6 +2052,12 @@ async function main() {
 		ops.replaceChildren('INVENTORY', invTotalSpan);
 
 		selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+
+		/* Удалить когда отключат */
+		view.setProperties({ offset: [0, 0] });
+		ViewOffsets.NORMAL = 0;
+		ViewOffsets.CENTER = 0;
+		/* */
 	}
 
 
@@ -3128,19 +3137,23 @@ async function main() {
 
 	/* Перезапрос инвью */
 	{
-		let button = document.createElement('button');
-
-		button.classList.add('fa-solid', 'fa-rotate');
-
-		button.addEventListener('click', () => {
+		function redraw() {
 			view.setCenter([0, 0]);
 			setTimeout(() => {
 				view.setCenter(playerFeature.getGeometry().getCoordinates());
 				view.adjustCenter(view.getProperties().offset);
 			}, 1);
-		});
+		}
+
+		let button = document.createElement('button');
+
+		button.classList.add('fa-solid', 'fa-rotate');
+
+		button.addEventListener('click', redraw);
 
 		toolbar.addItem(button, 3);
+
+		redraw();
 	}
 
 
