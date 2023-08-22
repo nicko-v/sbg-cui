@@ -235,10 +235,6 @@ body {
 	margin-top: 10px;
 }
 
-.draw-slider-wrp .splide__slide * {
-	direction: ltr;
-}
-
 .game-menu button {
 	pointer-events: auto;
 }
@@ -1125,15 +1121,6 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_profile-compare {
 	font-size: 1.2em;
 	margin-left: auto;
-}
-
-.sbgcui_drawslider_sort {
-	position: absolute;
-	top: calc(100% + 10px);
-}
-
-.draw-slider-wrp:has(#refs-list > li:only-child) .sbgcui_drawslider_sort {
-	display: none;
 }
 
 .sbgcui_hidden {
