@@ -858,9 +858,10 @@ body {
 }
 
 .sbgcui_favs-li {
+	--sbgcui-favs-li-gap: 5px;
 	display: flex;
 	align-items: center;
-	gap: 5px;
+	gap: var(--sbgcui-favs-li-gap);
 }
 
 .sbgcui_favs-li-data {
@@ -902,9 +903,11 @@ body {
 }
 
 .sbgcui_favs-li-delete {
-	font-size: 25px;
+	font-size: 20px;
 	color: var(--accent);
 	padding: 0;
+	width: calc(1em + var(--sbgcui-favs-li-gap));
+	height: 1em;
 }
 
 .sbgcui_xpProgressBar {
@@ -931,7 +934,7 @@ body {
 	position: absolute;
 	bottom: 140px;
 	right: 30px;
-	font-size: 30px;
+	font-size: 1em;
 	width: 50px;
 	height: 50px;
 	display: flex;
@@ -1117,6 +1120,8 @@ li[sbgcui-excluded-core]>span {
 	animation-timing-function: ease-out;
 	color: var(--text-disabled);
 	font-size: 2em;
+	width: 1em;
+	height: 1em;
 	position: absolute;
 	right: 10px;
 	top: 0;
@@ -1125,11 +1130,15 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_profile-compare {
 	font-size: 1.2em;
 	margin-left: auto;
+	width: 2.2em;
+	padding: 0 0.5em;
 }
 
 .sbgcui_drawslider_sort {
 	position: absolute;
 	top: calc(100% + 10px);
+	width: 3.2em;
+	padding: 0 1em;
 }
 
 .draw-slider-wrp:has(#refs-list > li:only-child) .sbgcui_drawslider_sort {

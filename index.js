@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.0
+// @version      1.9.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.0';
+	const USERSCRIPT_VERSION = '1.9.1';
 	const LATEST_KNOWN_VERSION = '0.4.0';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2707,7 +2707,7 @@
 
 				favsList.append(favsListHeader, favsListContent);
 
-				star.classList.add('fa', 'fa-solid-star',);
+				star.classList.add('fa', 'fa-solid-star', 'sbgcui_favs_star');
 				star.addEventListener('click', () => {
 					fillFavsList();
 					favsList.classList.toggle('sbgcui_hidden');

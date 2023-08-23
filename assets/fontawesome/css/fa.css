@@ -1,10 +1,10 @@
 .fa::before {
+  -webkit-mask: var(--fa-url);
+	mask: var(--fa-url);
 	background-color: currentColor;
   content: "";
+  display: block;
 	height: 100%;
-	left: 0;
-	position: absolute;
-	top: 0;
 	width: 100%;
 	-webkit-mask-repeat: no-repeat;
 	mask-repeat: no-repeat;
