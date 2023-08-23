@@ -23,6 +23,7 @@ html {
 body {
 	display: flex;
 	flex-direction: column;
+	justify-content: end;
 	position: relative;
 	overscroll-behavior: contain;
 	overflow: hidden;
