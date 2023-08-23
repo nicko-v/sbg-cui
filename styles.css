@@ -616,14 +616,16 @@ body {
 	position: absolute;
 	top: 5px;
 	right: 0;
-	width: 50px;
+	padding: 0;
+	height: 1em;
+	width: 1em;
 	font-size: 32px;
 	display: flex;
 	justify-content: center;
 	text-shadow: 0 0 5px var(--text-shadow);
 }
 
-.sbgcui_point_star.fa-solid {
+.sbgcui_point_star.fa-solid-star {
 	color: var(--selection);
 }
 
