@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.1
+// @version      1.9.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,8 +15,8 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.1';
-	const LATEST_KNOWN_VERSION = '0.4.0';
+	const USERSCRIPT_VERSION = '1.9.2';
+	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2055,9 +2055,10 @@
 		/* Удаление ненужного, переносы, переименования */
 		{
 			let ops = document.querySelector('#ops');
-			let blContainer = document.querySelector('.bottomleft-container');
+			let blContainer = document.querySelector('.bottom-container');
 			let rotateArrow = document.querySelector('.ol-rotate');
 			let layersButton = document.querySelector('#layers');
+			let notifsButton = document.querySelector('#notifs-menu');
 			let attackSliderClose = document.querySelector('#attack-slider-close');
 			let zoomContainer = document.querySelector('.ol-zoom');
 
@@ -2080,7 +2081,10 @@
 			layersButton.innerText = '';
 			layersButton.classList.add('fa', 'fa-solid-layer-group');
 
-			zoomContainer.append(rotateArrow, toggleFollow, layersButton);
+			notifsButton.innerText = '';
+			notifsButton.classList.add('fa', 'fa-solid-envelope');
+
+			zoomContainer.append(rotateArrow, toggleFollow, notifsButton, layersButton);
 
 			toggleFollow.innerText = '';
 			toggleFollow.classList.add('fa', 'fa-solid-location-crosschairs');

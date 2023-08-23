@@ -100,6 +100,7 @@ body {
 	font-size: 1.5em;
 	padding: 0 0.1em;
 	z-index: 2;
+	position: absolute;
 }
 
 #inventory__close[sbgcui_measurement_mode]:has(~.inventory__content[data-tab="3"]) {
@@ -119,6 +120,37 @@ body {
 	top: 0;
 	left: 0;
 	z-index: 1;
+}
+
+#notifs-menu {
+	margin: 1px;
+}
+
+#notifs-menu[data-count]::before {
+	content: '';
+	position: initial;
+	top: initial;
+	right: initial;
+	translate: initial;
+	background: currentColor;
+	color: inherit;
+	border-radius: initial;
+	padding: initial;
+	min-width: initial;
+	box-sizing: border-box;
+	font-size: 0.7em;
+}
+
+#notifs-menu[data-count]::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	margin: 3px;
+	background: var(--accent);
+	border-radius: 50%;
+	width: 25%;
+	height: 25%;
 }
 
 #self-info__exp {
@@ -195,7 +227,7 @@ body {
 	margin-bottom: 5px;
 }
 
-.bottomleft-container {
+.bottom-container {
 	pointer-events: none;
 	z-index: 2;
 	position: relative;
@@ -204,9 +236,11 @@ body {
 	order: 3;
 	margin: 0 5px 15px;
 	justify-content: center;
+	translate: initial;
+	width: initial;
 }
 
-.bottomleft-container button {
+.bottom-container button {
 	pointer-events: auto;
 }
 
@@ -239,7 +273,7 @@ body {
 	direction: ltr;
 }
 
-.game-menu > .fa-solid-rotate {
+.game-menu>.fa-solid-rotate {
 	width: 2em;
 }
 
@@ -357,7 +391,7 @@ body {
 	margin-right: 5px;
 }
 
-.inventory__tabs {
+.inventory__header {
 	order: 2;
 	margin-bottom: 10px;
 	padding: 0;
@@ -460,11 +494,11 @@ body {
 	width: 100%;
 }
 
-.pr-stat__age > .pr-stat-val {
+.pr-stat__age>.pr-stat-val {
 	position: relative;
 }
 
-.pr-stat__age > .pr-stat-val::after {
+.pr-stat__age>.pr-stat-val::after {
 	bottom: -1.2em;
 	color: var(--sbgcui-diff-color, var(--text-disabled));
 	content: "(" counter(sbgcui-reg-date) " d)";
@@ -577,7 +611,7 @@ body {
 	margin: 0;
 }
 
-.sbgcui_compare_stats-diff-wrp > span:first-child {
+.sbgcui_compare_stats-diff-wrp>span:first-child {
 	overflow-x: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1156,8 +1190,15 @@ li[sbgcui-excluded-core]>span {
 }
 
 @keyframes move-left-fade-out {
-	from { transform: translateX(0); opacity: 1; }
-	to   { transform: translateX(-40px); opacity: 0; }
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+
+	to {
+		transform: translateX(-40px);
+		opacity: 0;
+	}
 }
 
 @media (orientation: portrait) {
