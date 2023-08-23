@@ -138,7 +138,7 @@ body {
 	padding: initial;
 	min-width: initial;
 	box-sizing: border-box;
-	font-size: 0.7em;
+	font-size: 1em;
 }
 
 #notifs-menu[data-count]::after {
@@ -1088,7 +1088,10 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_cluster-close {
 	bottom: 35px;
 	font-size: 40px;
+	height: 1em;
+	padding: 0;
 	position: absolute;
+	width: 1em;
 }
 
 .sbgcui_cluster-iconWrapper {
