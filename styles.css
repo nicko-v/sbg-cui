@@ -239,6 +239,10 @@ body {
 	direction: ltr;
 }
 
+.game-menu > .fa-solid-rotate {
+	width: 2em;
+}
+
 .game-menu button {
 	pointer-events: auto;
 }
