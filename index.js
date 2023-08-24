@@ -3729,8 +3729,8 @@
 		/* Показ количества регионов и опыта за снос */
 		{
 			function openHandler() {
-				regionsAmountDiv.innerText = `${regionsText}: ${lastOpenedPoint.regionsAmount}`;
-				destroyRewardDiv.innerText = `${rewardText}: ${lastOpenedPoint.destroyReward} ${i18next.t('units.pts-xp')}`;
+				regionsAmountDiv.innerText = `${regionsText}: ${formatter.format(lastOpenedPoint.regionsAmount)}`;
+				destroyRewardDiv.innerText = `${rewardText}: ${formatter.format(lastOpenedPoint.destroyReward)} ${i18next.t('units.pts-xp')}`;
 			}
 
 			const pointControls = document.querySelector('.info.popup .i-buttons');
@@ -3739,6 +3739,7 @@
 			const destroyRewardDiv = document.createElement('div');
 			const regionsText = i18next.language == 'ru' ? 'Регионы' : 'Regions';
 			const rewardText = i18next.language == 'ru' ? 'За уничтожение' : 'Reward';
+			const formatter = new Intl.NumberFormat(i18next.language);
 
 			regionsAmountDiv.classList.add('i-stat__entry');
 			destroyRewardDiv.classList.add('i-stat__entry', 'sbgcui_destroy_reward');
