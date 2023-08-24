@@ -182,7 +182,6 @@
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
-				data = data.replace('if (!allowed.includes', 'if (allowed.includes');
 
 				script.textContent = data;
 
