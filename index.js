@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.3
+// @version      1.9.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.3';
+	const USERSCRIPT_VERSION = '1.9.4';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -36,6 +36,14 @@
 		2: { eng: 'catalysers', rus: 'катализаторы' },
 		3: { eng: 'refs', rus: 'рефы' },
 		4: { eng: 'brooms', rus: 'веники' },
+	};
+	const ACTIONS_REWARDS = {
+		build: {},
+		destroy: {
+			region: 125,
+			line: 45,
+			core: 10,
+		},
 	};
 	const DEFAULT_CONFIG = {
 		maxAmountInBag: {
@@ -210,6 +218,7 @@
 
 		class Point {
 			constructor(pointData) {
+				this.coords = pointData.c;
 				this.guid = pointData.g;
 				this.level = pointData.l;
 				this.team = pointData.te;
@@ -288,6 +297,28 @@
 				});
 
 				return result;
+			}
+
+			get coresAmount() {
+				return Object.keys(this.cores).length;
+			}
+
+			get linesAmount() {
+				return this.lines.in + this.lines.out;
+			}
+
+			get regionsAmount() {
+				return inviewRegionsVertexes.filter(e => {
+					return e.find(e => e[0] == this.coords[0] && e[1] == this.coords[1]) != undefined;
+				}).length;
+			}
+
+			get destroyReward() {
+				return (
+					ACTIONS_REWARDS.destroy.core * this.coresAmount +
+					ACTIONS_REWARDS.destroy.line * this.linesAmount +
+					ACTIONS_REWARDS.destroy.region * this.regionsAmount
+				);
 			}
 
 			update(cores) {
@@ -524,6 +555,7 @@
 
 		let uniques = { c: new Set(), v: new Set() };
 		let inview = {};
+		let inviewRegionsVertexes = [];
 
 		let view = map.getView();
 
@@ -652,10 +684,15 @@
 
 									break;
 								case '/api/inview':
+									resolve(response);
+
 									const hParam = url.searchParams.get('h');
 									const isUniqueInRequest = hParam != null;
 									const isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
 									const inviewPoints = parsedResponse.p;
+									const inviewRegions = parsedResponse.r;
+
+									inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
 
 									if (!inviewPoints) { break; }
 
@@ -3686,6 +3723,30 @@
 			drawSlider.addEventListener('drawSliderOpened', resetIcon);
 
 			sliderButtons.insertBefore(flipButton, cancelButton);
+		}
+
+
+		/* Показ количества регионов и опыта за снос */
+		{
+			function openHandler() {
+				regionsAmountDiv.innerText = `${regionsText}: ${lastOpenedPoint.regionsAmount}`;
+				destroyRewardDiv.innerText = `${rewardText}: ${lastOpenedPoint.destroyReward} ${i18next.t('units.pts-xp')}`;
+			}
+
+			const pointControls = document.querySelector('.info.popup .i-buttons');
+			const pointStat = document.querySelector('.info.popup .i-stat');
+			const regionsAmountDiv = document.createElement('div');
+			const destroyRewardDiv = document.createElement('div');
+			const regionsText = i18next.language == 'ru' ? 'Регионы' : 'Regions';
+			const rewardText = i18next.language == 'ru' ? 'За уничтожение' : 'Reward';
+
+			regionsAmountDiv.classList.add('i-stat__entry');
+			destroyRewardDiv.classList.add('i-stat__entry', 'sbgcui_destroy_reward');
+
+			pointStat.insertBefore(regionsAmountDiv, pointControls);
+			pointStat.insertBefore(destroyRewardDiv, pointControls);
+
+			pointPopup.addEventListener('pointPopupOpened', openHandler);
 		}
 	}
 

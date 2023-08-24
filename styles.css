@@ -1210,6 +1210,10 @@ li[sbgcui-excluded-core]>span {
 	padding: 0 0.5em;
 }
 
+.sbgcui_destroy_reward {
+	margin-top: 5px;
+}
+
 .sbgcui_drawslider_sort {
 	position: absolute;
 	top: calc(100% + 10px);
