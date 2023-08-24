@@ -413,6 +413,35 @@ body {
 	color: var(--selection);
 }
 
+.notifs__entry {
+	grid-template-columns: 2fr 5fr 1fr;
+}
+
+.notifs__entry-view > span {
+	display: none;
+}
+
+.notifs__entry-view {
+	height: 80%;
+	font-size: 20px;
+}
+
+.notifs__entry-view::before {
+	-webkit-mask: url("./assets/fontawesome/svg/solid/map-location-dot.svg");
+	mask: url("./assets/fontawesome/svg/solid/map-location-dot.svg");
+	background-color: currentColor;
+  content: "";
+  display: block;
+	height: 100%;
+	width: 100%;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: 1em;
+	mask-size: 1em;
+}
+
 .ol-control {
 	left: initial;
 	right: 0.5em;

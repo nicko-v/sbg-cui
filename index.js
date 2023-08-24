@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.2
+// @version      1.9.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.2';
+	const USERSCRIPT_VERSION = '1.9.3';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -182,9 +182,7 @@
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
-				/* Удалить когда отключат */
-				data = data.replace('const ViewOffsets', 'window.ViewOffsets');
-				/* */
+				data = data.replace('if (!allowed.includes', 'if (allowed.includes');
 
 				script.textContent = data;
 
@@ -482,8 +480,10 @@
 		let html = document.documentElement;
 		let attackButton = document.querySelector('#attack-menu');
 		let attackSlider = document.querySelector('.attack-slider-wrp');
+		let drawSlider = document.querySelector('.draw-slider-wrp');
 		let catalysersList = document.querySelector('#catalysers-list');
 		let coresList = document.querySelector('#cores-list');
+		let refsList = document.querySelector('#refs-list');
 		let discoverButton = document.querySelector('#discover');
 		let inventoryButton = document.querySelector('#ops');
 		let invCloseButton = document.querySelector('#inventory__close');
@@ -1928,6 +1928,14 @@
 			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
 
 
+			let drawSliderObserver = new MutationObserver(records => {
+				let isHidden = records[0].target.classList.contains('hidden');
+				let event = new Event(isHidden ? 'drawSliderClosed' : 'drawSliderOpened', { bubbles: true });
+				records[0].target.dispatchEvent(event);
+			});
+			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ["class"] });
+
+
 			let inventoryContentObserver = new MutationObserver(records => {
 				records.forEach(e => {
 					if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
@@ -2036,7 +2044,7 @@
 
 				let timeoutID = setTimeout(() => {
 					view.animate(
-						{ center: ol.coordinate.add(player.feature.getGeometry().getCoordinates(), view.getProperties().offset) },
+						{ center: player.feature.getGeometry().getCoordinates() },
 						{ zoom: 17 });
 				}, 500);
 
@@ -2094,12 +2102,6 @@
 			ops.replaceChildren('INVENTORY', invTotalSpan);
 
 			selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
-
-			/* Удалить когда отключат */
-			view.setProperties({ offset: [0, 0] });
-			ViewOffsets.NORMAL = 0;
-			ViewOffsets.CENTER = 0;
-			/* */
 		}
 
 
@@ -2553,23 +2555,6 @@
 					localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
 				},
 			});
-
-
-			/* Старый вариант хранения избранного */
-			{
-				let legacyFavs = JSON.parse(localStorage.getItem('sbgcui_pointsSubscriptions'));
-				let legacyReminders = JSON.parse(localStorage.getItem('sbgcui_reminders'));
-
-				if (legacyFavs) {
-					for (let guid of legacyFavs) {
-						let cooldown = legacyReminders[guid];
-						favorites[guid] = new Favorite(guid, cooldown);
-					}
-					favorites.save();
-					localStorage.removeItem('sbgcui_pointsSubscriptions');
-					localStorage.removeItem('sbgcui_reminders');
-				}
-			}
 
 
 			/* Звезда на карточке точки */
@@ -3183,7 +3168,6 @@
 				view.setCenter([0, 0]);
 				setTimeout(() => {
 					view.setCenter(playerFeature.getGeometry().getCoordinates());
-					view.adjustCenter(view.getProperties().offset);
 				}, 1);
 			}
 
@@ -3679,22 +3663,28 @@
 
 		/* Кнопка смены сортировки при рисовании */
 		{
-			let direction = 'ltr';
+			function flip() {
+				const refs = refsList.childNodes;
+				const refsReversed = [...refs].reverse();
+
+				refsList.replaceChildren(...refsReversed);
+				window.draw_slider.refresh();
+
+				flipButton.classList.toggle('fa-solid-arrow-down-short-wide');
+				flipButton.classList.toggle('fa-solid-arrow-down-wide-short');
+			}
+
+			function resetIcon() {
+				flipButton.classList.replace('fa-solid-arrow-down-wide-short', 'fa-solid-arrow-down-short-wide');
+			}
+
 			const flipButton = document.createElement('button');
 			const sliderButtons = document.querySelector('.draw-slider-buttons');
 			const cancelButton = document.querySelector('#draw-slider-close');
 
 			flipButton.classList.add('fa', 'fa-solid-arrow-down-short-wide', 'fa-rotate-270', 'sbgcui_drawslider_sort');
-			flipButton.addEventListener('click', () => {
-				direction = direction == 'ltr' ? 'rtl' : 'ltr';
-
-				window.draw_slider.options.direction = direction;
-				draw_slider.go(direction == 'ltr' ? 0 : draw_slider.length);
-				window.draw_slider.refresh();
-
-				flipButton.classList.toggle('fa-solid-arrow-down-short-wide');
-				flipButton.classList.toggle('fa-solid-arrow-down-wide-short');
-			});
+			flipButton.addEventListener('click', flip);
+			drawSlider.addEventListener('drawSliderOpened', resetIcon);
 
 			sliderButtons.insertBefore(flipButton, cancelButton);
 		}

@@ -50,6 +50,10 @@
   --fa-url: url("../svg/solid/location-crosschairs.svg");
 }
 
+.fa-solid-map-location-dot {
+  --fa-url: url("../svg/solid/map-location-dot.svg");
+}
+
 .fa-solid-rotate {
   --fa-url: url("../svg/solid/rotate.svg");
 }
