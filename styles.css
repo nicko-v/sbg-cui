@@ -424,8 +424,9 @@ body {
 .notifs__entry-view {
 	appearance: none;
 	border-style: solid;
-	height: 80%;
+	height: 35px;
 	font-size: 25px;
+	padding: 0;
 }
 
 .notifs__entry-view::before {
