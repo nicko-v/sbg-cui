@@ -422,8 +422,10 @@ body {
 }
 
 .notifs__entry-view {
+	appearance: none;
+	border-style: solid;
 	height: 80%;
-	font-size: 20px;
+	font-size: 25px;
 }
 
 .notifs__entry-view::before {
