@@ -359,6 +359,11 @@ body {
 	white-space: nowrap;
 }
 
+#i-stat__energy>span {
+	color: var(--text-disabled);
+	display: block;
+}
+
 .info.popup {
 	padding-bottom: 3em;
 }

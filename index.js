@@ -2077,7 +2077,6 @@
 					if (timeout.length != 0) {
 						let span = document.createElement('span');
 
-						span.style.color = 'var(--text-disabled)';
 						span.innerText = ` (${timeout})`;
 						pointEnergySpan.appendChild(span);
 					}
