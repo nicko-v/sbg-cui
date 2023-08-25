@@ -3820,6 +3820,35 @@
 
 			map.addLayer(customPointsLayer);
 		}
+
+
+		/* Количество регионов под кликом */
+		{
+			function buttonClickHandler() {
+				const toast = createToast('Нажмите на регион чтобы узнать, сколько их в этом месте.');
+
+				toast.options.className = 'sbgcui_toast-selection';
+				toast.showToast();
+
+				map.un('click', mapClickHandler);
+				map.once('click', mapClickHandler);
+			}
+
+			function mapClickHandler(event) {
+				const features = map.getFeaturesAtPixel(event.pixel, {
+					layerFilter: layer => layer.get('name') == 'regions',
+				});
+
+				alert(`Количество регионов в точке: ${features.length}`);
+			}
+
+			const button = document.createElement('button');
+
+			button.classList.add('fa', 'fa-brands-stack-overflow');
+			button.addEventListener('click', buttonClickHandler);
+
+			toolbar.addItem(button, 5);
+		}
 	}
 
 })();

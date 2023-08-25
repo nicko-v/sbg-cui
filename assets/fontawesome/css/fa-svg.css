@@ -1,3 +1,7 @@
+.fa-brands-stack-overflow {
+  --fa-url: url("../svg/brands/stack-overflow.svg");
+}
+
 .fa-regular-star {
   --fa-url: url("../svg/regular/star.svg");
 }
