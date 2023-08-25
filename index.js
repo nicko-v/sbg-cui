@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.5
+// @version      1.9.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.5';
+	const USERSCRIPT_VERSION = '1.9.6';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3798,7 +3798,10 @@
 						geometry: new ol.geom.Point([0, 0])
 					});
 
-					popup.addEventListener('click', () => { popup.classList.add('sbgcui_hidden'); });
+					popup.addEventListener('click', () => {
+						popup.classList.add('sbgcui_hidden');
+						setTimeout(() => { popup.style.zIndex = 0; }, 100);
+					});
 					document.body.appendChild(popup);
 
 					zeroPointFeature.setId('sbgcui_zeroPoint');
@@ -3813,7 +3816,17 @@
 							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
 						}),
 					}));
-					zeroPointFeature.on('click', () => { popup.classList.remove('sbgcui_hidden'); });
+
+					map.on('click', event => {
+						const features = map.getFeaturesAtPixel(event.pixel, {
+							layerFilter: layer => layer.get('name') == 'sbgcui_points',
+						});
+
+						if (features.includes(zeroPointFeature)) {
+							popup.classList.remove('sbgcui_hidden');
+							setTimeout(() => { popup.style.zIndex = 9; }, 100);
+						}
+					});
 					customPointsSource.addFeature(zeroPointFeature);
 				})
 				.catch(error => { console.log('Ошибка при загрузке ресурса.', error); });
