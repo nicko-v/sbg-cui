@@ -1225,6 +1225,31 @@ li[sbgcui-excluded-core]>span {
 	display: none;
 }
 
+.sbgcui_zeroPoint {
+	background-color: var(--background);
+	border: 2px solid var(--border);
+	border-radius: 10px;
+	color: var(--text);
+	left: 50%;
+	max-width: 400px;
+	padding: 0 10px 10px;
+	position: absolute;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 90%;
+	z-index: 9;
+}
+
+.sbgcui_zeroPoint-header {
+	color: var(--accent);
+	text-align: center;
+}
+
+.sbgcui_zeroPoint-footer {
+	color: var(--text-disabled);
+	text-align: center;
+}
+
 .sbgcui_hidden {
 	display: none;
 }

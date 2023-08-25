@@ -698,7 +698,7 @@
 
 									const mapConfig = JSON.parse(localStorage.getItem('map-config'));
 									const lParam = url.searchParams.get('l');
-									
+
 									inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
 
 									if (mapConfig.l == lParam) {
@@ -3775,6 +3775,50 @@
 			pointStat.insertBefore(destroyRewardDiv, pointControls);
 
 			pointPopup.addEventListener('pointPopupOpened', openHandler);
+		}
+
+
+		/* Точка в [0, 0] */
+		{
+			const customPointsSource = new ol.source.Vector();
+			const customPointsLayer = new ol.layer.Vector({
+				source: customPointsSource,
+				name: 'sbgcui_points',
+				minZoom: 15,
+				className: 'ol-layer__sbgcui_points',
+				zIndex: 9
+			});
+
+			fetch(`${HOME_DIR}/assets/html/zero-point-info.html`)
+				.then(r => r.text())
+				.then(html => {
+					const parser = new DOMParser();
+					const popup = parser.parseFromString(html, 'text/html').body.firstChild;
+					const zeroPointFeature = new ol.Feature({
+						geometry: new ol.geom.Point([0, 0])
+					});
+
+					popup.addEventListener('click', () => { popup.classList.add('sbgcui_hidden'); });
+					document.body.appendChild(popup);
+
+					zeroPointFeature.setId('sbgcui_zeroPoint');
+					zeroPointFeature.setStyle(new ol.style.Style({
+						geometry: new ol.geom.Circle([0, 0], 30),
+						fill: new ol.style.Fill({ color: '#BB7100' }),
+						stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 5 }),
+						text: new ol.style.Text({
+							font: '30px Manrope',
+							text: '?',
+							fill: new ol.style.Fill({ color: '#000' }),
+							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
+						}),
+					}));
+					zeroPointFeature.on('click', () => { popup.classList.remove('sbgcui_hidden'); });
+					customPointsSource.addFeature(zeroPointFeature);
+				})
+				.catch(error => { console.log('Ошибка при загрузке ресурса.', error); });
+
+			map.addLayer(customPointsLayer);
 		}
 	}
 
