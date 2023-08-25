@@ -95,6 +95,7 @@
 			outerBottomColor: '#28C4F4',
 		},
 		drawing: {
+			minDistance: -1,
 			maxDistance: -1,
 		},
 	};
@@ -699,7 +700,7 @@
 									const lParam = url.searchParams.get('l');
 									
 									inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
-									
+
 									if (mapConfig.l == lParam) {
 										resolve(response);
 									} else {
@@ -758,8 +759,11 @@
 
 									break;
 								case '/api/draw':
-									const maxDistance = config.drawing.maxDistance;
 									if (!'data' in parsedResponse) { break; }
+
+									let { minDistance, maxDistance } = config.drawing;
+									minDistance = minDistance == -1 ? -Infinity : +minDistance;
+									maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
 
 									if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
 										const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
@@ -782,13 +786,14 @@
 										break;
 									}
 
-									if (maxDistance != -1) {
-										const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance);
+									if (isFinite(minDistance) || isFinite(maxDistance)) {
+										const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
 										const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
 
 										if (hiddenPoints > 0) {
 											const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
-																			из списка согласно настройкам максимальной длины линии (${config.drawing.maxDistance} м).`;
+																			из списка согласно настройкам ограничения дальности рисования
+																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
 											const toast = createToast(message, 'top left');
 
 											toast.options.className = 'sbgcui_toast-selection';
@@ -1525,11 +1530,12 @@
 					`Настройки, касающиеся рисования линий. Значение "-1" в текстовом поле отключает ограничение.`
 				);
 				const subSection = document.createElement('section');
+				const minDistanceTextField = createTextField('Скрывать рефы ближе, чем (м):', 'drawing_minDistance', drawing.minDistance);
 				const maxDistanceTextField = createTextField('Скрывать рефы дальше, чем (м):', 'drawing_maxDistance', drawing.maxDistance);
 
 				subSection.classList.add('sbgcui_settings-subsection');
 
-				subSection.append(maxDistanceTextField);
+				subSection.append(minDistanceTextField, maxDistanceTextField);
 
 				section.appendChild(subSection);
 
