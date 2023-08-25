@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.4
+// @version      1.9.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.4';
+	const USERSCRIPT_VERSION = '1.9.5';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -190,6 +190,7 @@
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
+				data = data.replace('class Bitfield', 'window.Bitfield = class Bitfield');
 
 				script.textContent = data;
 
@@ -593,6 +594,13 @@
 							url.searchParams.set('h', hParam);
 						}
 
+						const mapConfig = JSON.parse(localStorage.getItem('map-config'));
+						const layers = Bitfield.from(mapConfig.l);
+
+						layers.change(1, 1);
+						layers.change(2, 1);
+						url.searchParams.set('l', layers.toString());
+
 						break;
 				}
 
@@ -684,15 +692,28 @@
 
 									break;
 								case '/api/inview':
-									resolve(response);
+									const inviewPoints = parsedResponse.p;
+									const inviewRegions = parsedResponse.r;
+
+									const mapConfig = JSON.parse(localStorage.getItem('map-config'));
+									const lParam = url.searchParams.get('l');
+									
+									inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
+									
+									if (mapConfig.l == lParam) {
+										resolve(response);
+									} else {
+										const layers = Bitfield.from(mapConfig.l);
+										if (layers.get(1) == 0) { parsedResponse.l = []; }
+										if (layers.get(2) == 0) { parsedResponse.r = []; }
+
+										const modifiedResponse = createResponse(parsedResponse, response);
+										resolve(modifiedResponse);
+									}
 
 									const hParam = url.searchParams.get('h');
 									const isUniqueInRequest = hParam != null;
 									const isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-									const inviewPoints = parsedResponse.p;
-									const inviewRegions = parsedResponse.r;
-
-									inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
 
 									if (!inviewPoints) { break; }
 
@@ -3738,7 +3759,7 @@
 			const regionsAmountDiv = document.createElement('div');
 			const destroyRewardDiv = document.createElement('div');
 			const regionsText = i18next.language == 'ru' ? 'Регионы' : 'Regions';
-			const rewardText = i18next.language == 'ru' ? 'За уничтожение' : 'Reward';
+			const rewardText = i18next.language == 'ru' ? 'Награда' : 'Reward';
 			const formatter = new Intl.NumberFormat(i18next.language);
 
 			regionsAmountDiv.classList.add('i-stat__entry');
