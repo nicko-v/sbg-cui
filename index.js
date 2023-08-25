@@ -3769,7 +3769,7 @@
 			const formatter = new Intl.NumberFormat(i18next.language);
 
 			regionsAmountDiv.classList.add('i-stat__entry');
-			destroyRewardDiv.classList.add('i-stat__entry', 'sbgcui_destroy_reward');
+			destroyRewardDiv.classList.add('i-stat__entry');
 
 			pointStat.insertBefore(regionsAmountDiv, pointControls);
 			pointStat.insertBefore(destroyRewardDiv, pointControls);
