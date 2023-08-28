@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.6
+// @version      1.9.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.6';
+	const USERSCRIPT_VERSION = '1.9.7';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -280,21 +280,24 @@
 			}
 
 			get dischargeTimeout() {
-				let mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
+				const mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
+				const rtf = new Intl.RelativeTimeFormat(i18next.language, { style: 'short' });
 
 				if (mostChargedCatalyserEnergy == null) { return ''; }
 
 				let timeout = mostChargedCatalyserEnergy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
 				let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
-				let dh2 = ['d', 'hr'];
+				let dh2 = ['day', 'hour'];
 				let result = '';
 
 				dh1.forEach((e, i) => {
-					let amount = Math.trunc(timeout / e);
+					const amount = Math.trunc(timeout / e);
+					const parts = rtf.formatToParts(amount, dh2[i]);
+					const formatted = `${parts[1].value}${parts[2].value}`;
 
 					if (!amount) { return; }
 
-					result += `${result.length ? ', ' : '~'}${amount}${dh2[i]}`;
+					result += `${result.length ? ', ' : ''}${formatted}`;
 					timeout -= amount * e;
 				});
 
@@ -331,6 +334,9 @@
 						owner: core.o,
 					}
 				});
+				
+				const event = new Event('pointRepaired');
+				pointPopup.dispatchEvent(event);
 			}
 
 			selectCore(type, currentLevel) {
@@ -544,6 +550,7 @@
 		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
+		let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -810,6 +817,11 @@
 								case '/api/profile':
 									if ('data' in parsedResponse) {
 										regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.data.created_at));
+									}
+									break;
+								case '/api/repair':
+									if ('data' in parsedResponse) {
+										lastOpenedPoint.update(parsedResponse.data.co);
 									}
 									break;
 								default:
@@ -1987,6 +1999,7 @@
 				let isHidden = records[0].target.classList.contains('hidden');
 				let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
 				records[0].target.dispatchEvent(event);
+				isAttackSliderOpened = !isHidden;
 			});
 			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
 
@@ -2036,6 +2049,7 @@
 
 
 			let catalysersListObserver = new MutationObserver(records => {
+				if (!isAttackSliderOpened) { return; }
 				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
 					let event = new Event('activeSlideChanged');
 					catalysersList.dispatchEvent(event);
@@ -2070,16 +2084,6 @@
 					pointPopup.style.backgroundImage = '';
 					pointPopup.classList.remove('sbgcui_point-popup-bg');
 					pointImage.classList.remove('sbgcui_no_bg_image');
-				}
-
-				if (config.ui.pointDischargeTimeout) {
-					let timeout = lastOpenedPoint.dischargeTimeout;
-					if (timeout.length != 0) {
-						let span = document.createElement('span');
-
-						span.innerText = ` (${timeout})`;
-						pointEnergySpan.appendChild(span);
-					}
 				}
 			});
 
@@ -3860,6 +3864,23 @@
 			button.addEventListener('click', buttonClickHandler);
 
 			toolbar.addItem(button, 5);
+		}
+
+		/* Время до разрядки точки */
+		{
+			function updateTimeout() {
+				if (config.ui.pointDischargeTimeout) {
+					timeoutSpan.innerText = `~${lastOpenedPoint.dischargeTimeout}`;
+				}
+			}
+
+			const timeoutSpan = document.createElement('span');
+
+			timeoutSpan.classList.add('sbgcui_discharge_timeout');
+			pointEnergySpan.after(timeoutSpan);
+
+			pointPopup.addEventListener('pointPopupOpened', updateTimeout);
+			pointPopup.addEventListener('pointRepaired', updateTimeout);
 		}
 	}
 

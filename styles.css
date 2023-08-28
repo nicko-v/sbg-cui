@@ -372,14 +372,10 @@ body {
 	display: block;
 }
 
-.info.popup {
-	padding-bottom: 3em;
-}
-
 .info.popup>.popup-close {
 	bottom: 5px;
 	font-size: 1.75em;
-	position: absolute;
+	position: sticky;
 }
 
 .inventory__content {
@@ -1322,6 +1318,11 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_zeroPoint-footer {
 	color: var(--text-disabled);
 	text-align: center;
+}
+
+.sbgcui_discharge_timeout {
+	color: var(--text-disabled);
+	display: block;
 }
 
 .sbgcui_hidden {
