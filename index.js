@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.7
+// @version      1.9.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.7';
+	const USERSCRIPT_VERSION = '1.9.8';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3854,8 +3854,17 @@
 				const features = map.getFeaturesAtPixel(event.pixel, {
 					layerFilter: layer => layer.get('name') == 'regions',
 				});
+				const areasM2 = features.map(feature => ol.sphere.getArea(feature.getGeometry()));
+				const minAreaM2 = Math.min(...areasM2);
+				const maxAreaM2 = Math.max(...areasM2);
+				const minArea = minAreaM2 < 1e6 ? i18next.t('units.sqm', { count: minAreaM2 }) : i18next.t('units.sqkm', { count: minAreaM2 / 1e6 });
+				const maxArea = maxAreaM2 < 1e6 ? i18next.t('units.sqm', { count: maxAreaM2 }) : i18next.t('units.sqkm', { count: maxAreaM2 / 1e6 });
+				let message = `Количество регионов в точке: ${features.length}.`;
 
-				alert(`Количество регионов в точке: ${features.length}`);
+				if (features.length == 1) { message += `\n\nПлощадь региона: ${maxArea}.`; }
+				if (features.length > 1) { message += `\n\nПлощадь самого большого региона: ${maxArea}.\nПлощадь самого маленького региона: ${minArea}.`; }
+				
+				alert(message);
 			}
 
 			const button = document.createElement('button');
@@ -3866,6 +3875,7 @@
 			toolbar.addItem(button, 5);
 		}
 
+	
 		/* Время до разрядки точки */
 		{
 			function updateTimeout() {
