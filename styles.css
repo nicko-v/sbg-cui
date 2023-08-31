@@ -112,7 +112,7 @@ body {
 	position: absolute;
 }
 
-#inventory__close[sbgcui_measurement_mode]:has(~.inventory__content[data-tab="3"]) {
+.inventory.popup:has(.inventory__content[data-tab="3"]) #inventory__close[sbgcui_measurement_mode] {
 	color: var(--selection);
 }
 
