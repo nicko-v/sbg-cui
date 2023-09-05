@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.9
+// @version      1.9.10
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.9';
+	const USERSCRIPT_VERSION = '1.9.10';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -107,7 +107,7 @@
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
 	window.stop();
-	window.cuiVersion = USERSCRIPT_VERSION;
+	window.cuiStatus = 'loading';
 
 	fetch('/')
 		.then(r => r.text())
@@ -3895,7 +3895,7 @@
 		}
 
 
-		window.dispatchEvent(new Event('cuiReady'));
+		window.cuiStatus = 'loaded';
 	}
 
 })();
