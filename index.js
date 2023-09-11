@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.10
+// @version      1.9.11
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.10';
+	const USERSCRIPT_VERSION = '1.9.11';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -821,7 +821,7 @@
 									}
 									break;
 								case '/api/repair':
-									if ('data' in parsedResponse) {
+									if ('data' in parsedResponse && parsedResponse.data.g == lastOpenedPoint.guid) {
 										lastOpenedPoint.update(parsedResponse.data.co);
 									}
 									break;
