@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.11
+// @version      1.9.12
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.11';
+	const USERSCRIPT_VERSION = '1.9.12';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -193,6 +193,9 @@
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
 				data = data.replace('class Bitfield', 'window.Bitfield = class Bitfield');
+				data = data.replaceAll(/makeEntry\(e,\sdata\)(?!\s{)/g, 'window.makeEntryDec(e, data, makeEntry)');
+				data = data.replaceAll(`Intl.NumberFormat('ru'`, 'Intl.NumberFormat(LANG');
+				data = data.replaceAll(`lng: 'ru'`, 'lng: LANG');
 
 				script.textContent = data;
 
@@ -2013,24 +2016,6 @@
 			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ["class"] });
 
 
-			let inventoryContentObserver = new MutationObserver(records => {
-				records.forEach(e => {
-					if (e.oldValue.indexOf('loading') > -1 && e.target.classList.contains('loaded')) {
-						let energy = e.target.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
-						let isAllied = e.target.querySelector('.inventory__item-title').style.color.indexOf(`team-${player.team}`) > -1;
-
-						if (isAllied) {
-							e.target.style.setProperty('--sbgcui-energy', `${energy}%`);
-							if (energy < 100) {
-								e.target.style.setProperty('--sbgcui-display-r-button', 'flex');
-							}
-						}
-					}
-				});
-			});
-			inventoryContentObserver.observe(inventoryContent, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
-
-
 			let xpDiffSpanObserver = new MutationObserver(records => {
 				let xp = records.find(e => e.addedNodes.length).addedNodes[0].data.match(/\d+/)[0];
 				showXp(xp);
@@ -2274,6 +2259,19 @@
 
 		/* Зарядка из инвентаря */
 		{
+			function makeEntryDec(e, data, makeEntry) {
+				if (data.te == player.team) {
+					e.style.setProperty('--sbgcui-energy', `${data.e}%`);
+					if (data.e < 100) {
+						e.style.setProperty('--sbgcui-display-r-button', 'flex');
+					}
+				}
+				
+				return makeEntry(e, data);
+			}
+
+			window.makeEntryDec = makeEntryDec;
+			
 			inventoryContent.addEventListener('click', event => {
 				if (!event.currentTarget.matches('.inventory__content[data-tab="3"]')) { return; }
 				if (!event.target.closest('.inventory__item-controls')) { return; }
