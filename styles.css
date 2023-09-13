@@ -141,6 +141,7 @@ body {
 	top: initial;
 	right: initial;
 	translate: initial;
+	transform: initial;
 	background: currentColor;
 	color: inherit;
 	border-radius: initial;
@@ -245,7 +246,7 @@ body {
 	order: 3;
 	margin: 0 5px 15px;
 	justify-content: center;
-	translate: initial;
+	transform: initial;
 	width: initial;
 }
 
@@ -365,6 +366,10 @@ body {
 	text-overflow: ellipsis;
 	overflow-x: hidden;
 	white-space: nowrap;
+}
+
+.i-stat__entry:has(span[data-i18n="info.regions"]) {
+	display: none;
 }
 
 #i-stat__energy>span {
@@ -548,6 +553,10 @@ body {
 	visibility: hidden !important;
 }
 
+.ol-scale-line {
+	display: none;
+}
+
 .pr-stats__section-header,
 .settings-section__header {
 	color: var(--selection);
@@ -571,6 +580,10 @@ body {
 .pr-buttons {
 	display: flex;
 	gap: 5px;
+}
+
+.region-picker {
+	display: none;
 }
 
 .self-info {
