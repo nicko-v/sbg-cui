@@ -42,6 +42,7 @@ body {
 	width: 6em;
 	height: 6em;
 	padding: 0;
+	margin-bottom: 10px;
 	border-width: 8px;
 	border-radius: 50%;
 	border-color: var(--sbgcui-branding-color);
