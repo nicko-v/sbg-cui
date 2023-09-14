@@ -554,7 +554,10 @@ body {
 }
 
 .ol-scale-line {
-	display: none;
+	bottom: 0;
+	left: 50%;
+	padding-bottom: 0;
+	translate: -50% 0;
 }
 
 .pr-stats__section-header,
