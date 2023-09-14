@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.9.12
+// @version      1.10.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.9.12';
+	const USERSCRIPT_VERSION = '1.10.1';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -193,9 +193,9 @@
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
 				data = data.replace('class Bitfield', 'window.Bitfield = class Bitfield');
+				data = data.replace(`if (type == 'osm') {`, `if (type == 'stadia') { source=new ol.source.StadiaMaps({ layer:'stamen_watercolor' })} else if (type == 'osm') {`);
+				data = data.replace(`$('[name="baselayer"]').on('change', e`, `$('.layers-config__list').on('change', '[name="baselayer"]', e`);
 				data = data.replaceAll(/makeEntry\(e,\sdata\)(?!\s{)/g, 'window.makeEntryDec(e, data, makeEntry)');
-				data = data.replaceAll(`Intl.NumberFormat('ru'`, 'Intl.NumberFormat(LANG');
-				data = data.replaceAll(`lng: 'ru'`, 'lng: LANG');
 
 				script.textContent = data;
 
@@ -232,6 +232,7 @@
 					in: pointData.li.i,
 					out: pointData.li.o,
 				};
+				this.regionsAmount = pointData.r;
 				this.cores = {};
 				this.image = `https://lh3.googleusercontent.com/${pointData.i}`;
 
@@ -278,6 +279,10 @@
 				return pointEnergy / maxPointEnergy * 100;
 			}
 
+			get energyFormatted() {
+				return percent_format.format(this.energy);
+			}
+
 			get mostChargedCatalyserEnergy() {
 				let energy = Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
 				return isFinite(energy) ? energy : null;
@@ -314,12 +319,6 @@
 
 			get linesAmount() {
 				return this.lines.in + this.lines.out;
-			}
-
-			get regionsAmount() {
-				return inviewRegionsVertexes.filter(e => {
-					return e.find(e => e[0] == this.coords[0] && e[1] == this.coords[1]) != undefined;
-				}).length;
 			}
 
 			get destroyReward() {
@@ -535,7 +534,7 @@
 		let pointCores = document.querySelector('.i-stat__cores');
 		let pointImage = document.querySelector('#i-image');
 		let pointImageBox = document.querySelector('.i-image-box');
-		let pointEnergySpan = document.querySelector('#i-stat__energy');
+		let pointEnergyValue = document.createElement('span');
 		let pointLevelSpan = document.querySelector('#i-level');
 		let pointOwnerSpan = document.querySelector('#i-stat__owner');
 		let pointTitleSpan = document.querySelector('#i-title');
@@ -571,6 +570,8 @@
 		let inviewRegionsVertexes = [];
 
 		let view = map.getView();
+
+		let percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
 
 		let numbersConverter = {
@@ -2071,6 +2072,8 @@
 					pointPopup.classList.remove('sbgcui_point-popup-bg');
 					pointImage.classList.remove('sbgcui_no_bg_image');
 				}
+
+				pointEnergyValue.innerText = `${lastOpenedPoint.energyFormatted}% @ ${lastOpenedPoint.coresAmount}`;
 			});
 
 			document.addEventListener("backbutton", () => {
@@ -2121,6 +2124,9 @@
 			let notifsButton = document.querySelector('#notifs-menu');
 			let attackSliderClose = document.querySelector('#attack-slider-close');
 			let zoomContainer = document.querySelector('.ol-zoom');
+			let pointEnergy = document.createElement('div');
+			let pointEnergyLabel = document.createElement('span');
+			let pointOwner = document.querySelector('.i-stat__entry:has(#i-stat__owner)');
 
 			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 			document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -2154,6 +2160,12 @@
 			ops.replaceChildren('INVENTORY', invTotalSpan);
 
 			selfLvlSpan.innerText = (player.level <= 9 ? '0' : '') + player.level;
+
+			pointEnergy.classList.add('i-stat__entry');
+			pointEnergyLabel.innerText = i18next.t('info.energy');
+			pointEnergyValue.id = 'i-stat__energy';
+			pointEnergy.append(pointEnergyLabel, ': ', pointEnergyValue);
+			pointOwner.after(pointEnergy);
 		}
 
 
@@ -2177,6 +2189,25 @@
 			doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
 
 			map.addControl(toolbar);
+
+
+			const stadiaLabel = document.createElement('label');
+			const stadiaInput = document.createElement('input');
+			const stadiaSpan = document.createElement('span');
+			const isSelected = JSON.parse(localStorage.getItem('settings')).base == 'stadia';
+
+			stadiaLabel.classList.add('layers-config__entry');
+
+			stadiaInput.type = 'radio';
+			stadiaInput.name = 'baselayer';
+			stadiaInput.value = 'stadia';
+			stadiaInput.checked = isSelected;
+
+			stadiaSpan.innerText = 'Stamen Watercolor'
+
+			stadiaLabel.append(stadiaInput, stadiaSpan);
+
+			document.querySelector('.layers-config__entry:has(input[value="osm"])').after(stadiaLabel);
 		}
 
 
@@ -3755,25 +3786,20 @@
 		}
 
 
-		/* Показ количества регионов и опыта за снос */
+		/* Показ опыта за снос */
 		{
 			function openHandler() {
-				regionsAmountDiv.innerText = `${regionsText}: ${formatter.format(lastOpenedPoint.regionsAmount)}`;
 				destroyRewardDiv.innerText = `${rewardText}: ${formatter.format(lastOpenedPoint.destroyReward)} ${i18next.t('units.pts-xp')}`;
 			}
 
 			const pointControls = document.querySelector('.info.popup .i-buttons');
 			const pointStat = document.querySelector('.info.popup .i-stat');
-			const regionsAmountDiv = document.createElement('div');
 			const destroyRewardDiv = document.createElement('div');
-			const regionsText = i18next.language == 'ru' ? 'Регионы' : 'Regions';
 			const rewardText = i18next.language == 'ru' ? 'Награда' : 'Reward';
 			const formatter = new Intl.NumberFormat(i18next.language);
 
-			regionsAmountDiv.classList.add('i-stat__entry');
 			destroyRewardDiv.classList.add('i-stat__entry');
 
-			pointStat.insertBefore(regionsAmountDiv, pointControls);
 			pointStat.insertBefore(destroyRewardDiv, pointControls);
 
 			pointPopup.addEventListener('pointPopupOpened', openHandler);
@@ -3886,7 +3912,7 @@
 			const timeoutSpan = document.createElement('span');
 
 			timeoutSpan.classList.add('sbgcui_discharge_timeout');
-			pointEnergySpan.after(timeoutSpan);
+			pointEnergyValue.after(timeoutSpan);
 
 			pointPopup.addEventListener('pointPopupOpened', updateTimeout);
 			pointPopup.addEventListener('pointRepaired', updateTimeout);

@@ -368,10 +368,6 @@ body {
 	white-space: nowrap;
 }
 
-.i-stat__entry:has(span[data-i18n="info.regions"]) {
-	display: none;
-}
-
 #i-stat__energy>span {
 	color: var(--text-disabled);
 	display: block;
@@ -517,6 +513,10 @@ body {
 	mask-position: center;
 	-webkit-mask-size: 1em;
 	mask-size: 1em;
+}
+
+.ol-attribution {
+	display: none;
 }
 
 .ol-control {
