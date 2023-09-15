@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.1
+// @version      1.10.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.1';
+	const USERSCRIPT_VERSION = '1.10.2';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2126,7 +2126,7 @@
 			let zoomContainer = document.querySelector('.ol-zoom');
 			let pointEnergy = document.createElement('div');
 			let pointEnergyLabel = document.createElement('span');
-			let pointOwner = document.querySelector('.i-stat__entry:has(#i-stat__owner)');
+			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
 
 			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 			document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -2207,7 +2207,7 @@
 
 			stadiaLabel.append(stadiaInput, stadiaSpan);
 
-			document.querySelector('.layers-config__entry:has(input[value="osm"])').after(stadiaLabel);
+			document.querySelector('input[value="osm"]').parentElement.after(stadiaLabel);
 		}
 
 
