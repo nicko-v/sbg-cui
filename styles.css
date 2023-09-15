@@ -558,7 +558,7 @@ body {
 	bottom: 0;
 	left: 50%;
 	padding-bottom: 0;
-	translate: -50% 0;
+	transform: translate(-50%, 0);
 }
 
 .pr-stats__section-header,
