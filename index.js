@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.2
+// @version      1.10.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.2';
+	const USERSCRIPT_VERSION = '1.10.3';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2591,7 +2591,7 @@
 
 					if (clicks + 1 == 5) {
 						let iStat = document.querySelector('.i-stat');
-						let guid = document.querySelector('.info.popup').dataset.guid;
+						let guid = pointPopup.dataset.guid;
 						let guidSpan = document.createElement('span');
 
 						guidSpan.innerText = `GUID: ${guid}`;
@@ -2603,7 +2603,7 @@
 							});
 						});
 
-						iStat.prepend(guidSpan);
+						pointPopup.insertBefore(guidSpan, iStat);
 
 						pointPopup.addEventListener('pointPopupClosed', _ => {
 							guidSpan.remove();
