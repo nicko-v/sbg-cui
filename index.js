@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.3
+// @version      1.10.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.3';
+	const USERSCRIPT_VERSION = '1.10.4';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -134,7 +134,7 @@
 			}
 
 			forEachFeatureAtPixel(pixel, callback, options = {}) {
-				const isShowInfoCallback = callback.toString().includes('showInfo(');
+				const isShowInfoCallback = callback.toString().includes('piv.push');
 
 				options.hitTolerance = isFinite(options.hitTolerance) ? options.hitTolerance : HIT_TOLERANCE;
 
