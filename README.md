@@ -23,7 +23,7 @@
 ## Установка: Android
 1. Установить Яндекс.Браузер: [ссылка](https://play.google.com/store/apps/details?id=com.yandex.browser&hl=ru&gl=US). Либо его модифицированную версию, где вырезано всё лишнее: [ссылка](https://4pda.to/forum/index.php?showtopic=473341&view=findpost&p=113472644). 
 2. Установить Tampermonkey: [ссылка](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo). Ссылку открывать в Яндекс.Браузере. 
-3. В списке каталога дополнений выдать Tampermonkey разрешение открывать файлы по ссылкам. 
+3. В списке [каталога дополнений](chrome://tune/) выдать Tampermonkey разрешение открывать файлы по ссылкам. 
 4. В браузере нажать на иконку плагина Tampermonkey и перейти в Dashboard. 
 5. На открывшейся странице плагина перейти справа во вкладку “Utilities”. 
 6. Внизу в поле “Import from URL” вставить ссылку на скрипт нажать “Install”: https://nicko-v.github.io/sbg-cui/index.min.js
