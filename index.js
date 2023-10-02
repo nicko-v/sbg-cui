@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://3d.sytes.net/
-// @version      1.10.4
+// @version      1.10.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.4';
+	const USERSCRIPT_VERSION = '1.10.5';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -825,8 +825,8 @@
 									}
 									break;
 								case '/api/repair':
-									if ('data' in parsedResponse && parsedResponse.data.g == lastOpenedPoint.guid) {
-										lastOpenedPoint.update(parsedResponse.data.co);
+									if ('data' in parsedResponse && isPointPopupOpened) {
+										lastOpenedPoint.update(parsedResponse.data);
 									}
 									break;
 								default:
@@ -2321,7 +2321,7 @@
 						if (r.error) {
 							throw new Error(r.error);
 						} else if (r.data) {
-							let [pointEnergy, maxEnergy] = r.data.co.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
+							let [pointEnergy, maxEnergy] = r.data.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
 							let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
 							let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
 							let percentage = Math.floor(pointEnergy / maxEnergy * 100);
