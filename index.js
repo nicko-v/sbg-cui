@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         SBG CUI
-// @namespace    https://3d.sytes.net/
-// @version      1.10.5
+// @namespace    https://sbg-game.ru/app/
+// @version      1.10.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
 // @author       NV
-// @match        https://3d.sytes.net/*
-// @exclude      https://3d.sytes.net/login/
+// @match        https://sbg-game.ru/app/*
+// @exclude      https://sbg-game.ru/app/login/
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.5';
+	const USERSCRIPT_VERSION = '1.10.6';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
