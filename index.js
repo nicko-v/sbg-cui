@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.10.6
+// @version      1.10.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.6';
+	const USERSCRIPT_VERSION = '1.10.7';
 	const LATEST_KNOWN_VERSION = '0.4.1';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -109,7 +109,7 @@
 	window.stop();
 	window.cuiStatus = 'loading';
 
-	fetch('/')
+	fetch('/app')
 		.then(r => r.text())
 		.then(data => {
 			data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
@@ -158,7 +158,7 @@
 			}
 
 			setStyle(style) {
-				if (style && playerFeature == undefined && style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/icons\/player/)) {
+				if (style && playerFeature == undefined && style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/assets\/player/)) {
 					let setCenter = style[1].getGeometry().setCenter;
 
 					style[1].getGeometry().setCenter = pos => {
@@ -183,7 +183,7 @@
 	}
 
 	function loadMainScript() {
-		fetch('/script.js')
+		fetch('/app/script.js')
 			.then(r => r.text())
 			.then(data => {
 				let script = document.createElement('script');
