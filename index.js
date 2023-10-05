@@ -4003,7 +4003,7 @@
 
 			toggleRotationLock();
 
-			lockRotationButton.classList.add('fa', 'fa-solid-', 'sbgcui_lock_rotation');
+			lockRotationButton.classList.add('fa', 'fa-solid-compass', 'sbgcui_lock_rotation');
 			lockRotationButton.addEventListener('click', toggleRotationLock);
 
 			toggleFollow.before(lockRotationButton);
