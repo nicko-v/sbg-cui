@@ -2114,7 +2114,7 @@
 
 			toggleFollow.addEventListener('click', () => {
 				dragPanInteraction.setActive(toggleFollow.dataset.active == 'false');
-			})
+			});
 		}
 
 
@@ -3964,14 +3964,11 @@
 			}
 
 			function toggleRotationLock(event) {
-				const isFollow = localStorage.getItem('follow') == 'true';
-
 				// Если был эвент нажатия кнопки — переключаем.
 				// Иначе функция вызвана при запуске скрипта и должна установить сохранённое ранее значение.
 				if (event) { isRotationLocked = !isRotationLocked; }
 
 				if (isRotationLocked) { resetView(); }
-				dragPanInteraction.setActive(isRotationLocked && !isFollow);
 				pinchRotateInteraction.setActive(!isRotationLocked);
 				lockRotationButton.setAttribute('sbgcui_locked', isRotationLocked);
 				localStorage.setItem('sbgcui_isRotationLocked', isRotationLocked);
