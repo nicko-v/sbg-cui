@@ -1,13 +1,12 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.10.7
+// @version      1.11.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
 // @author       NV
 // @match        https://sbg-game.ru/app/*
-// @exclude      https://sbg-game.ru/app/login/
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -15,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.10.7';
+	const USERSCRIPT_VERSION = '1.11.0';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -338,7 +337,7 @@
 						owner: core.o,
 					}
 				});
-				
+
 				const event = new Event('pointRepaired');
 				pointPopup.dispatchEvent(event);
 			}
@@ -1661,7 +1660,7 @@
 			window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
 			window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
 
-			doubleClickZoomInteraction?.setActive(Boolean(ui.doubleClickZoom));
+			doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
 
 			if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
 
@@ -2111,7 +2110,7 @@
 			});
 
 			toggleFollow.addEventListener('click', () => {
-				dragPanInteraction?.setActive(toggleFollow.dataset.active == 'false');
+				dragPanInteraction.setActive(toggleFollow.dataset.active == 'false');
 			})
 		}
 
@@ -2172,11 +2171,13 @@
 
 		/* Доработка карты */
 		{
-			var dragPanInteraction;
-			var doubleClickZoomInteraction;
+			let attributionControl, rotateControl;
+			var dragPanInteraction, doubleClickZoomInteraction;
 			var toolbar = new Toolbar();
+			const controls = map.getControls();
+			const interactions = map.getInteractions();
 
-			map.getInteractions().forEach(interaction => {
+			interactions.forEach(interaction => {
 				switch (interaction.constructor) {
 					case ol.interaction.DragPan:
 						dragPanInteraction = interaction;
@@ -2186,9 +2187,24 @@
 						break;
 				}
 			});
-			dragPanInteraction?.setActive(localStorage.getItem('follow') == 'false');
-			doubleClickZoomInteraction?.setActive(Boolean(config.ui.doubleClickZoom));
 
+			dragPanInteraction.setActive(localStorage.getItem('follow') == 'false');
+			doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
+
+
+			controls.forEach(control => {
+				switch (control.constructor) {
+					case ol.control.Attribution:
+						attributionControl = control;
+						break;
+					case ol.control.Rotate:
+						rotateControl = control;
+						break;
+				}
+			});
+
+			map.removeControl(attributionControl);
+			map.removeControl(rotateControl);
 			map.addControl(toolbar);
 
 
@@ -2298,12 +2314,12 @@
 						e.style.setProperty('--sbgcui-display-r-button', 'flex');
 					}
 				}
-				
+
 				return makeEntry(e, data);
 			}
 
 			window.makeEntryDec = makeEntryDec;
-			
+
 			inventoryContent.addEventListener('click', event => {
 				if (!event.currentTarget.matches('.inventory__content[data-tab="3"]')) { return; }
 				if (!event.target.closest('.inventory__item-controls')) { return; }
@@ -2598,7 +2614,7 @@
 						guidSpan.innerText = `GUID: ${guid}`;
 
 						guidSpan.addEventListener('click', _ => {
-							window.navigator.clipboard.writeText(`${window.location.origin}/?point=${guid}`).then(_ => {
+							window.navigator.clipboard.writeText(`${window.location.origin + window.location.pathname}?point=${guid}`).then(_ => {
 								let toast = createToast('Ссылка на точку скопирована в буфер обмена.');
 								toast.showToast();
 							});
@@ -3889,7 +3905,7 @@
 
 				if (features.length == 1) { message += `\n\nПлощадь региона: ${maxArea}.`; }
 				if (features.length > 1) { message += `\n\nПлощадь самого большого региона: ${maxArea}.\nПлощадь самого маленького региона: ${minArea}.`; }
-				
+
 				alert(message);
 			}
 
@@ -3901,7 +3917,7 @@
 			toolbar.addItem(button, 5);
 		}
 
-	
+
 		/* Время до разрядки точки */
 		{
 			function updateTimeout() {
@@ -3917,6 +3933,86 @@
 
 			pointPopup.addEventListener('pointPopupOpened', updateTimeout);
 			pointPopup.addEventListener('pointRepaired', updateTimeout);
+		}
+
+
+		/* Вращение карты */
+		{
+			let isRotationLocked = localStorage.getItem('sbgcui_isRotationLocked') == 'true';
+			let latestTouchPoint = null;
+			const lockRotationButton = document.createElement('button');
+			const mapDiv = document.getElementById('map');
+
+			function rotateView(pointA, pointB) {
+				const center = map.getPixelFromCoordinate(view.getCenter());
+				const aAngle = Math.atan2((pointA[1] - center[1]), (pointA[0] - center[0]));
+				const bAngle = Math.atan2((pointB[1] - center[1]), (pointB[0] - center[0]));
+				const anchor = map.getCoordinateFromPixel(center);
+
+				view.adjustRotation(bAngle - aAngle, anchor);
+			}
+
+			function resetView() {
+				view.set('animationInProgress', true);
+				view.animate({ rotation: 0 }, () => { view.set('animationInProgress', false); });
+			}
+
+			function toggleRotationLock(event) {
+				const isFollow = localStorage.getItem('follow') == 'true';
+
+				// Если был эвент нажатия кнопки — переключаем.
+				// Иначе функция вызвана при запуске скрипта и должна установить сохранённое ранее значение.
+				if (event) { isRotationLocked = !isRotationLocked; }
+
+				if (isRotationLocked) { resetView(); }
+				dragPanInteraction.setActive(isRotationLocked && !isFollow);
+				lockRotationButton.setAttribute('sbgcui_locked', isRotationLocked);
+				localStorage.setItem('sbgcui_isRotationLocked', isRotationLocked);
+			}
+
+			function touchStartHandler(event) {
+				const isFollow = localStorage.getItem('follow') == 'true';
+
+				if (isRotationLocked) { return; }
+				if (!isFollow) { return; }
+				if (event.target.nodeName != 'CANVAS') { return; }
+				if (event.targetTouches.length > 1) { return; }
+
+				latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+			}
+
+			function touchMoveHandler(event) {
+				event.preventDefault();
+
+				if (latestTouchPoint == null) { return; }
+
+				const ongoingTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+
+				rotateView(latestTouchPoint, ongoingTouchPoint);
+				latestTouchPoint = ongoingTouchPoint;
+			}
+
+			function touchEndHandler() {
+				latestTouchPoint = null;
+			}
+
+			function rotationChangeHandler(e) {
+				if (view.get('animationInProgress') != true) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
+				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
+			}
+
+			toggleRotationLock();
+
+			lockRotationButton.classList.add('fa', 'fa-solid-', 'sbgcui_lock_rotation');
+			lockRotationButton.addEventListener('click', toggleRotationLock);
+
+			toggleFollow.before(lockRotationButton);
+
+			mapDiv.addEventListener('touchstart', touchStartHandler);
+			mapDiv.addEventListener('touchmove', touchMoveHandler);
+			mapDiv.addEventListener('touchend', touchEndHandler);
+
+			view.on('change:rotation', rotationChangeHandler);
 		}
 
 

@@ -30,6 +30,10 @@
   --fa-url: url("../svg/solid/circle-xmark.svg");
 }
 
+.fa-solid-compass {
+  --fa-url: url("../svg/solid/compass.svg");
+}
+
 .fa-solid-droplet-slash {
   --fa-url: url("../svg/solid/droplet-slash.svg");
 }

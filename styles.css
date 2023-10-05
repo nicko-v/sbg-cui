@@ -516,10 +516,6 @@ body {
 	mask-size: 1em;
 }
 
-.ol-attribution {
-	display: none;
-}
-
 .ol-control {
 	left: initial;
 	right: 0.5em;
@@ -541,17 +537,6 @@ body {
 
 .ol-layer__base {
 	filter: invert(var(--sbgcui-invert)) hue-rotate(var(--sbgcui-hueRotate)) brightness(var(--sbgcui-brightness)) grayscale(var(--sbgcui-grayscale)) sepia(var(--sbgcui-sepia)) blur(var(--sbgcui-blur)) !important;
-}
-
-.ol-rotate {
-	position: initial;
-	margin-top: 10px;
-	transform: none !important;
-}
-
-.ol-rotate.ol-hidden {
-	opacity: 0 !important;
-	visibility: hidden !important;
 }
 
 .ol-scale-line {
@@ -805,6 +790,23 @@ body {
 
 #i-ref[data-has="0"]~.sbgcui_point_trash {
 	display: none;
+}
+
+.sbgcui_lock_rotation {
+	margin-top: 20px !important;
+	opacity: 0.5;
+}
+
+.sbgcui_lock_rotation[sbgcui_locked="true"] {
+	opacity: 1;
+}
+
+.sbgcui_lock_rotation[sbgcui_locked="true"]::before {
+	transition: transform 0.5s ease;
+}
+
+.sbgcui_lock_rotation[sbgcui_locked="false"]::before {
+	transform: rotate(var(--sbgcui_angle));
 }
 
 .sbgcui_settings {
