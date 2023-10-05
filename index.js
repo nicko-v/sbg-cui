@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.0
+// @version      1.11.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.0';
+	const USERSCRIPT_VERSION = '1.11.1';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2098,9 +2098,12 @@
 				let touchStartDate = Date.now();
 
 				let timeoutID = setTimeout(() => {
+					view.set('animationInProgress', true);
 					view.animate(
 						{ center: player.feature.getGeometry().getCoordinates() },
-						{ zoom: 17 });
+						{ zoom: 17 },
+						{ rotation: 0 },
+						() => { view.set('animationInProgress', false); });
 				}, 500);
 
 				this.addEventListener('touchend', () => {
@@ -2172,7 +2175,7 @@
 		/* Доработка карты */
 		{
 			let attributionControl, rotateControl;
-			var dragPanInteraction, doubleClickZoomInteraction;
+			var dragPanInteraction, doubleClickZoomInteraction, pinchRotateInteraction;
 			var toolbar = new Toolbar();
 			const controls = map.getControls();
 			const interactions = map.getInteractions();
@@ -2184,6 +2187,9 @@
 						break;
 					case ol.interaction.DoubleClickZoom:
 						doubleClickZoomInteraction = interaction;
+						break;
+					case ol.interaction.PinchRotate:
+						pinchRotateInteraction = interaction;
 						break;
 				}
 			});
@@ -3966,6 +3972,7 @@
 
 				if (isRotationLocked) { resetView(); }
 				dragPanInteraction.setActive(isRotationLocked && !isFollow);
+				pinchRotateInteraction.setActive(!isRotationLocked);
 				lockRotationButton.setAttribute('sbgcui_locked', isRotationLocked);
 				localStorage.setItem('sbgcui_isRotationLocked', isRotationLocked);
 			}
@@ -3996,8 +4003,10 @@
 				latestTouchPoint = null;
 			}
 
-			function rotationChangeHandler(e) {
-				if (view.get('animationInProgress') != true) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
+			function rotationChangeHandler() {
+				const isFollow = localStorage.getItem('follow') == 'true';
+
+				if (isFollow && view.get('animationInProgress') != true) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
 				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
 			}
 

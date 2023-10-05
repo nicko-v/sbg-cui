@@ -189,6 +189,7 @@ body {
 }
 
 #toggle-follow {
+	margin-bottom: 20px;
 	transform: rotate(-90deg);
 }
 
