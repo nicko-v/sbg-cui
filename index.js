@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.2
+// @version      1.11.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.2';
+	const USERSCRIPT_VERSION = '1.11.3';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3837,7 +3837,7 @@
 			const pointControls = document.querySelector('.info.popup .i-buttons');
 			const pointStat = document.querySelector('.info.popup .i-stat');
 			const destroyRewardDiv = document.createElement('div');
-			const rewardText = i18next.language == 'ru' ? 'Награда' : 'Reward';
+			const rewardText = i18next.language == 'ru-RU' ? 'Награда' : 'Reward';
 			const formatter = new Intl.NumberFormat(i18next.language);
 
 			destroyRewardDiv.classList.add('i-stat__entry');
@@ -4039,6 +4039,20 @@
 			mapDiv.addEventListener('touchend', touchEndHandler);
 
 			view.on('change:rotation', rotationChangeHandler);
+		}
+
+
+		/* Кнопка навигации к точке */
+		{
+			const navLink = document.createElement('a');
+
+			navLink.innerText = i18next.language == 'ru-RU' ? 'Навигация' : 'Navigate';
+
+			pointPopup.appendChild(navLink);
+
+			pointPopup.addEventListener('pointPopupOpened', () => {
+				navLink.href = `yandexmaps://maps.yandex.ru/?pt=${lastOpenedPoint.coords.join(',')}`;
+			});
 		}
 
 
