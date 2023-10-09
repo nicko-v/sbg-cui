@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.1
+// @version      1.11.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.1';
+	const USERSCRIPT_VERSION = '1.11.2';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -22,6 +22,7 @@
 	const DISCOVERY_COOLDOWN = 90;
 	const PLAYER_RANGE = 45;
 	const HIT_TOLERANCE = 15;
+	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
@@ -100,7 +101,7 @@
 		},
 	};
 
-	let map, playerFeature;
+	let map, view, playerFeature;
 
 
 	if (window.location.pathname.startsWith('/login')) { return; }
@@ -178,8 +179,17 @@
 			}
 		}
 
+		class View extends ol.View {
+			constructor(options) {
+				options.padding = [VIEW_PADDING, 0, 0, 0];
+				super(options);
+				view = this;
+			}
+		}
+
 		ol.Map = Map;
 		ol.Feature = Feature;
+		ol.View = View;
 	}
 
 	function loadMainScript() {
@@ -192,10 +202,11 @@
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
 				data = data.replace('const draw_slider =', 'window.draw_slider =');
-				data = data.replace('class Bitfield', 'window.Bitfield = class Bitfield');
+				data = data.replace('class Bitfield', 'window.requestEntities = requestEntities; window.Bitfield = class Bitfield');
 				data = data.replace(`if (type == 'osm') {`, `if (type == 'stadia') { source=new ol.source.StadiaMaps({ layer:'stamen_watercolor' })} else if (type == 'osm') {`);
 				data = data.replace(`$('[name="baselayer"]').on('change', e`, `$('.layers-config__list').on('change', '[name="baselayer"]', e`);
 				data = data.replaceAll(/makeEntry\(e,\sdata\)(?!\s{)/g, 'window.makeEntryDec(e, data, makeEntry)');
+				data = data.replaceAll('view.calculateExtent(map.getSize()', `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`);
 
 				script.textContent = data;
 
@@ -369,17 +380,21 @@
 			#isExpanded = false;
 			#toolbar = document.createElement('div');
 
-			constructor() {
-				let container = document.createElement('div');
+			constructor(toolbarName) {
+				const container = document.createElement('div');
+				const isExpanded = localStorage.getItem(toolbarName) == 'true';
+
 				container.classList.add('ol-unselectable', 'ol-control', 'sbgcui_toolbar-control');
 				super({ element: container });
+
+				this.name = toolbarName;
 
 				this.#expandButton.classList.add('fa', 'fa-solid-angle-up');
 				this.#expandButton.addEventListener('click', this.handleExpand.bind(this));
 
 				this.#toolbar.classList.add('sbgcui_toolbar');
 
-				this.collapse();
+				isExpanded ? this.expand() : this.collapse();
 
 				container.append(this.#toolbar, this.#expandButton);
 			}
@@ -396,6 +411,7 @@
 				this.#toolbar.classList.add('sbgcui_hidden');
 
 				this.#isExpanded = false;
+				localStorage.setItem(this.name, false)
 			}
 
 			expand() {
@@ -405,6 +421,7 @@
 				this.#toolbar.classList.remove('sbgcui_hidden');
 
 				this.#isExpanded = true;
+				localStorage.setItem(this.name, true)
 			}
 
 			handleExpand() {
@@ -568,8 +585,6 @@
 		let uniques = { c: new Set(), v: new Set() };
 		let inview = {};
 		let inviewRegionsVertexes = [];
-
-		let view = map.getView();
 
 		let percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
@@ -2076,6 +2091,10 @@
 				pointEnergyValue.innerText = `${lastOpenedPoint.energyFormatted}% @ ${lastOpenedPoint.coresAmount}`;
 			});
 
+			pointPopup.addEventListener('pointRepaired', () => {
+				pointEnergyValue.innerText = `${lastOpenedPoint.energyFormatted}% @ ${lastOpenedPoint.coresAmount}`;
+			});
+
 			document.addEventListener("backbutton", () => {
 				if (isProfilePopupOpened) {
 					click(pointPopupCloseButton);
@@ -2176,7 +2195,7 @@
 		{
 			let attributionControl, rotateControl;
 			var dragPanInteraction, doubleClickZoomInteraction, pinchRotateInteraction;
-			var toolbar = new Toolbar();
+			var toolbar = new Toolbar('sbgcui_main_toolbar');
 			const controls = map.getControls();
 			const interactions = map.getInteractions();
 
@@ -3997,6 +4016,7 @@
 			}
 
 			function touchEndHandler() {
+				if (latestTouchPoint != null) { window.requestEntities(); }
 				latestTouchPoint = null;
 			}
 
