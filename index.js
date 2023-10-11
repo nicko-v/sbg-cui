@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.3
+// @version      1.11.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.3';
+	const USERSCRIPT_VERSION = '1.11.4';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -1019,6 +1019,19 @@
 				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
 				method: 'POST',
 			}).then(r => r.json());
+		}
+
+		async function fetchHTMLasset(filename) {
+			return fetch(`${HOME_DIR}/assets/html/${filename}.html`)
+				.then(r => {
+					if (r.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${r.status})`); }
+					return r.text();
+				})
+				.then(html => {
+					const parser = new DOMParser();
+					const node = parser.parseFromString(html, 'text/html').body.firstChild;
+					return node;
+				});
 		}
 
 		function createResponse(obj, originalResponse) {
@@ -3859,47 +3872,45 @@
 				zIndex: 9
 			});
 
-			fetch(`${HOME_DIR}/assets/html/zero-point-info.html`)
-				.then(r => r.text())
-				.then(html => {
-					const parser = new DOMParser();
-					const popup = parser.parseFromString(html, 'text/html').body.firstChild;
-					const zeroPointFeature = new ol.Feature({
-						geometry: new ol.geom.Point([0, 0])
+			try {
+				const popup = await fetchHTMLasset('zero-point-info');
+				const zeroPointFeature = new ol.Feature({
+					geometry: new ol.geom.Point([0, 0])
+				});
+
+				popup.addEventListener('click', () => {
+					popup.classList.add('sbgcui_hidden');
+					setTimeout(() => { popup.style.zIndex = 0; }, 100);
+				});
+				document.body.appendChild(popup);
+
+				zeroPointFeature.setId('sbgcui_zeroPoint');
+				zeroPointFeature.setStyle(new ol.style.Style({
+					geometry: new ol.geom.Circle([0, 0], 30),
+					fill: new ol.style.Fill({ color: '#BB7100' }),
+					stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 5 }),
+					text: new ol.style.Text({
+						font: '30px Manrope',
+						text: '?',
+						fill: new ol.style.Fill({ color: '#000' }),
+						stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
+					}),
+				}));
+
+				map.on('click', event => {
+					const features = map.getFeaturesAtPixel(event.pixel, {
+						layerFilter: layer => layer.get('name') == 'sbgcui_points',
 					});
 
-					popup.addEventListener('click', () => {
-						popup.classList.add('sbgcui_hidden');
-						setTimeout(() => { popup.style.zIndex = 0; }, 100);
-					});
-					document.body.appendChild(popup);
-
-					zeroPointFeature.setId('sbgcui_zeroPoint');
-					zeroPointFeature.setStyle(new ol.style.Style({
-						geometry: new ol.geom.Circle([0, 0], 30),
-						fill: new ol.style.Fill({ color: '#BB7100' }),
-						stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 5 }),
-						text: new ol.style.Text({
-							font: '30px Manrope',
-							text: '?',
-							fill: new ol.style.Fill({ color: '#000' }),
-							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 })
-						}),
-					}));
-
-					map.on('click', event => {
-						const features = map.getFeaturesAtPixel(event.pixel, {
-							layerFilter: layer => layer.get('name') == 'sbgcui_points',
-						});
-
-						if (features.includes(zeroPointFeature)) {
-							popup.classList.remove('sbgcui_hidden');
-							setTimeout(() => { popup.style.zIndex = 9; }, 100);
-						}
-					});
-					customPointsSource.addFeature(zeroPointFeature);
-				})
-				.catch(error => { console.log('Ошибка при загрузке ресурса.', error); });
+					if (features.includes(zeroPointFeature)) {
+						popup.classList.remove('sbgcui_hidden');
+						setTimeout(() => { popup.style.zIndex = 9; }, 100);
+					}
+				});
+				customPointsSource.addFeature(zeroPointFeature);
+			} catch (error) {
+				console.log(error);
+			}
 
 			map.addLayer(customPointsLayer);
 		}
@@ -4042,17 +4053,77 @@
 		}
 
 
-		/* Кнопка навигации к точке */
+		/* Навигация к точке */
 		{
-			const navLink = document.createElement('a');
+			try {
+				if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
 
-			navLink.innerText = i18next.language == 'ru-RU' ? 'Навигация' : 'Navigate';
+				function createURL(app, routeType) {
+					const [lonA, latA] = ol.proj.toLonLat(playerFeature.getGeometry().getCoordinates());
+					const [lonB, latB] = lastOpenedPoint.coords;
+					let url;
 
-			pointPopup.appendChild(navLink);
+					switch (app) {
+						case 'yamaps':
+							url = `yandexmaps://maps.yandex.ru/?rtext=${latA},${lonA}~${latB},${lonB}&rtt=${routeType}`;
+							break;
+						case 'yanavi':
+							url = `yandexnavi://build_route_on_map?lat_from=${latA}&lon_from=${lonA}&lat_to=${latB}&lon_to=${lonB}`;
+							break;
+					}
 
-			pointPopup.addEventListener('pointPopupOpened', () => {
-				navLink.href = `yandexmaps://maps.yandex.ru/?pt=${lastOpenedPoint.coords.join(',')}`;
-			});
+					return url;
+				}
+
+				function routeTypeClickHandler(event) {
+					const app = event.currentTarget.dataset.app;
+					const routeType = event.target.dataset.routetype;
+
+					if (event.target.nodeName != 'LI') { return; }
+
+					navPopup.querySelectorAll('li[sbgcui_nav_selected]').forEach(e => { e.removeAttribute('sbgcui_nav_selected'); })
+					event.target.setAttribute('sbgcui_nav_selected', '');
+					submitButton.dataset.app = app;
+					submitButton.dataset.routetype = routeType;
+				}
+
+				const navPopup = await fetchHTMLasset('navigate');
+				const coordsSpan = navPopup.querySelector('.sbgcui_navigate-coords');
+				const form = navPopup.querySelector('form');
+				const menus = navPopup.querySelectorAll('menu');
+				const [cancelButton, submitButton] = navPopup.querySelectorAll('.sbgcui_navigate-form-buttons > button');
+				const navButton = document.createElement('button');
+
+				navButton.classList.add('fa', 'fa-solid-route', 'sbgcui_button_reset', 'sbgcui_navbutton');
+				navButton.addEventListener('click', () => { navPopup.classList.toggle('sbgcui_hidden'); });
+				pointPopup.appendChild(navButton);
+
+				pointPopup.addEventListener('pointPopupOpened', () => {
+					coordsSpan.innerText = lastOpenedPoint.coords.slice().reverse().join(', ');
+				});
+				coordsSpan.addEventListener('click', () => {
+					window.navigator.clipboard.writeText(coordsSpan.innerText).then(() => {
+						const toast = createToast('Координаты скопированы в буфер обмена.');
+						toast.showToast();
+					});
+				});
+
+				form.addEventListener('submit', event => { event.preventDefault(); })
+
+				menus.forEach(menu => {
+					menu.addEventListener('click', routeTypeClickHandler);
+				});
+
+				cancelButton.addEventListener('click', () => { navPopup.classList.add('sbgcui_hidden'); });
+				submitButton.addEventListener('click', () => {
+					const url = createURL(submitButton.dataset.app, submitButton.dataset.routetype);
+					if (url != undefined) { window.location.href = url; }
+				});
+
+				document.body.appendChild(navPopup);
+			} catch (error) {
+				console.log(error);
+			}
 		}
 
 
