@@ -1357,7 +1357,7 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_navbutton {
 	bottom: 10px;
-	color: var(--text-disabled);
+	color: var(--text);
 	font-size: 30px;
 	height: 1em;
 	left: 10px;
@@ -1393,7 +1393,6 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_navigate-subtitle {
-	color: var(--text-disabled);
 	margin: 0 0 10px;
 	text-align: center;
 }
