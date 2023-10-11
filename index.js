@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.4
+// @version      1.11.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.4';
+	const USERSCRIPT_VERSION = '1.11.5';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -4070,6 +4070,12 @@
 						case 'yanavi':
 							url = `yandexnavi://build_route_on_map?lat_from=${latA}&lon_from=${lonA}&lat_to=${latB}&lon_to=${lonB}`;
 							break;
+						case 'dgis':
+							url = `dgis://2gis.ru/routeSearch/rsType/${routeType}/from/${lonA},${latA}/to/${lonB},${latB}`;
+							break;
+						case 'gmaps':
+							url = `comgooglemaps://?saddr=${latA},${lonA}&daddr=${latB},${lonB}&directionsmode=${routeType}`;
+							break;
 					}
 
 					return url;
@@ -4087,6 +4093,14 @@
 					submitButton.dataset.routetype = routeType;
 				}
 
+				function closeNavPopup() {
+					navPopup.classList.add('sbgcui_hidden');
+				}
+
+				function toggleNavPopup() {
+					navPopup.classList.toggle('sbgcui_hidden');
+				}
+
 				const navPopup = await fetchHTMLasset('navigate');
 				const coordsSpan = navPopup.querySelector('.sbgcui_navigate-coords');
 				const form = navPopup.querySelector('form');
@@ -4095,7 +4109,7 @@
 				const navButton = document.createElement('button');
 
 				navButton.classList.add('fa', 'fa-solid-route', 'sbgcui_button_reset', 'sbgcui_navbutton');
-				navButton.addEventListener('click', () => { navPopup.classList.toggle('sbgcui_hidden'); });
+				navButton.addEventListener('click', toggleNavPopup);
 				pointPopup.appendChild(navButton);
 
 				pointPopup.addEventListener('pointPopupOpened', () => {
@@ -4114,11 +4128,16 @@
 					menu.addEventListener('click', routeTypeClickHandler);
 				});
 
-				cancelButton.addEventListener('click', () => { navPopup.classList.add('sbgcui_hidden'); });
+				cancelButton.addEventListener('click', closeNavPopup);
 				submitButton.addEventListener('click', () => {
 					const url = createURL(submitButton.dataset.app, submitButton.dataset.routetype);
-					if (url != undefined) { window.location.href = url; }
+					if (url != undefined) {
+						window.location.href = url;
+						closeNavPopup();
+					}
 				});
+
+				pointPopupCloseButton.addEventListener('click', closeNavPopup)
 
 				document.body.appendChild(navPopup);
 			} catch (error) {

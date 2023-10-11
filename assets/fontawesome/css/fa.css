@@ -10,8 +10,8 @@
 	mask-repeat: no-repeat;
 	-webkit-mask-position: center;
 	mask-position: center;
-	-webkit-mask-size: 1em;
-	mask-size: 1em;
+	-webkit-mask-size: contain;
+	mask-size: contain;
 }
 
 .fa-fade::before {
