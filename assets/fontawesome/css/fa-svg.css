@@ -26,6 +26,18 @@
   --fa-url: url("../svg/solid/asterisk.svg");
 }
 
+.fa-solid-bicycle {
+  --fa-url: url("../svg/solid/bicycle.svg");
+}
+
+.fa-solid-bus {
+  --fa-url: url("../svg/solid/bus.svg");
+}
+
+.fa-solid-car {
+  --fa-url: url("../svg/solid/car.svg");
+}
+
 .fa-solid-circle-xmark {
   --fa-url: url("../svg/solid/circle-xmark.svg");
 }
@@ -62,8 +74,16 @@
   --fa-url: url("../svg/solid/map-location-dot.svg");
 }
 
+.fa-solid-person-walking {
+  --fa-url: url("../svg/solid/person-walking.svg");
+}
+
 .fa-solid-rotate {
   --fa-url: url("../svg/solid/rotate.svg");
+}
+
+.fa-solid-route {
+  --fa-url: url("../svg/solid/route.svg");
 }
 
 .fa-solid-scale-unbalanced {
