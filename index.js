@@ -101,7 +101,7 @@
 		},
 	};
 
-	let map, view, playerFeature, isAttackSliderOpened;
+	let map, view, playerFeature, isAttackSliderOpened, isDrawSliderOpened;
 	let isFollow = localStorage.getItem('follow') == 'true';
 
 
@@ -186,6 +186,10 @@
 				options.constrainResolution = true;
 				super(options);
 				view = this;
+			}
+
+			getCenter() {
+				return (isAttackSliderOpened && isFollow) ? playerFeature.getGeometry().getCoordinates() : super.getCenter();
 			}
 
 			setCenter(center) {
@@ -586,6 +590,7 @@
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 		isAttackSliderOpened = !attackSlider.classList.contains('hidden');
+		isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -2056,6 +2061,7 @@
 				let isHidden = records[0].target.classList.contains('hidden');
 				let event = new Event(isHidden ? 'drawSliderClosed' : 'drawSliderOpened', { bubbles: true });
 				records[0].target.dispatchEvent(event);
+				isDrawSliderOpened = !isHidden;
 			});
 			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ['class'] });
 
@@ -2247,7 +2253,7 @@
 				}
 			});
 
-			dragPanInteraction.setActive(localStorage.getItem('follow') == 'false');
+			dragPanInteraction.setActive(toggleFollow.dataset.active != 'true');
 			doubleClickZoomInteraction.setActive(Boolean(config.ui.doubleClickZoom));
 
 
