@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.9
+// @version      1.11.10
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.9';
+	const USERSCRIPT_VERSION = '1.11.10';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -199,6 +199,7 @@
 				let script = document.createElement('script');
 
 				if (DeviceOrientationEvent) { data = data.replace('function initCompass() {', 'function initCompass() {return;'); }
+				data = data.replace('if (zoom % 1 != 0)', '//if (zoom % 1 != 0)');
 				data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
@@ -3301,11 +3302,18 @@
 				playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
 				playerFeature.changed();
+
+				view.fit(playerFeature.getStyle()[3].getGeometry(), {
+					duration: 300,
+					size: map.getSize(),
+					padding: [0, 0, VIEW_PADDING, 0],
+				});
 			}
 
 			function hideBlastRange() {
 				playerFeature.getStyle()[3].getGeometry().setRadius(0);
 				playerFeature.changed();
+				view.animate({ zoom: 17 });
 			}
 
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
@@ -4176,7 +4184,9 @@
 			}
 		}
 
-
+		window.view = view;
+		window.map = map;
+		window.pf = playerFeature;
 		window.cuiStatus = 'loaded';
 	}
 
