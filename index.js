@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.7
+// @version      1.11.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.7';
+	const USERSCRIPT_VERSION = '1.11.8';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3991,7 +3991,13 @@
 
 			function resetView() {
 				view.set('animationInProgress', true);
-				view.animate({ rotation: 0 }, () => { view.set('animationInProgress', false); });
+				view.animate({ rotation: 0 }, isCompleted => {
+					if (isCompleted) {
+						view.set('animationInProgress', false);
+					} else {
+						resetView();
+					}
+				});
 			}
 
 			function toggleRotationLock(event) {
