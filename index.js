@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.10
+// @version      1.11.11
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.10';
+	const USERSCRIPT_VERSION = '1.11.11';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -101,7 +101,8 @@
 		},
 	};
 
-	let map, view, playerFeature;
+	let map, view, playerFeature, isAttackSliderOpened;
+	let isFollow = localStorage.getItem('follow') == 'true';
 
 
 	if (window.location.pathname.startsWith('/login')) { return; }
@@ -182,8 +183,20 @@
 		class View extends ol.View {
 			constructor(options) {
 				options.padding = [VIEW_PADDING, 0, 0, 0];
+				options.constrainResolution = true;
 				super(options);
 				view = this;
+			}
+
+			setCenter(center) {
+				if (isAttackSliderOpened && isFollow) {
+					view.fit(playerFeature.getStyle()[3].getGeometry(), {
+						size: map.getSize(),
+						padding: [0, 0, VIEW_PADDING, 0],
+					});
+				} else {
+					super.setCenter(center);
+				}
 			}
 		}
 
@@ -572,7 +585,7 @@
 		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
-		let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
+		isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -2011,7 +2024,7 @@
 
 				if (event) { records[0].target.dispatchEvent(event); }
 			});
-			pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
+			pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
 
 
 			let profilePopupObserver = new MutationObserver(records => {
@@ -2019,7 +2032,7 @@
 				let event = new Event(isProfilePopupOpened ? 'profilePopupOpened' : 'profilePopupClosed', { bubbles: true });
 				records[0].target.dispatchEvent(event);
 			});
-			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ["class"] });
+			profilePopupObserver.observe(profilePopup, { attributes: true, attributeFilter: ['class'] });
 
 
 			let inventoryPopupObserver = new MutationObserver(records => {
@@ -2027,7 +2040,7 @@
 				let event = new Event(isInventoryPopupOpened ? 'inventoryPopupOpened' : 'inventoryPopupClosed');
 				records[0].target.dispatchEvent(event);
 			});
-			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ["class"] });
+			inventoryPopupObserver.observe(inventoryPopup, { attributes: true, attributeFilter: ['class'] });
 
 
 			let attackSliderObserver = new MutationObserver(records => {
@@ -2036,7 +2049,7 @@
 				records[0].target.dispatchEvent(event);
 				isAttackSliderOpened = !isHidden;
 			});
-			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ["class"] });
+			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ['class'] });
 
 
 			let drawSliderObserver = new MutationObserver(records => {
@@ -2044,7 +2057,7 @@
 				let event = new Event(isHidden ? 'drawSliderClosed' : 'drawSliderOpened', { bubbles: true });
 				records[0].target.dispatchEvent(event);
 			});
-			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ["class"] });
+			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ['class'] });
 
 
 			let xpDiffSpanObserver = new MutationObserver(records => {
@@ -2080,6 +2093,12 @@
 				coresList.dispatchEvent(event);
 			});
 			coresListObserver.observe(coresList, { childList: true });
+
+
+			let toggleFollowObserver = new MutationObserver(records => {
+				isFollow = toggleFollow.dataset.active == 'true';
+			});
+			toggleFollowObserver.observe(toggleFollow, { attributes: true, attributeFilter: ['data-active'] });
 		}
 
 
@@ -3293,27 +3312,40 @@
 		/* Показ радиуса катализатора */
 		{
 			function drawBlastRange() {
-				let activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
-				let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
-				let item = cache.find(e => e.g == activeSlide.dataset.guid);
-				let level = item.l;
-				let range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
+				const activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
+				const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
+				const item = cache.find(e => e.g == activeSlide.dataset.guid);
+				const level = item.l;
+				const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
 
 				playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
 				playerFeature.changed();
 
-				view.fit(playerFeature.getStyle()[3].getGeometry(), {
-					duration: 300,
-					size: map.getSize(),
-					padding: [0, 0, VIEW_PADDING, 0],
-				});
+				if (isFollow) {
+					view.setConstrainResolution(false);
+					view.fit(playerFeature.getStyle()[3].getGeometry(), {
+						duration: 200,
+						size: map.getSize(),
+						padding: [0, 0, VIEW_PADDING, 0],
+					});
+				}
 			}
 
 			function hideBlastRange() {
 				playerFeature.getStyle()[3].getGeometry().setRadius(0);
 				playerFeature.changed();
-				view.animate({ zoom: 17 });
+
+				if (isFollow) { resetView(); }
+			}
+
+			function resetView() {
+				view.setConstrainResolution(true);
+				view.animate(
+					{ center: player.feature.getGeometry().getCoordinates(), duration: 200 },
+					{ zoom: 17, duration: 400 },
+					isCompleted => { !isCompleted && resetView(); }
+				);
 			}
 
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
@@ -4021,8 +4053,6 @@
 			}
 
 			function touchStartHandler(event) {
-				const isFollow = toggleFollow.dataset.active == 'true';
-
 				if (isRotationLocked) { return; }
 				if (!isFollow) { return; }
 				if (event.target.nodeName != 'CANVAS') { return; }
@@ -4050,8 +4080,6 @@
 			}
 
 			function rotationChangeHandler() {
-				const isFollow = localStorage.getItem('follow') == 'true';
-
 				if (isFollow && view.get('animationInProgress') != true) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
 				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
 			}
@@ -4172,21 +4200,30 @@
 
 		/* Поворот стрелки игрока */
 		{
+			function rotateArrow(event) {
+				const deviceRotationDeg = event.webkitCompassHeading;
+
+				if (Math.abs(playerArrowRotationDeg - deviceRotationDeg) > 3) {
+					const playerArrowRotationRad = deviceRotationDeg * Math.PI / 180;
+
+					playerArrow.setRotation(playerArrowRotationRad + view.getRotation());
+					playerFeature.changed();
+
+					playerArrowRotationDeg = deviceRotationDeg;
+				}
+			}
+
 			const playerArrow = playerFeature.getStyle()[0].getImage();
+			let playerArrowRotationDeg = 0;
 
 			if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
 				document.body.addEventListener('click', () => { DeviceOrientationEvent.requestPermission(); }, { once: true });
 
-				window.addEventListener('deviceorientation', event => {
-					playerArrow.setRotation(event.webkitCompassHeading * Math.PI / 180 + view.getRotation());
-					playerFeature.changed();
-				});
+				window.addEventListener('deviceorientation', rotateArrow);
 			}
 		}
 
-		window.view = view;
-		window.map = map;
-		window.pf = playerFeature;
+
 		window.cuiStatus = 'loaded';
 	}
 
