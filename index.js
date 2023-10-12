@@ -9,6 +9,7 @@
 // @match        https://sbg-game.ru/app/*
 // @run-at       document-idle
 // @grant        none
+// @icon64URL    https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
 (function () {
