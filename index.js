@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.6
+// @version      1.11.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.6';
+	const USERSCRIPT_VERSION = '1.11.7';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3976,6 +3976,7 @@
 		{
 			let isRotationLocked = localStorage.getItem('sbgcui_isRotationLocked') == 'true';
 			let latestTouchPoint = null;
+			let touches = [];
 			const lockRotationButton = document.createElement('button');
 			const mapDiv = document.getElementById('map');
 
@@ -4013,6 +4014,7 @@
 				if (event.targetTouches.length > 1) { return; }
 
 				latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+				touches = [];
 			}
 
 			function touchMoveHandler(event) {
@@ -4024,10 +4026,11 @@
 
 				rotateView(latestTouchPoint, ongoingTouchPoint);
 				latestTouchPoint = ongoingTouchPoint;
+				touches.push(ongoingTouchPoint);
 			}
 
 			function touchEndHandler() {
-				if (latestTouchPoint != null) { window.requestEntities(); }
+				if (touches.length != 0) { window.requestEntities(); }
 				latestTouchPoint = null;
 			}
 
