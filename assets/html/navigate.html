@@ -4,7 +4,27 @@
     <h6 class="sbgcui_navigate-subtitle">Выберите, какой маршрут проложить до точки <span class="sbgcui_navigate-coords"></span></h6>
   </hgroup>
   <form class="sbgcui_navigate-form">
-    
+    <section>
+      <h4 class="sbgcui_navigate-form-title">Яндекс</h4>
+      <div class="sbgcui_navigate-form-subsections">
+        <div>
+          <h5 class="sbgcui_navigate-form-subtitle">Карты</h5>
+          <menu class="sbgcui_navigate-form-menu" data-app="yamaps">
+            <li class="fa fa-solid-car sbgcui_hidden" data-routetype="auto"></li>
+            <li class="fa fa-solid-bus" data-routetype="mt"></li>
+            <li class="fa fa-solid-kick-scooter sbgcui_hidden" data-routetype="sc"></li>
+            <li class="fa fa-solid-person-walking" data-routetype="pd"></li>
+            <li class="fa fa-solid-bicycle" data-routetype="bc"></li>
+          </menu>
+        </div>
+        <div>
+          <h5 class="sbgcui_navigate-form-subtitle">Навигатор</h5>
+          <menu class="sbgcui_navigate-form-menu" data-app="yanavi">
+            <li class="fa fa-solid-car"></li>
+          </menu>
+        </div>
+      </div>
+    </section>
     <section>
       <h4 class="sbgcui_navigate-form-title">Google Maps</h4>
       <menu class="sbgcui_navigate-form-menu" data-app="gmaps">
@@ -14,27 +34,10 @@
       </menu>
     </section>
     <section>
-      <h4 class="sbgcui_navigate-form-title">Яндекс.Карты</h4>
-      <menu class="sbgcui_navigate-form-menu" data-app="yamaps">
-        <li class="fa fa-solid-car" data-routetype="auto"></li>
-        <li class="fa fa-solid-bus" data-routetype="mt"></li>
-        <li class="fa fa-solid-kick-scooter" data-routetype="sc"></li>
-        <li class="fa fa-solid-person-walking" data-routetype="pd"></li>
-      </menu>
-    </section>
-    <section>
-      <h4 class="sbgcui_navigate-form-title">Яндекс.Навигатор</h4>
-      <menu class="sbgcui_navigate-form-menu" data-app="yanavi">
-        <li class="fa fa-solid-car"></li>
-      </menu>
-    </section>
-    <section>
       <h4 class="sbgcui_navigate-form-title">2ГИС</h4>
       <menu class="sbgcui_navigate-form-menu" data-app="dgis">
-        <!--
-        <li class="fa fa-solid-car" data-routetype="car"></li>
-        <li class="fa fa-solid-bus" data-routetype="ctx"></li>
-        -->
+        <li class="fa fa-solid-car sbgcui_hidden" data-routetype="car"></li>
+        <li class="fa fa-solid-bus sbgcui_hidden" data-routetype="ctx"></li>
         <li class="fa fa-solid-person-walking" data-routetype="pedestrian"></li>
       </menu>
     </section>

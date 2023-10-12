@@ -1405,7 +1405,17 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_navigate-form-title {
 	margin: 0;
-	padding: 10px 0;
+	padding: 15px 0 3px;
+}
+
+.sbgcui_navigate-form-subsections {
+	display: flex;
+	justify-content: space-between;
+}
+
+.sbgcui_navigate-form-subtitle {
+	margin: 0 0 5px;
+	text-align: center;
 }
 
 .sbgcui_navigate-form-menu {
@@ -1415,7 +1425,7 @@ li[sbgcui-excluded-core]>span {
 	padding: 0 0 0 15px;
 }
 
-.sbgcui_navigate-form-menu > li[sbgcui_nav_selected] {
+.sbgcui_navigate-form-menu > li[data-selected] {
 	background-color: var(--selection);
 	outline: 3px solid var(--border-transp);
 }

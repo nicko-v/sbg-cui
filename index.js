@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.5
+// @version      1.11.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.5';
+	const USERSCRIPT_VERSION = '1.11.6';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -4086,9 +4086,15 @@
 					const routeType = event.target.dataset.routetype;
 
 					if (event.target.nodeName != 'LI') { return; }
+					if (event.target.hasAttribute('data-selected')) {
+						delete event.target.dataset.selected;
+						delete submitButton.dataset.app;
+						delete submitButton.dataset.routetype;
+						return;
+					}
 
-					navPopup.querySelectorAll('li[sbgcui_nav_selected]').forEach(e => { e.removeAttribute('sbgcui_nav_selected'); })
-					event.target.setAttribute('sbgcui_nav_selected', '');
+					navPopup.querySelectorAll('li[data-selected]').forEach(e => { delete e.dataset.selected; })
+					event.target.dataset.selected = '';
 					submitButton.dataset.app = app;
 					submitButton.dataset.routetype = routeType;
 				}
