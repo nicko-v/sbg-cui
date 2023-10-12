@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.8
+// @version      1.11.9
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -14,7 +14,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.8';
+	const USERSCRIPT_VERSION = '1.11.9';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -198,6 +198,7 @@
 			.then(data => {
 				let script = document.createElement('script');
 
+				if (DeviceOrientationEvent) { data = data.replace('function initCompass() {', 'function initCompass() {return;'); }
 				data = data.replace('const Catalysers = [', 'window.Catalysers = [');
 				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
 				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
@@ -3974,7 +3975,7 @@
 
 		/* Вращение карты */
 		{
-			let isRotationLocked = localStorage.getItem('sbgcui_isRotationLocked') == 'true';
+			let isRotationLocked = ['true', null].includes(localStorage.getItem('sbgcui_isRotationLocked'));
 			let latestTouchPoint = null;
 			let touches = [];
 			const lockRotationButton = document.createElement('button');
@@ -4012,7 +4013,7 @@
 			}
 
 			function touchStartHandler(event) {
-				const isFollow = localStorage.getItem('follow') == 'true';
+				const isFollow = toggleFollow.dataset.active == 'true';
 
 				if (isRotationLocked) { return; }
 				if (!isFollow) { return; }
@@ -4157,6 +4158,21 @@
 				document.body.appendChild(navPopup);
 			} catch (error) {
 				console.log(error);
+			}
+		}
+
+
+		/* Поворот стрелки игрока */
+		{
+			const playerArrow = playerFeature.getStyle()[0].getImage();
+
+			if (DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+				document.body.addEventListener('click', () => { DeviceOrientationEvent.requestPermission(); }, { once: true });
+
+				window.addEventListener('deviceorientation', event => {
+					playerArrow.setRotation(event.webkitCompassHeading * Math.PI / 180 + view.getRotation());
+					playerFeature.changed();
+				});
 			}
 		}
 
