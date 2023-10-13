@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.12
+// @version      1.11.13
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.12';
+	const USERSCRIPT_VERSION = '1.11.13';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -196,8 +196,9 @@
 			setCenter(center) {
 				if (isAttackSliderOpened && isFollow) {
 					view.fit(playerFeature.getStyle()[3].getGeometry(), {
-						size: map.getSize(),
+						maxZoom: 17,
 						padding: [0, 0, VIEW_PADDING, 0],
+						size: map.getSize(),
 					});
 				} else if (isDrawSliderOpened) {
 					const [xPX, yPX] = map.getPixelFromCoordinate(center);
@@ -2200,6 +2201,9 @@
 			let pointEnergy = document.createElement('div');
 			let pointEnergyLabel = document.createElement('span');
 			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
+			let highlevelCatalyserWarn = document.querySelector('.attack-slider-highlevel');
+
+			attackSlider.prepend(highlevelCatalyserWarn);
 
 			document.querySelectorAll('[data-i18n="self-info.name"], [data-i18n="self-info.xp"], [data-i18n="units.pts-xp"], [data-i18n="self-info.inventory"], [data-i18n="self-info.position"]').forEach(e => { e.remove(); });
 			document.querySelectorAll('.self-info__entry').forEach(e => {
@@ -3343,8 +3347,9 @@
 					view.setConstrainResolution(false);
 					view.fit(playerFeature.getStyle()[3].getGeometry(), {
 						duration: 200,
-						size: map.getSize(),
+						maxZoom: 17,
 						padding: [0, 0, VIEW_PADDING, 0],
+						size: map.getSize(),
 					});
 				}
 			}

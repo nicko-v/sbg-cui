@@ -212,6 +212,18 @@ body {
 	border-radius: 4px;
 }
 
+.attack-slider-highlevel {
+	background: none;
+}
+
+.splide__arrow--prev {
+	left: 0;
+}
+
+.splide__arrow--next {
+	right: 0;
+}
+
 .attack-slider-buttons {
 	margin-top: 5px;
 }
@@ -226,6 +238,12 @@ body {
 .attack-slider-highlevel {
 	height: unset;
 	padding-bottom: 5px;
+}
+
+.attack-slider-wrp,
+.draw-slider-wrp {
+	width: calc(100% - 100px);
+	margin: 0 auto;
 }
 
 .attack-slider-wrp {
