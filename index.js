@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.11
+// @version      1.11.12
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -9,13 +9,13 @@
 // @match        https://sbg-game.ru/app/*
 // @run-at       document-idle
 // @grant        none
-// @icon64URL    https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
+// @iconURL    https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.11';
+	const USERSCRIPT_VERSION = '1.11.12';
 	const LATEST_KNOWN_VERSION = '0.4.2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -199,6 +199,11 @@
 						size: map.getSize(),
 						padding: [0, 0, VIEW_PADDING, 0],
 					});
+				} else if (isDrawSliderOpened) {
+					const [xPX, yPX] = map.getPixelFromCoordinate(center);
+					const shiftedCenter = map.getCoordinateFromPixel([xPX, yPX + VIEW_PADDING]);
+
+					super.setCenter(shiftedCenter);
 				} else {
 					super.setCenter(center);
 				}
@@ -2050,19 +2055,17 @@
 
 
 			let attackSliderObserver = new MutationObserver(records => {
-				let isHidden = records[0].target.classList.contains('hidden');
-				let event = new Event(isHidden ? 'attackSliderClosed' : 'attackSliderOpened', { bubbles: true });
+				isAttackSliderOpened = !records[0].target.classList.contains('hidden');
+				let event = new Event(isAttackSliderOpened ? 'attackSliderOpened' : 'attackSliderClosed');
 				records[0].target.dispatchEvent(event);
-				isAttackSliderOpened = !isHidden;
 			});
 			attackSliderObserver.observe(attackSlider, { attributes: true, attributeFilter: ['class'] });
 
 
 			let drawSliderObserver = new MutationObserver(records => {
-				let isHidden = records[0].target.classList.contains('hidden');
-				let event = new Event(isHidden ? 'drawSliderClosed' : 'drawSliderOpened', { bubbles: true });
+				isDrawSliderOpened = !records[0].target.classList.contains('hidden');
+				let event = new Event(isDrawSliderOpened ? 'drawSliderOpened' : 'drawSliderClosed');
 				records[0].target.dispatchEvent(event);
-				isDrawSliderOpened = !isHidden;
 			});
 			drawSliderObserver.observe(drawSlider, { attributes: true, attributeFilter: ['class'] });
 
@@ -2175,6 +2178,13 @@
 			toggleFollow.addEventListener('click', () => {
 				dragPanInteraction.setActive(toggleFollow.dataset.active == 'false');
 			});
+
+			drawSlider.addEventListener('drawSliderOpened', () => {
+				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
+				// Иначе не успевает отработать MutationObserver, меняющий флаг isDrawSliderOpened.
+				window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
+			});
+			drawSlider.addEventListener('drawSliderClosed', () => { view.setCenter(playerFeature.getGeometry().getCoordinates()); });
 		}
 
 
