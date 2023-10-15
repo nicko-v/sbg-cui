@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.14
+// @version      1.11.15
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.14';
+	const USERSCRIPT_VERSION = '1.11.15';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -907,7 +907,6 @@
 				method: "GET",
 			})
 				.then(r => r.json())
-				.then(r => r.data)
 				.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
 		}
 
