@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.13
+// @version      1.11.14
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,8 +15,8 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.13';
-	const LATEST_KNOWN_VERSION = '0.4.2';
+	const USERSCRIPT_VERSION = '1.11.14';
+	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
 	const MIN_FREE_SPACE = 100;
@@ -2215,6 +2215,7 @@
 
 				toDelete.forEach(e => { e.remove(); });
 			});
+			document.querySelector('.i-stat__tools').remove();
 
 			attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
 			attackButton.childNodes[0].remove(); // Надпись Attack.
