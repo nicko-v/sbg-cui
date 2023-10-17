@@ -3402,8 +3402,11 @@
 				const currentZoom = view.getZoom();
 
 				view.animate(
-					{ center: player.feature.getGeometry().getCoordinates(), duration: 200 },
-					{ zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom, duration: 400 },
+					{
+						center: player.feature.getGeometry().getCoordinates(),
+						zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom,
+						duration: 200
+					},
 					isCompleted => { !isCompleted && resetView(); }
 				);
 			}
