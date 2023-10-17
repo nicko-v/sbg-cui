@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.18
+// @version      1.11.19
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.18';
+	const USERSCRIPT_VERSION = '1.11.19';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -232,6 +232,8 @@
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `function initCompass() {`:
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
+				case `testuser`:
+					return `NickolayV`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `view.calculateExtent(map.getSize()`:
@@ -257,6 +259,7 @@
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(function initCompass\\(\\) {)`,
+			`(testuser)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
@@ -3368,7 +3371,7 @@
 
 		/* Показ радиуса катализатора */
 		{
-			function drawBlastRange() {
+			function drawBlastRange(event) {
 				const activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
 				const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 				const item = cache.find(e => e.g == activeSlide.dataset.guid);
@@ -3380,7 +3383,7 @@
 				playerFeature.changed();
 
 				if (isFollow) {
-					if (beforeAttackZoom == null) { beforeAttackZoom = view.getZoom(); }
+					if (event.type == 'attackSliderOpened') { beforeAttackZoom = view.getZoom(); }
 					view.fit(playerFeature.getStyle()[3].getGeometry(), {
 						callback: () => { blastRangeZoom = view.getZoom(); },
 						duration: 200,
@@ -3395,23 +3398,24 @@
 				playerFeature.getStyle()[3].getGeometry().setRadius(0);
 				playerFeature.changed();
 
-				if (isFollow) { resetView(); }
+				if (isFollow) {
+					currentZoom = view.getZoom();
+					resetView();
+				}
 			}
 
 			function resetView() {
-				const currentZoom = view.getZoom();
-
 				view.animate(
 					{
 						center: player.feature.getGeometry().getCoordinates(),
 						zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom,
 						duration: 200
 					},
-					isCompleted => { if (isCompleted) { beforeAttackZoom = null; } else { resetView(); } }
+					isCompleted => { !isCompleted && resetView(); }
 				);
 			}
 
-			let blastRangeZoom, beforeAttackZoom = null;
+			let beforeAttackZoom, blastRangeZoom, currentZoom;
 
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
 			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
