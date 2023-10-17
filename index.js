@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.17
+// @version      1.11.18
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.17';
+	const USERSCRIPT_VERSION = '1.11.18';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -3380,7 +3380,7 @@
 				playerFeature.changed();
 
 				if (isFollow) {
-					beforeAttackZoom = view.getZoom();
+					if (beforeAttackZoom == null) { beforeAttackZoom = view.getZoom(); }
 					view.fit(playerFeature.getStyle()[3].getGeometry(), {
 						callback: () => { blastRangeZoom = view.getZoom(); },
 						duration: 200,
@@ -3407,11 +3407,11 @@
 						zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom,
 						duration: 200
 					},
-					isCompleted => { !isCompleted && resetView(); }
+					isCompleted => { if (isCompleted) { beforeAttackZoom = null; } else { resetView(); } }
 				);
 			}
 
-			let blastRangeZoom, beforeAttackZoom;
+			let blastRangeZoom, beforeAttackZoom = null;
 
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
 			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
