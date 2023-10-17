@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.16
+// @version      1.11.17
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.16';
+	const USERSCRIPT_VERSION = '1.11.17';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -184,7 +184,6 @@
 		class View extends ol.View {
 			constructor(options) {
 				options.padding = [VIEW_PADDING, 0, 0, 0];
-				options.constrainResolution = true;
 				super(options);
 				view = this;
 			}
@@ -217,25 +216,60 @@
 	}
 
 	function loadMainScript() {
+		function replacer(match) {
+			switch (match) {
+				case `const Catalysers`:
+					return `window.Catalysers`;
+				case `const TeamColors`:
+					return `window.TeamColors`;
+				case `if (zoom % 1 != 0)`:
+					return `//if (zoom % 1 != 0)`;
+				case `const draw_slider`:
+					return `window.draw_slider`;
+				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
+					return `if ($('.attack-slider-wrp').hasClass('hidden')) {return;`;
+				case `$('[name="baselayer"]').on('change', e`:
+					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
+				case `function initCompass() {`:
+					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
+				case `makeEntry(e, data)`:
+					return `window.makeEntryDec(e, data, makeEntry)`;
+				case `view.calculateExtent(map.getSize()`:
+					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
+				case `z: view.getZoom()`:
+					return `z: Math.floor(view.getZoom())`;
+				case `const persist = [`:
+					return `const persist = [/^sbgcui_/, `;
+				case `if (type == 'osm') {`:
+					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
+				case `class Bitfield`:
+					return `window.requestEntities = requestEntities; window.Bitfield = class Bitfield`;
+				default:
+					return match;
+			}
+		}
+
+		const regexp = new RegExp([
+			`(const Catalysers)`,
+			`(const TeamColors)`,
+			`(if \\(zoom % 1 != 0\\))`,
+			`(const draw_slider)`,
+			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
+			`(function initCompass\\(\\) {)`,
+			`(makeEntry\\(e, data\\)(?!\\s{))`,
+			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
+			`(z: view.getZoom\\(\\))`,
+			`(const persist = \\[)`,
+			`(if \\(type == 'osm'\\) {)`,
+			`(class Bitfield)`,
+		].join('|'), 'g');
+
 		fetch('/app/script.js')
 			.then(r => r.text())
 			.then(data => {
-				let script = document.createElement('script');
-
-				if (DeviceOrientationEvent) { data = data.replace('function initCompass() {', 'function initCompass() {return;'); }
-				data = data.replace('if (zoom % 1 != 0)', '//if (zoom % 1 != 0)');
-				data = data.replace('const Catalysers = [', 'window.Catalysers = [');
-				data = data.replace('const TeamColors = [', 'window.TeamColors = [');
-				data = data.replace('const persist = [', 'const persist = [/^sbgcui_/, ');
-				data = data.replace('const draw_slider =', 'window.draw_slider =');
-				data = data.replace('class Bitfield', 'window.requestEntities = requestEntities; window.Bitfield = class Bitfield');
-				data = data.replace(`if (type == 'osm') {`, `if (type == 'stadia') { source=new ol.source.StadiaMaps({ layer:'stamen_watercolor' })} else if (type == 'osm') {`);
-				data = data.replace(`$('[name="baselayer"]').on('change', e`, `$('.layers-config__list').on('change', '[name="baselayer"]', e`);
-				data = data.replaceAll(/makeEntry\(e,\sdata\)(?!\s{)/g, 'window.makeEntryDec(e, data, makeEntry)');
-				data = data.replaceAll('view.calculateExtent(map.getSize()', `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`);
-
-				script.textContent = data;
-
+				const script = document.createElement('script');
+				script.textContent = data.replace(regexp, replacer);
 				document.head.appendChild(script);
 			})
 			.catch(error => {
@@ -495,16 +529,16 @@
 				}
 			}
 
-			#remindAt(timestamp) {
-				function onTimeout() {
-					this.#notify();
-					this.cooldown = null;
-				}
+			#onTimeout() {
+				this.#notify();
+				this.cooldown = null;
+			}
 
+			#remindAt(timestamp) {
 				let delay = timestamp - Date.now();
 
 				clearTimeout(this.timeoutID);
-				this.timeoutID = setTimeout(onTimeout.bind(this), delay);
+				this.timeoutID = setTimeout(this.#onTimeout.bind(this), delay);
 			}
 
 			toJSON() {
@@ -2107,6 +2141,7 @@
 
 			let toggleFollowObserver = new MutationObserver(records => {
 				isFollow = toggleFollow.dataset.active == 'true';
+				dragPanInteraction.setActive(!isFollow);
 			});
 			toggleFollowObserver.observe(toggleFollow, { attributes: true, attributeFilter: ['data-active'] });
 		}
@@ -2173,10 +2208,6 @@
 					let touchDuration = Date.now() - touchStartDate;
 					if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
 				}, { once: true });
-			});
-
-			toggleFollow.addEventListener('click', () => {
-				dragPanInteraction.setActive(toggleFollow.dataset.active == 'false');
 			});
 
 			drawSlider.addEventListener('drawSliderOpened', () => {
@@ -2288,23 +2319,28 @@
 			map.addControl(toolbar);
 
 
-			const stadiaLabel = document.createElement('label');
-			const stadiaInput = document.createElement('input');
-			const stadiaSpan = document.createElement('span');
-			const isSelected = JSON.parse(localStorage.getItem('settings')).base == 'stadia';
+			const stadiaWatercolorLabel = document.createElement('label');
+			const stadiaTonerLabel = document.createElement('label');
 
-			stadiaLabel.classList.add('layers-config__entry');
+			[stadiaWatercolorLabel, stadiaTonerLabel].forEach((label, index) => {
+				const input = document.createElement('input');
+				const span = document.createElement('span');
+				const theme = index == 0 ? 'Watercolor' : 'Toner';
+				const isSelected = JSON.parse(localStorage.getItem('settings')).base == `stadia_${theme.toLowerCase()}`;
 
-			stadiaInput.type = 'radio';
-			stadiaInput.name = 'baselayer';
-			stadiaInput.value = 'stadia';
-			stadiaInput.checked = isSelected;
+				label.classList.add('layers-config__entry');
 
-			stadiaSpan.innerText = 'Stamen Watercolor'
+				input.type = 'radio';
+				input.name = 'baselayer';
+				input.value = `stadia_${theme.toLowerCase()}`;
+				input.checked = isSelected;
 
-			stadiaLabel.append(stadiaInput, stadiaSpan);
+				span.innerText = `Stadia ${theme}`
 
-			document.querySelector('input[value="osm"]').parentElement.after(stadiaLabel);
+				label.append(input, span);
+			});
+
+			document.querySelector('input[value="osm"]').parentElement.after(stadiaWatercolorLabel, stadiaTonerLabel);
 		}
 
 
@@ -2921,7 +2957,7 @@
 				let guid = event.target.closest('.inventory__item').dataset.ref;
 
 				if (!guid) { return; }
-				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/?point=${guid}`; }
+				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
 			});
 		}
 
@@ -3344,8 +3380,9 @@
 				playerFeature.changed();
 
 				if (isFollow) {
-					view.setConstrainResolution(false);
+					beforeAttackZoom = view.getZoom();
 					view.fit(playerFeature.getStyle()[3].getGeometry(), {
+						callback: () => { blastRangeZoom = view.getZoom(); },
 						duration: 200,
 						maxZoom: 17,
 						padding: [0, 0, VIEW_PADDING, 0],
@@ -3362,13 +3399,16 @@
 			}
 
 			function resetView() {
-				view.setConstrainResolution(true);
+				const currentZoom = view.getZoom();
+
 				view.animate(
 					{ center: player.feature.getGeometry().getCoordinates(), duration: 200 },
-					{ zoom: 17, duration: 400 },
+					{ zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom, duration: 400 },
 					isCompleted => { !isCompleted && resetView(); }
 				);
 			}
+
+			let blastRangeZoom, beforeAttackZoom;
 
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
 			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
@@ -3913,7 +3953,7 @@
 			const pointControls = document.querySelector('.info.popup .i-buttons');
 			const pointStat = document.querySelector('.info.popup .i-stat');
 			const destroyRewardDiv = document.createElement('div');
-			const rewardText = i18next.language == 'ru-RU' ? 'Награда' : 'Reward';
+			const rewardText = i18next.language.includes('ru') ? 'Награда' : 'Reward';
 			const formatter = new Intl.NumberFormat(i18next.language);
 
 			destroyRewardDiv.classList.add('i-stat__entry');
@@ -4021,7 +4061,7 @@
 		{
 			function updateTimeout() {
 				if (config.ui.pointDischargeTimeout) {
-					timeoutSpan.innerText = `~${lastOpenedPoint.dischargeTimeout}`;
+					timeoutSpan.innerText = `(~${lastOpenedPoint.dischargeTimeout})`;
 				}
 			}
 

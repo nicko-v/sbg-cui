@@ -212,6 +212,10 @@ body {
 	border-radius: 4px;
 }
 
+.draw-slider-buttons {
+	padding: 0;
+}
+
 .attack-slider-highlevel {
 	background: none;
 }
@@ -222,6 +226,14 @@ body {
 
 .splide__arrow--next {
 	right: 0;
+}
+
+.refs-list__title {
+	display: -webkit-box;
+	text-overflow: unset;
+	white-space: break-spaces;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 }
 
 .attack-slider-buttons {
@@ -1115,13 +1127,13 @@ body {
 }
 
 .sbgcui_attack-menu-rotate {
-	border-color: var(--selection)!important;
+	border-color: var(--selection) !important;
 	transition: border-color 0.5s ease-out 0.4s;
 }
 
 .sbgcui_attack-menu-rotate::after {
 	transform: rotate(135deg);
-	background-color: var(--selection)!important;
+	background-color: var(--selection) !important;
 	border-bottom-left-radius: 0 !important;
 }
 
@@ -1139,7 +1151,7 @@ body {
 	box-shadow: 0 0 5px var(--shadow);
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
-	padding: 0;
+	padding: 7px;
 }
 
 .inventory__content:not([data-tab="3"])+.inventory__controls>.sbgcui_refs-sort-button {
@@ -1329,7 +1341,7 @@ li[sbgcui-excluded-core]>span {
 	font-size: 1.2em;
 	margin-left: auto;
 	width: 4em;
-	padding: 0 0.5em;
+	padding: 2px;
 }
 
 .sbgcui_drawslider_sort {
@@ -1369,7 +1381,7 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_discharge_timeout {
-	color: var(--text-disabled);
+	color: var(--text);
 	display: block;
 }
 
@@ -1401,7 +1413,7 @@ li[sbgcui-excluded-core]>span {
 	z-index: 3;
 }
 
-.sbgcui_navigate > hgroup {
+.sbgcui_navigate>hgroup {
 	align-items: center;
 	display: flex;
 	flex-direction: column;
@@ -1443,12 +1455,12 @@ li[sbgcui-excluded-core]>span {
 	padding: 0 0 0 15px;
 }
 
-.sbgcui_navigate-form-menu > li[data-selected] {
+.sbgcui_navigate-form-menu>li[data-selected] {
 	background-color: var(--selection);
 	outline: 3px solid var(--border-transp);
 }
 
-.sbgcui_navigate-form-menu > li {
+.sbgcui_navigate-form-menu>li {
 	border: 2px solid var(--border-transp);
 	border-radius: 5px;
 	box-sizing: border-box;
@@ -1465,7 +1477,7 @@ li[sbgcui-excluded-core]>span {
 	margin-top: 40px;
 }
 
-.sbgcui_navigate-form-buttons > button {
+.sbgcui_navigate-form-buttons>button {
 	font-size: 16px;
 	height: 2em;
 	width: 40%;
