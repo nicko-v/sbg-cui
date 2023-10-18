@@ -232,6 +232,7 @@ body {
 	display: -webkit-box;
 	text-overflow: unset;
 	white-space: break-spaces;
+	word-wrap: break-word;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 }
