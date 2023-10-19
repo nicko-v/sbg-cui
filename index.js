@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.19
+// @version      1.11.20
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.19';
+	const USERSCRIPT_VERSION = '1.11.20';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -27,11 +27,12 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
+	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const HIGHLEVEL_MARKER = 8;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
 	const IS_CDB_MAP = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
 	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 6, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1, 10: 1 };
+	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 4, 4: 4, 5: 3, 6: 3, 7: 2, 8: 2, 9: 1, 10: 1 };
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const ITEMS_TYPES = {
 		1: { eng: 'cores', rus: 'ядра' },
@@ -102,7 +103,7 @@
 		},
 	};
 
-	let map, view, playerFeature, isAttackSliderOpened, isDrawSliderOpened;
+	let map, view, playerFeature;
 	let isFollow = localStorage.getItem('follow') == 'true';
 
 
@@ -179,6 +180,10 @@
 
 				super.setStyle(style);
 			}
+
+			get blastRange() {
+				return this == playerFeature ? this.getStyle()[3].getGeometry() : undefined;
+			}
 		}
 
 		class View extends ol.View {
@@ -186,27 +191,30 @@
 				options.padding = [VIEW_PADDING, 0, 0, 0];
 				super(options);
 				view = this;
+				window.view = view;
 			}
 
-			getCenter() {
-				return (isAttackSliderOpened && isFollow) ? playerFeature.getGeometry().getCoordinates() : super.getCenter();
+			fitBlastRange(isCompleted) {
+				if (isCompleted) { this.set('blastRangeZoom', this.getZoom()); return; }
+
+				this.removePadding();
+				this.fit(playerFeature.blastRange, {
+					callback: this.fitBlastRange.bind(this),
+					duration: 0, // Временно отключено
+					maxZoom: 17,
+				});
 			}
 
-			setCenter(center) {
-				if (isAttackSliderOpened && isFollow) {
-					view.fit(playerFeature.getStyle()[3].getGeometry(), {
-						maxZoom: 17,
-						padding: [0, 0, VIEW_PADDING, 0],
-						size: map.getSize(),
-					});
-				} else if (isDrawSliderOpened) {
-					const [xPX, yPX] = map.getPixelFromCoordinate(center);
-					const shiftedCenter = map.getCoordinateFromPixel([xPX, yPX + VIEW_PADDING]);
+			setTopPadding() {
+				this.padding = [VIEW_PADDING, 0, 0, 0];
+			}
 
-					super.setCenter(shiftedCenter);
-				} else {
-					super.setCenter(center);
-				}
+			setBottomPadding() {
+				this.padding = [0, 0, VIEW_PADDING, 0];
+			}
+
+			removePadding() {
+				this.padding = [0, 0, 0, 0];
 			}
 		}
 
@@ -629,12 +637,13 @@
 		let selfNameSpan = document.querySelector('#self-info__name');
 		let toggleFollow = document.querySelector('#toggle-follow');
 		let xpDiffSpan = document.querySelector('.xp-diff');
+		let zoomContainer = document.querySelector('.ol-zoom');
 
 		let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 		let isPointPopupOpened = !pointPopup.classList.contains('hidden');
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
-		isAttackSliderOpened = !attackSlider.classList.contains('hidden');
-		isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+		let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
+		let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -786,6 +795,7 @@
 								case '/api/inview':
 									const inviewPoints = parsedResponse.p;
 									const inviewRegions = parsedResponse.r;
+									const zoom = +url.searchParams.get('z');
 
 									const mapConfig = JSON.parse(localStorage.getItem('map-config'));
 									const lParam = url.searchParams.get('l');
@@ -809,7 +819,7 @@
 
 									if (!inviewPoints) { break; }
 
-									if (isHighlightCoresOrLevel) {
+									if (isHighlightCoresOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
 										let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
 
 										if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
@@ -2127,12 +2137,19 @@
 
 			let catalysersListObserver = new MutationObserver(records => {
 				if (!isAttackSliderOpened) { return; }
-				if ([...records].filter(e => e.oldValue.includes('is-active') && !e.target.classList.contains('is-active')).length) {
+
+				const attributesRecords = [...records].filter(r => r.type == 'attributes');
+				const childListRecords = [...records].filter(r => r.type == 'childList');
+
+				const isActiveSwitched = attributesRecords.some(r => r.oldValue.includes('is-active') && !r.target.classList.contains('is-active'));
+				const isEverySlideAddedNow = childListRecords.length > 0 && childListRecords.every(r => r.addedNodes.length == 1 && r.removedNodes.length == 0);
+
+				if (isActiveSwitched || isEverySlideAddedNow) {
 					let event = new Event('activeSlideChanged');
 					catalysersList.dispatchEvent(event);
 				}
 			});
-			catalysersListObserver.observe(catalysersList, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+			catalysersListObserver.observe(catalysersList, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
 
 			let coresListObserver = new MutationObserver(records => {
@@ -2196,16 +2213,20 @@
 			});
 
 			toggleFollow.addEventListener('touchstart', () => {
-				let touchStartDate = Date.now();
+				function resetView(isCompleted) {
+					if (isCompleted) { return; }
 
-				let timeoutID = setTimeout(() => {
-					view.set('animationInProgress', true);
 					view.animate(
 						{ center: player.feature.getGeometry().getCoordinates() },
 						{ zoom: 17 },
 						{ rotation: 0 },
-						() => { view.set('animationInProgress', false); });
-				}, 500);
+						resetView
+					);
+				}
+
+				let touchStartDate = Date.now();
+
+				let timeoutID = setTimeout(resetView, 500);
 
 				this.addEventListener('touchend', () => {
 					let touchDuration = Date.now() - touchStartDate;
@@ -2214,11 +2235,17 @@
 			});
 
 			drawSlider.addEventListener('drawSliderOpened', () => {
+				view.setBottomPadding();
+				
 				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
-				// Иначе не успевает отработать MutationObserver, меняющий флаг isDrawSliderOpened.
+				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
 				window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
 			});
-			drawSlider.addEventListener('drawSliderClosed', () => { view.setCenter(playerFeature.getGeometry().getCoordinates()); });
+
+			drawSlider.addEventListener('drawSliderClosed', () => {
+				view.setTopPadding();
+				view.setCenter(playerFeature.getGeometry().getCoordinates());
+			});
 		}
 
 
@@ -2230,7 +2257,6 @@
 			let layersButton = document.querySelector('#layers');
 			let notifsButton = document.querySelector('#notifs-menu');
 			let attackSliderClose = document.querySelector('#attack-slider-close');
-			let zoomContainer = document.querySelector('.ol-zoom');
 			let pointEnergy = document.createElement('div');
 			let pointEnergyLabel = document.createElement('span');
 			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
@@ -3371,7 +3397,7 @@
 
 		/* Показ радиуса катализатора */
 		{
-			function drawBlastRange(event) {
+			function drawBlastRange() {
 				const activeSlide = [...catalysersList.children].find(e => e.classList.contains('is-active'));
 				const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 				const item = cache.find(e => e.g == activeSlide.dataset.guid);
@@ -3382,44 +3408,51 @@
 				playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
 				playerFeature.changed();
 
-				if (isFollow) {
-					if (event.type == 'attackSliderOpened') { beforeAttackZoom = view.getZoom(); }
-					view.fit(playerFeature.getStyle()[3].getGeometry(), {
-						callback: () => { blastRangeZoom = view.getZoom(); },
-						duration: 200,
-						maxZoom: 17,
-						padding: [0, 0, VIEW_PADDING, 0],
-						size: map.getSize(),
-					});
-				}
+				if (isFollow) { view.fitBlastRange(); }
 			}
 
 			function hideBlastRange() {
+				const currentZoom = view.getZoom();
+				const { beforeAttackZoom, blastRangeZoom } = view.getProperties();
+				onCloseZoom = currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom;
+
 				playerFeature.getStyle()[3].getGeometry().setRadius(0);
 				playerFeature.changed();
 
-				if (isFollow) {
-					currentZoom = view.getZoom();
-					resetView();
-				}
+				if (isFollow) { resetView(); }
 			}
 
-			function resetView() {
+			function resetView(isCompleted) {
+				if (isCompleted) { return; }
+				view.setTopPadding();
 				view.animate(
 					{
-						center: player.feature.getGeometry().getCoordinates(),
-						zoom: currentZoom == blastRangeZoom ? beforeAttackZoom : currentZoom,
-						duration: 200
+						center: playerFeature.getGeometry().getCoordinates(),
+						zoom: onCloseZoom,
+						duration: 0, // Временно отключено
 					},
-					isCompleted => { !isCompleted && resetView(); }
+					resetView
 				);
 			}
 
-			let beforeAttackZoom, blastRangeZoom, currentZoom;
+			function saveCurrentZoom() {
+				view.setProperties({
+					beforeAttackZoom: view.getZoom(),
+					isZoomChanged: false
+				});
+			}
 
+			function zoomContainerClickHandler(event) {
+				const isZoomButtonClicked = event.target.matches('.ol-zoom-in, .ol-zoom-out');
+				if (isAttackSliderOpened && isZoomButtonClicked) { view.set('isZoomChanged', true); }
+			}
+
+			let onCloseZoom;
+
+			attackSlider.addEventListener('attackSliderOpened', saveCurrentZoom);
 			catalysersList.addEventListener('activeSlideChanged', drawBlastRange);
-			attackSlider.addEventListener('attackSliderOpened', drawBlastRange);
 			attackSlider.addEventListener('attackSliderClosed', hideBlastRange);
+			zoomContainer.addEventListener('click', zoomContainerClickHandler);
 		}
 
 
@@ -4099,15 +4132,10 @@
 				view.adjustRotation(bAngle - aAngle, anchor);
 			}
 
-			function resetView() {
-				view.set('animationInProgress', true);
-				view.animate({ rotation: 0 }, isCompleted => {
-					if (isCompleted) {
-						view.set('animationInProgress', false);
-					} else {
-						resetView();
-					}
-				});
+			function resetView(isCompleted) {
+				if (isCompleted) { return; }
+
+				view.animate({ rotation: 0 }, resetView);
 			}
 
 			function toggleRotationLock(event) {
@@ -4149,7 +4177,9 @@
 			}
 
 			function rotationChangeHandler() {
-				if (isFollow && view.get('animationInProgress') != true) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
+				const isAnimating = view.getAnimating();
+
+				if (isFollow && !isAnimating) { view.setCenter(playerFeature.getGeometry().getCoordinates()); }
 				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
 			}
 
