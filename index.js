@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.21
+// @version      1.11.22
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.21';
+	const USERSCRIPT_VERSION = '1.11.22';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -28,7 +28,8 @@
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
-	const HIGHLEVEL_MARKER = 8;
+	const HIGHLEVEL_MARKER = 9;
+	const LANG = i18next.language;
 	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
 	const IS_CDB_MAP = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
 	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
@@ -934,7 +935,10 @@
 
 		async function getSelfData() {
 			return fetch('/api/self', {
-				headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+				headers: {
+					authorization: `Bearer ${localStorage.getItem('auth')}`,
+					'accept-language': LANG
+				},
 				method: "GET",
 			})
 				.then(response => response.json().then(parsedResponse => ({
@@ -950,7 +954,10 @@
 
 		async function getPlayerData(guid, name) {
 			return fetch(`/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`, {
-				headers: { authorization: `Bearer ${localStorage.getItem('auth')}`, },
+				headers: {
+					authorization: `Bearer ${localStorage.getItem('auth')}`,
+					'accept-language': LANG
+				},
 				method: "GET",
 			})
 				.then(r => r.json())
@@ -959,15 +966,22 @@
 
 		async function getPointData(guid, isCompact = true) {
 			return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
-				headers: { authorization: `Bearer ${player.auth}` },
+				headers: {
+					authorization: `Bearer ${player.auth}`,
+					'accept-language': LANG
+				},
 				method: 'GET'
 			}).then(r => r.json()).then(r => r.data);
 		}
 
 		async function getInventory() {
 			return fetch('/api/inventory', {
-				headers: { authorization: `Bearer ${player.auth}` },
+				headers: {
+					authorization: `Bearer ${player.auth}`,
+					'accept-language': LANG
+				},
 				method: 'GET',
+				'accept-language': LANG
 			}).then(r => r.json()).then(r => r.i);
 		}
 
@@ -1075,6 +1089,7 @@
 				return fetch('/api/inventory', {
 					headers: {
 						authorization: `Bearer ${player.auth}`,
+						'accept-language': LANG,
 						'content-type': 'application/json',
 					},
 					body: JSON.stringify({ selection: groupedItems[e], tab: e }),
@@ -1087,6 +1102,7 @@
 			return fetch('/api/repair', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
+					'accept-language': LANG,
 					'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
 				},
 				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
@@ -2479,6 +2495,50 @@
 				return makeEntry(e, data);
 			}
 
+			function recursiveRepair(pointGuid, refEntry) {
+				repairPoint(pointGuid)
+					.then(r => {
+						if (r.error) {
+							throw new Error(r.error);
+						} else if (r.data) {
+							const [pointEnergy, maxEnergy] = r.data.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
+							const refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
+							const refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
+							const percentage = Math.floor(pointEnergy / maxEnergy * 100);
+							const refsCache = JSON.parse(localStorage.getItem('refs-cache'));
+
+							refEntry.style.setProperty('--sbgcui-energy', `${percentage}%`);
+
+							if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
+
+							updateExpBar(r.xp.cur);
+							showXp(r.xp.diff);
+
+							if (refsCache[pointGuid]) {
+								refsCache[pointGuid].e = percentage;
+								localStorage.setItem('refs-cache', JSON.stringify(refsCache));
+							}
+
+							if (percentage != 100) { recursiveRepair(...arguments); }
+						}
+					})
+					.catch(error => {
+						if (error.message.match(/полностью|вражеской|fully|enemy/)) {
+							refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
+							return;
+						}
+
+						const toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
+
+						toast.options.className = 'error-toast';
+						toast.showToast();
+
+						console.log('SBG CUI: Ошибка при зарядке.', error);
+
+						refEntry.style.setProperty('--sbgcui-display-r-button', 'flex');
+					});
+			}
+
 			window.makeEntryDec = makeEntryDec;
 
 			inventoryContent.addEventListener('click', event => {
@@ -2492,45 +2552,12 @@
 				// Приходится указывать конкретное число (50), потому что кнопка V при нажатии получает display: none и не имеет offsetWidth.
 				if (event.offsetX < 50) { return; }
 
-				let pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
+				const pointGuid = event.target.closest('.inventory__item')?.dataset.ref;
+				const refEntry = event.target.closest('.inventory__item');
 
-				repairPoint(pointGuid)
-					.then(r => {
-						if (r.error) {
-							throw new Error(r.error);
-						} else if (r.data) {
-							let [pointEnergy, maxEnergy] = r.data.reduce((result, core) => [result[0] + core.e, result[1] + CORES_ENERGY[core.l]], [0, 0]);
-							let refInfoDiv = document.querySelector(`.inventory__item[data-ref="${pointGuid}"] .inventory__item-left`);
-							let refInfoEnergy = refInfoDiv.querySelector('.inventory__item-descr').childNodes[4];
-							let percentage = Math.floor(pointEnergy / maxEnergy * 100);
-							let refsCache = JSON.parse(localStorage.getItem('refs-cache'));
-
-							let inventoryItem = event.target.closest('.inventory__item');
-
-							inventoryItem.style.setProperty('--sbgcui-energy', `${percentage}%`);
-							inventoryItem.style.setProperty('--sbgcui-display-r-button', (percentage == 100 ? 'none' : 'flex'));
-
-							if (refInfoEnergy) { refInfoEnergy.nodeValue = percentage; }
-
-							updateExpBar(r.xp.cur);
-							showXp(r.xp.diff);
-
-							if (refsCache[pointGuid]) {
-								refsCache[pointGuid].e = percentage;
-								localStorage.setItem('refs-cache', JSON.stringify(refsCache));
-							}
-						}
-					})
-					.catch(error => {
-						if (error.message.match(/полностью|fully/)) { return; }
-
-						let toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
-
-						toast.options.className = 'error-toast';
-						toast.showToast();
-
-						console.log('SBG CUI: Ошибка при зарядке.', error);
-					});
+				refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
+				
+				recursiveRepair(pointGuid, refEntry);
 			});
 		}
 
