@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.20
+// @version      1.11.21
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.20';
+	const USERSCRIPT_VERSION = '1.11.21';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -2251,16 +2251,17 @@
 
 		/* Удаление ненужного, переносы, переименования */
 		{
-			let ops = document.querySelector('#ops');
-			let blContainer = document.querySelector('.bottom-container');
-			let rotateArrow = document.querySelector('.ol-rotate');
-			let layersButton = document.querySelector('#layers');
-			let notifsButton = document.querySelector('#notifs-menu');
-			let attackSliderClose = document.querySelector('#attack-slider-close');
-			let pointEnergy = document.createElement('div');
-			let pointEnergyLabel = document.createElement('span');
-			let pointOwner = document.querySelector('#i-stat__owner').parentElement;
-			let highlevelCatalyserWarn = document.querySelector('.attack-slider-highlevel');
+			const ops = document.querySelector('#ops');
+			const blContainer = document.querySelector('.bottom-container');
+			const rotateArrow = document.querySelector('.ol-rotate');
+			const layersButton = document.querySelector('#layers');
+			const notifsButton = document.querySelector('#notifs-menu');
+			const attackSliderClose = document.querySelector('#attack-slider-close');
+			const pointEnergy = document.createElement('div');
+			const pointEnergyLabel = document.createElement('span');
+			const pointOwner = document.querySelector('#i-stat__owner').parentElement;
+			const highlevelCatalyserWarn = document.querySelector('.attack-slider-highlevel');
+			const popupCloseButtons = document.querySelectorAll('.popup-close, #inventory__close');
 
 			attackSlider.prepend(highlevelCatalyserWarn);
 
@@ -2278,8 +2279,6 @@
 
 			attackSliderClose.remove(); // Кнопка закрытия слайдера не нужна.
 			attackButton.childNodes[0].remove(); // Надпись Attack.
-
-			invCloseButton.innerText = '[x]';
 
 			layersButton.innerText = '';
 			layersButton.classList.add('fa', 'fa-solid-layer-group');
@@ -2303,6 +2302,13 @@
 			pointEnergyValue.id = 'i-stat__energy';
 			pointEnergy.append(pointEnergyLabel, ': ', pointEnergyValue);
 			pointOwner.after(pointEnergy);
+
+			popupCloseButtons.forEach(button => {
+				if (button.closest('.info, .inventory, .leaderboard, .notifs, .profile, .settings')) {
+					button.innerHTML = '';
+					button.classList.add('sbgcui_button_reset', 'fa', 'fa-solid-xmark');
+				}
+			});
 		}
 
 
