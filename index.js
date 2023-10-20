@@ -192,7 +192,6 @@
 				options.padding = [VIEW_PADDING, 0, 0, 0];
 				super(options);
 				view = this;
-				window.view = view;
 			}
 
 			fitBlastRange(isCompleted) {
