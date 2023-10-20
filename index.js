@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.22
+// @version      1.11.23
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.22';
+	const USERSCRIPT_VERSION = '1.11.23';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -106,7 +106,7 @@
 
 	let map, view, playerFeature;
 	let isFollow = localStorage.getItem('follow') == 'true';
-
+	const portrait = window.matchMedia('(orientation: portrait)');
 
 	if (window.location.pathname.startsWith('/login')) { return; }
 	if (document.querySelector('script[src="/intel.js"]')) { return; }
@@ -189,7 +189,7 @@
 
 		class View extends ol.View {
 			constructor(options) {
-				options.padding = [VIEW_PADDING, 0, 0, 0];
+				if (portrait.matches) { options.padding = [VIEW_PADDING, 0, 0, 0]; }
 				super(options);
 				view = this;
 			}
@@ -206,10 +206,12 @@
 			}
 
 			setTopPadding() {
+				if (!portrait.matches) { return; }
 				this.padding = [VIEW_PADDING, 0, 0, 0];
 			}
 
 			setBottomPadding() {
+				if (!portrait.matches) { return; }
 				this.padding = [0, 0, VIEW_PADDING, 0];
 			}
 
@@ -2259,6 +2261,11 @@
 
 			drawSlider.addEventListener('drawSliderClosed', () => {
 				view.setTopPadding();
+				view.setCenter(playerFeature.getGeometry().getCoordinates());
+			});
+
+			portrait.addEventListener('change', () => {
+				portrait.matches ? view.setTopPadding() : view.removePadding();
 				view.setCenter(playerFeature.getGeometry().getCoordinates());
 			});
 		}
