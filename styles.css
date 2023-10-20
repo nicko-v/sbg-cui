@@ -279,7 +279,14 @@ body {
 
 .catalysers-list__level,
 .cores-list__level {
-	font-size: 1.5em;
+	aspect-ratio: 1;
+	border: 2px solid;
+	border-radius: 10px;
+	font-size: 24px;
+	height: 24px;
+	line-height: 24px;
+	padding: 5px;
+	text-align: center;
 }
 
 .catalysers-list__amount,
@@ -299,7 +306,8 @@ body {
 }
 
 .deploy-slider-wrp {
-	margin-top: 10px;
+	margin: 10px auto 0;
+	width: 75%;
 }
 
 .draw-slider-wrp .splide__slide * {
@@ -336,9 +344,10 @@ body {
 .i-stat {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	grid-template-rows: auto;
+	grid-template-rows: 1fr repeat(6, auto);
 	gap: 0px 10px;
 	grid-template-areas:
+		"_ _"
 		"distance lines"
 		"owner regions"
 		"energy reward"
@@ -424,7 +433,7 @@ body {
 	z-index: 2;
 }
 
-.info > .popup-close {
+.info>.popup-close {
 	position: sticky;
 }
 

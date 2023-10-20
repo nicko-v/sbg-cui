@@ -2309,6 +2309,16 @@
 					button.classList.add('sbgcui_button_reset', 'fa', 'fa-solid-xmark');
 				}
 			});
+
+			const i18nMainCaches = Object.keys(localStorage).filter(key => key.match(/i18next_.+?-main/));
+			i18nMainCaches.forEach(cacheName => {
+				const cache = JSON.parse(localStorage.getItem(cacheName));
+
+				cache.items['core-short'] = '{{level}}';
+				cache.items['catalyser-short'] = '{{level}}';
+
+				localStorage.setItem(cacheName, JSON.stringify(cache));
+			});
 		}
 
 
