@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.24
+// @version      1.11.25
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.24';
+	const USERSCRIPT_VERSION = '1.11.25';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -104,7 +104,7 @@
 		},
 	};
 
-	let map, view, playerFeature;
+	let map, view, playerFeature, tempLinesSource;
 	let isFollow = localStorage.getItem('follow') == 'true';
 	const portrait = window.matchMedia('(orientation: portrait)');
 
@@ -135,6 +135,7 @@
 			constructor(options) {
 				super(options);
 				map = this;
+				tempLinesSource = options.layers.filter(layer => layer.get('name') == 'lines')[1]?.getSource();
 				window.dispatchEvent(new Event('mapReady'));
 			}
 
@@ -204,6 +205,15 @@
 					callback: this.fitBlastRange.bind(this),
 					duration: 0, // Временно отключено
 					maxZoom: currentZoom,
+				});
+			}
+
+			fitTempLine(lineGeometry, padding) {
+				this.removePadding();
+				this.fit(lineGeometry, {
+					duration: 0,
+					maxZoom: 17,
+					padding,
 				});
 			}
 
@@ -2257,6 +2267,7 @@
 
 			drawSlider.addEventListener('drawSliderOpened', () => {
 				view.setBottomPadding();
+				view.set('beforeDrawZoom', view.getZoom());
 
 				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
 				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
@@ -2264,8 +2275,12 @@
 			});
 
 			drawSlider.addEventListener('drawSliderClosed', () => {
+				const center = playerFeature.getGeometry().getCoordinates();
+				const zoom = view.get('beforeDrawZoom') || 17;
+
 				view.setTopPadding();
-				view.setCenter(playerFeature.getGeometry().getCoordinates());
+				view.setCenter(center);
+				view.setZoom(zoom);
 			});
 
 			portrait.addEventListener('change', () => {
@@ -4016,8 +4031,16 @@
 		}
 
 
-		/* Кнопка смены сортировки при рисовании */
+		/* Кнопки смены сортировки и вписывания линии при рисовании */
 		{
+			function fit() {
+				const tempLine = tempLinesSource?.getFeatures()[0].getGeometry();
+				const padding = [10, 0, window.innerHeight - drawSlider.getBoundingClientRect().y + 30, 0];
+
+				if (tempLine == undefined) { return; }
+				view.fitTempLine(tempLine, padding);
+			}
+
 			function flip() {
 				const refs = refsList.childNodes;
 				const refsReversed = [...refs].reverse();
@@ -4033,15 +4056,19 @@
 				flipButton.classList.replace('fa-solid-arrow-down-wide-short', 'fa-solid-arrow-down-short-wide');
 			}
 
+			const fitButton = document.createElement('button');
 			const flipButton = document.createElement('button');
 			const sliderButtons = document.querySelector('.draw-slider-buttons');
-			const cancelButton = document.querySelector('#draw-slider-close');
 
+			fitButton.classList.add('fa', 'fa-solid-up-right-and-down-left-from-center', 'sbgcui_drawslider_fit');
 			flipButton.classList.add('fa', 'fa-solid-arrow-down-short-wide', 'fa-rotate-270', 'sbgcui_drawslider_sort');
+
+			fitButton.addEventListener('click', fit);
 			flipButton.addEventListener('click', flip);
+
 			drawSlider.addEventListener('drawSliderOpened', resetIcon);
 
-			sliderButtons.insertBefore(flipButton, cancelButton);
+			sliderButtons.append(flipButton, fitButton);
 		}
 
 

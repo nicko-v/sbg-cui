@@ -109,3 +109,7 @@
 .fa-solid-xmark {
   --fa-url: url("../svg/solid/xmark.svg");
 }
+
+.fa-solid-up-right-and-down-left-from-center {
+  --fa-url: url("../svg/solid/up-right-and-down-left-from-center.svg");
+}
