@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.23
+// @version      1.11.24
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -9,13 +9,13 @@
 // @match        https://sbg-game.ru/app/*
 // @run-at       document-idle
 // @grant        none
-// @iconURL    https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
+// @iconURL      https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.23';
+	const USERSCRIPT_VERSION = '1.11.24';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -195,13 +195,15 @@
 			}
 
 			fitBlastRange(isCompleted) {
-				if (isCompleted) { this.set('blastRangeZoom', this.getZoom()); return; }
+				const currentZoom = this.getZoom();
+
+				if (isCompleted) { this.set('blastRangeZoom', currentZoom); return; }
 
 				this.removePadding();
 				this.fit(playerFeature.blastRange, {
 					callback: this.fitBlastRange.bind(this),
 					duration: 0, // Временно отключено
-					maxZoom: 17,
+					maxZoom: currentZoom,
 				});
 			}
 
@@ -1018,6 +1020,8 @@
 
 						if (itemName == 'refs') {
 							if (isStarMode && (itemLevel == starModeTarget?.guid)) {
+								itemMaxAmount = -1;
+							} else if (favorites[itemLevel]?.isActive) {
 								itemMaxAmount = -1;
 							} else if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) {
 								itemMaxAmount = -1;
@@ -1997,8 +2001,8 @@
 
 			if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
 				config.maxAmountInBag = {
-					cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 120, VII: 120, VIII: 120, IX: 120, X: -1 },
-					catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 1000, IX: -1, X: -1 },
+					cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 80, VIII: 80, IX: 80, X: 80 },
+					catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 0, IX: -1, X: -1 },
 					refs: { allied: -1, hostile: -1 },
 				};
 				config.autoSelect.upgrade = 'max';
@@ -2253,7 +2257,7 @@
 
 			drawSlider.addEventListener('drawSliderOpened', () => {
 				view.setBottomPadding();
-				
+
 				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
 				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
 				window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
@@ -2341,6 +2345,12 @@
 
 				localStorage.setItem(cacheName, JSON.stringify(cache));
 			});
+
+			window.draw_slider.options = {
+				height: '120px',
+				pagination: true,
+				perPage: 2,
+			};
 		}
 
 
@@ -2529,11 +2539,6 @@
 						}
 					})
 					.catch(error => {
-						if (error.message.match(/полностью|вражеской|fully|enemy/)) {
-							refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
-							return;
-						}
-
 						const toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
 
 						toast.options.className = 'error-toast';
@@ -2541,7 +2546,11 @@
 
 						console.log('SBG CUI: Ошибка при зарядке.', error);
 
-						refEntry.style.setProperty('--sbgcui-display-r-button', 'flex');
+						if (error.message.match(/полностью|вражеской|fully|enemy/)) {
+							refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
+						} else {
+							refEntry.style.setProperty('--sbgcui-display-r-button', 'flex');
+						}
 					});
 			}
 
@@ -2562,7 +2571,7 @@
 				const refEntry = event.target.closest('.inventory__item');
 
 				refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
-				
+
 				recursiveRepair(pointGuid, refEntry);
 			});
 		}
@@ -2917,6 +2926,7 @@
 				let star = document.createElement('button');
 				let favsList = document.createElement('div');
 				let favsListHeader = document.createElement('h3');
+				let favsListDescription = document.createElement('h6');
 				let favsListContent = document.createElement('ul');
 				let isFavsListOpened = false;
 
@@ -2938,7 +2948,7 @@
 
 							pointName.innerText = favorites[guid].name;
 							pointLink.appendChild(pointName);
-							pointLink.setAttribute('href', `/?point=${guid}`);
+							pointLink.setAttribute('href', `/app/?point=${guid}`);
 
 							deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
 							deleteButton.addEventListener('click', _ => {
@@ -2997,11 +3007,13 @@
 
 				favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
 				favsListHeader.classList.add('sbgcui_favs-header');
+				favsListDescription.classList.add('sbgcui_favs-descr');
 				favsListContent.classList.add('sbgcui_favs-content');
 
 				favsListHeader.innerText = 'Избранные точки';
+				favsListDescription.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
 
-				favsList.append(favsListHeader, favsListContent);
+				favsList.append(favsListHeader, favsListDescription, favsListContent);
 
 				star.classList.add('fa', 'fa-solid-star', 'sbgcui_favs_star');
 				star.addEventListener('click', () => {
