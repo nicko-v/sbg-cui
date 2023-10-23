@@ -29,7 +29,10 @@ body {
 	overflow: hidden;
 }
 
-#attack-slider-fire,
+#attack-slider-fire {
+	height: 50px;
+}
+
 .draw-slider-buttons button {
 	height: 40px;
 }
