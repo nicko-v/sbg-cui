@@ -1321,13 +1321,26 @@
 				for (let key in maxAmountInBag) {
 					let subSection = document.createElement('section');
 					let subSectionTitle = document.createElement('h4');
+					let subSectionSubTitle = document.createElement('h6');
 					let maxAmounts = document.createElement('div');
 
 					subSection.classList.add('sbgcui_settings-subsection');
 					subSectionTitle.classList.add('sbgcui_settings-title');
+					subSectionSubTitle.classList.add('sbgcui_settings-subtitle');
 					maxAmounts.classList.add('sbgcui_settings-maxamounts');
 
-					subSectionTitle.innerText = (key == 'cores') ? 'Ядра' : (key == 'catalysers') ? 'Катализаторы' : (key == 'refs') ? 'Рефы' : 'N/D';
+					switch (key) {
+						case 'cores':
+							subSectionTitle.innerText = 'Ядра';
+							break;
+						case 'catalysers':
+							subSectionTitle.innerText = 'Катализаторы';
+							break;
+						case 'refs':
+							subSectionTitle.innerText = 'Сноски';
+							subSectionSubTitle.innerHTML = `Сноски от избранных точек удаляться не будут.<br>Для добавления в избранное нажмите звезду на карточке точки.`;
+							break;
+					}
 
 					for (let type in maxAmountInBag[key]) {
 						let wrapper = document.createElement('div');
@@ -1356,7 +1369,7 @@
 						maxAmounts.appendChild(wrapper);
 					}
 
-					subSection.append(subSectionTitle, maxAmounts);
+					subSection.append(subSectionTitle, subSectionSubTitle, maxAmounts);
 
 					section.appendChild(subSection);
 				}
