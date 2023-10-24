@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.26
+// @version      1.11.27
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.26';
+	const USERSCRIPT_VERSION = '1.11.27';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -626,6 +626,7 @@
 		let html = document.documentElement;
 		let attackButton = document.querySelector('#attack-menu');
 		let attackSlider = document.querySelector('.attack-slider-wrp');
+		let blContainer = document.querySelector('.bottom-container');
 		let drawSlider = document.querySelector('.draw-slider-wrp');
 		let catalysersList = document.querySelector('#catalysers-list');
 		let coresList = document.querySelector('#cores-list');
@@ -2285,6 +2286,11 @@
 				view.setBottomPadding();
 				view.set('beforeDrawZoom', view.getZoom());
 
+				blContainer.classList.add('sbgcui_hidden');
+				zoomContainer.childNodes.forEach(e => { !e.matches('.ol-zoom-in, .ol-zoom-out') && e.classList.add('sbgcui_hidden'); });
+				zoomContainer.style.bottom = '50%';
+				map.removeControl(toolbar);
+
 				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
 				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
 				window.draw_slider.emit('active', { slide: drawSlider.querySelector('.splide__slide.is-active') });
@@ -2297,6 +2303,11 @@
 				view.setTopPadding();
 				view.setCenter(center);
 				view.setZoom(zoom);
+
+				blContainer.classList.remove('sbgcui_hidden');
+				zoomContainer.childNodes.forEach(e => { e.classList.remove('sbgcui_hidden'); });
+				zoomContainer.style.bottom = '';
+				map.addControl(toolbar);
 			});
 
 			portrait.addEventListener('change', () => {
@@ -2309,7 +2320,6 @@
 		/* Удаление ненужного, переносы, переименования */
 		{
 			const ops = document.querySelector('#ops');
-			const blContainer = document.querySelector('.bottom-container');
 			const rotateArrow = document.querySelector('.ol-rotate');
 			const layersButton = document.querySelector('#layers');
 			const notifsButton = document.querySelector('#notifs-menu');
@@ -2380,7 +2390,7 @@
 			window.draw_slider.options = {
 				height: '120px',
 				pagination: true,
-				perPage: 2,
+				//perPage: 2,
 			};
 		}
 
