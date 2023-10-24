@@ -232,9 +232,17 @@
 			}
 		}
 
+		class Tile extends ol.layer.Tile {
+			constructor(options) {
+				options.preload = Infinity;
+				super(options);
+			}
+		}
+
 		ol.Map = Map;
 		ol.Feature = Feature;
 		ol.View = View;
+		ol.layer.Tile = Tile;
 	}
 
 	function loadMainScript() {
