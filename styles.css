@@ -206,10 +206,10 @@ body {
 
 .draw-slider-buttons {
 	display: grid;
-	gap: 10px 20px;
-	grid-template-areas: "Draw Draw Close Close" ". Sort Fit .";
-	grid-template-columns: 1fr 1fr 1fr 1fr;
-	grid-template-rows: 1fr 0.5fr;
+	gap: 5px 20px;
+	grid-template-areas: "Draw Draw Draw Draw Close Close Close Close" ". Sort Sort . . Fit Fit .";
+	grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+	grid-template-rows: 50px 40px;
 	padding: 0;
 }
 
@@ -241,15 +241,6 @@ body {
 
 .splide__arrow--next {
 	right: 0;
-}
-
-.refs-list__title {
-	display: -webkit-box;
-	text-overflow: unset;
-	white-space: break-spaces;
-	word-wrap: break-word;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
 }
 
 .attack-slider-buttons {
