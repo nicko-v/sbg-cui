@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.25
+// @version      1.11.26
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.25';
+	const USERSCRIPT_VERSION = '1.11.26';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -262,6 +262,8 @@
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
 				case `z: view.getZoom()`:
 					return `z: Math.floor(view.getZoom())`;
+				case `if (area < 1)`:
+					return `if (area < 0)`;
 				case `const persist = [`:
 					return `const persist = [/^sbgcui_/, `;
 				case `if (type == 'osm') {`:
@@ -285,6 +287,7 @@
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
+			`(if \\(area < 1\\))`,
 			`(const persist = \\[)`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
@@ -2755,7 +2758,7 @@
 								case 'max_region':
 								case 'regions_area':
 									statName = i18next.t(`profile.stats.${key}`);
-									diff = diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : i18next.t('units.sqkm', { count: diff });
+									diff = /*diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : */i18next.t('units.sqkm', { count: diff });
 									break;
 								case 'xp':
 									statName = i18next.t(`profile.stats.total-xp`);
@@ -4005,7 +4008,7 @@
 						return value < 1000 ? i18next.t('units.m', { count: value }) : i18next.t('units.km', { count: value / 1000 });
 					case 'max_region':
 					case 'regions_area':
-						return value < 1 ? i18next.t('units.sqm', { count: value * 1e6 }) : i18next.t('units.sqkm', { count: value });
+						return /*value < 1 ? i18next.t('units.sqm', { count: value * 1e6 }) : */i18next.t('units.sqkm', { count: value });
 					case 'xp':
 						return `${formatter.format(value)} ${i18next.t('units.pts-xp')}`;
 					case 'created_at':
@@ -4179,8 +4182,8 @@
 				const areasM2 = features.map(feature => ol.sphere.getArea(feature.getGeometry()));
 				const minAreaM2 = Math.min(...areasM2);
 				const maxAreaM2 = Math.max(...areasM2);
-				const minArea = minAreaM2 < 1e6 ? i18next.t('units.sqm', { count: minAreaM2 }) : i18next.t('units.sqkm', { count: minAreaM2 / 1e6 });
-				const maxArea = maxAreaM2 < 1e6 ? i18next.t('units.sqm', { count: maxAreaM2 }) : i18next.t('units.sqkm', { count: maxAreaM2 / 1e6 });
+				const minArea = /*minAreaM2 < 1e6 ? i18next.t('units.sqm', { count: minAreaM2 }) : */i18next.t('units.sqkm', { count: minAreaM2 / 1e6 });
+				const maxArea = /*maxAreaM2 < 1e6 ? i18next.t('units.sqm', { count: maxAreaM2 }) : */i18next.t('units.sqkm', { count: maxAreaM2 / 1e6 });
 				let message = `Количество регионов в точке: ${features.length}.`;
 
 				if (features.length == 1) { message += `\n\nПлощадь региона: ${maxArea}.`; }
