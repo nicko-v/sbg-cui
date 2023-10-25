@@ -507,7 +507,7 @@
 				this.#toolbar.classList.add('sbgcui_hidden');
 
 				this.#isExpanded = false;
-				localStorage.setItem(this.name, false)
+				localStorage.setItem(this.name, false);
 			}
 
 			expand() {
@@ -517,7 +517,7 @@
 				this.#toolbar.classList.remove('sbgcui_hidden');
 
 				this.#isExpanded = true;
-				localStorage.setItem(this.name, true)
+				localStorage.setItem(this.name, true);
 			}
 
 			handleExpand() {
@@ -2036,7 +2036,7 @@
 
 			if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
 				config.maxAmountInBag = {
-					cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 80, VIII: 80, IX: 80, X: 80 },
+					cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 50, VIII: 50, IX: 50, X: 50 },
 					catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 0, IX: -1, X: -1 },
 					refs: { allied: -1, hostile: -1 },
 				};
@@ -2463,7 +2463,7 @@
 
 				span.innerText = `Stadia ${theme}`
 
-				label.append(input, span);
+				label.append(input, ' ', span);
 			});
 
 			document.querySelector('input[value="osm"]').parentElement.after(stadiaWatercolorLabel, stadiaTonerLabel);
