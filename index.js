@@ -197,6 +197,8 @@
 
 			fitBlastRange(isCompleted) {
 				const currentZoom = this.getZoom();
+				const isZoomChanged = view.get('isZoomChanged');
+				const maxZoom = isZoomChanged ? currentZoom : 17;
 
 				if (isCompleted) { this.set('blastRangeZoom', currentZoom); return; }
 
@@ -204,7 +206,7 @@
 				this.fit(playerFeature.blastRange, {
 					callback: this.fitBlastRange.bind(this),
 					duration: 0, // Временно отключено
-					maxZoom: currentZoom,
+					maxZoom,
 				});
 			}
 
