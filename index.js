@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.11.27
+// @version      1.12.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.11.27';
+	const USERSCRIPT_VERSION = '1.12.0';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -159,10 +159,6 @@
 		}
 
 		class Feature extends ol.Feature {
-			constructor(geometryOrProperties) {
-				super(geometryOrProperties);
-			}
-
 			setStyle(style) {
 				if (style && playerFeature == undefined && style.length == 3 && style[0].image_?.iconImage_.src_.match(/\/assets\/player/)) {
 					let setCenter = style[1].getGeometry().setCenter;
@@ -663,6 +659,7 @@
 		let selfExpSpan = document.querySelector('#self-info__exp');
 		let selfLvlSpan = document.querySelector('#self-info__explv');
 		let selfNameSpan = document.querySelector('#self-info__name');
+		let tlContainer = document.querySelector('.topleft-container')
 		let toggleFollow = document.querySelector('#toggle-follow');
 		let xpDiffSpan = document.querySelector('.xp-diff');
 		let zoomContainer = document.querySelector('.ol-zoom');
@@ -672,6 +669,7 @@
 		let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 		let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 		let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+		let isRefsViewerOpened = false;
 
 		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
 		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
@@ -716,6 +714,8 @@
 
 						break;
 					case '/api/inview':
+						if (isRefsViewerOpened) { resolve(); return; }
+
 						let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
 
 						if (uniqsHighlighting) {
@@ -1072,9 +1072,10 @@
 					if (!deleted.length) { return; }
 
 					let invTotal = responses.reduce((total, e) => e.count.total < total ? e.count.total : total, Infinity);
-					if (isFinite(invTotal)) { invTotalSpan.innerText = invTotal; }
-
-					if (inventoryButton.style.color.match('accent')) { inventoryButton.style.color = ''; }
+					if (isFinite(invTotal)) {
+						invTotalSpan.innerText = invTotal;
+						if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
+					}
 
 					/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
 					deleteFromCache(deleted);
@@ -1999,6 +2000,23 @@
 			return days;
 		}
 
+		function hideControls() {
+			// Отключаются все кнопки и панели кроме зума и фоллоу.
+			tlContainer.classList.add('sbgcui_hidden');
+			blContainer.classList.add('sbgcui_hidden');
+			zoomContainer.childNodes.forEach(e => { !e.matches('.ol-zoom-in, .ol-zoom-out, #toggle-follow') && e.classList.add('sbgcui_hidden'); });
+			zoomContainer.style.bottom = '50%';
+			map.removeControl(toolbar);
+		}
+
+		function showControls() {
+			tlContainer.classList.remove('sbgcui_hidden');
+			blContainer.classList.remove('sbgcui_hidden');
+			zoomContainer.childNodes.forEach(e => { e.classList.remove('sbgcui_hidden'); });
+			zoomContainer.style.bottom = '';
+			map.addControl(toolbar);
+		}
+
 
 		/* Данные о себе и версии игры */
 		{
@@ -2296,10 +2314,7 @@
 				view.setBottomPadding();
 				view.set('beforeDrawZoom', view.getZoom());
 
-				blContainer.classList.add('sbgcui_hidden');
-				zoomContainer.childNodes.forEach(e => { !e.matches('.ol-zoom-in, .ol-zoom-out') && e.classList.add('sbgcui_hidden'); });
-				zoomContainer.style.bottom = '50%';
-				map.removeControl(toolbar);
+				hideControls();
 
 				// Маленький костылёчек, который позволяет правильно центрировать вью при первом открытии слайдера.
 				// Иначе не успевает отработать MutationObserver, эмитящий эвент drawSliderOpened.
@@ -2314,10 +2329,7 @@
 				view.setCenter(center);
 				view.setZoom(zoom);
 
-				blContainer.classList.remove('sbgcui_hidden');
-				zoomContainer.childNodes.forEach(e => { e.classList.remove('sbgcui_hidden'); });
-				zoomContainer.style.bottom = '';
-				map.addControl(toolbar);
+				showControls();
 			});
 
 			portrait.addEventListener('change', () => {
@@ -2633,7 +2645,7 @@
 			let isSettingsMenuOpened = false;
 
 			let settingsMenu = createSettingsMenu();
-			document.querySelector('.topleft-container').appendChild(settingsMenu);
+			tlContainer.appendChild(settingsMenu);
 
 			let settingsButton = document.createElement('button');
 			settingsButton.classList.add('fa', 'fa-solid-gears');
@@ -4444,6 +4456,211 @@
 
 				window.addEventListener('deviceorientation', rotateArrow);
 			}
+		}
+
+
+		/* Показать рефы на карте */
+		{
+			function deleteRefs() {
+				if (uniqueRefsToDelete == 0) { return; }
+
+				const urtdSuffix = uniqueRefsToDelete % 10 == 1 ? 'ки' : 'ек';
+				let ortdSuffix;
+
+				switch (overallRefsToDelete % 10) {
+					case 1:
+						ortdSuffix = 'ку';
+						break;
+					case 2:
+					case 3:
+					case 4:
+						ortdSuffix = 'ки';
+						break;
+					default:
+						ortdSuffix = 'ок';
+						break;
+				}
+
+				if (!confirm(`Удалить ${overallRefsToDelete} ссыл${ortdSuffix} от ${uniqueRefsToDelete} точ${urtdSuffix}?`)) { return; }
+
+				const selectedFeatures = pointsWithRefsSource.getFeatures().filter(feature => feature.get('isSelected') == true);
+				const refsToDelete = selectedFeatures.map(feature => ({ guid: feature.getId(), type: 3, amount: feature.get('amount') }));
+				
+				deleteItems(refsToDelete)
+					.then(responses => {
+						const response = responses[0];
+
+						if ('error' in response) { throw response.error; }
+
+						invTotalSpan.innerText = response.count.total;
+						if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
+
+						deleteFromCache(refsToDelete);
+
+						uniqueRefsToDelete = 0;
+						overallRefsToDelete = 0;
+						selectedFeatures.forEach(feature => { pointsWithRefsSource.removeFeature(feature); });
+						
+						trashCanButton.style.setProperty('--sbgcui-overall-refs-to-del', `"0"`);
+						trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"0"`);
+					})
+					.catch(error => {
+						const toast = createToast('Ошибка при удалении ссылок.');
+
+						toast.options.className = 'error-toast';
+						toast.showToast();
+
+						console.log('SBG CUI: Ошибка при удалении ссылок.', error);
+					});
+			}
+
+			function hideViewer() {
+				pointsWithRefsSource.clear(true);
+
+				hideViewerButton.classList.add('sbgcui_hidden');
+				trashCanButton.classList.add('sbgcui_hidden');
+				showControls();
+
+				isRefsViewerOpened = false;
+				overallRefsToDelete = 0;
+				uniqueRefsToDelete = 0;
+
+				map.un('click', mapClickHandler);
+
+				view.setZoom(beforeOpenZoom);
+				view.setCenter(playerFeature.getGeometry().getCoordinates());
+
+				window.requestEntities();
+			}
+
+			function mapClickHandler(event) {
+				function toggleSelectState(feature) {
+					const { amount, isSelected } = feature.getProperties();
+
+					feature.set('isSelected', !isSelected);
+
+					overallRefsToDelete += amount * (isSelected ? -1 : 1);
+					uniqueRefsToDelete += isSelected ? -1 : 1;
+					trashCanButton.style.setProperty('--sbgcui-overall-refs-to-del', `"${overallRefsToDelete}"`);
+					trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"${uniqueRefsToDelete}"`);
+				}
+
+				const options = {
+					hitTolerance: 0,
+					layerFilter: layer => layer.get('name') == 'sbgcui_points_with_refs'
+				};
+
+				map.forEachFeatureAtPixel(event.pixel, toggleSelectState, options);
+			}
+
+			function showViewer() {
+				getInventory()
+					.then(inventory => {
+						const refs = inventory.filter(item => item.t == 3);
+						const layers = map.getAllLayers();
+
+						beforeOpenZoom = view.getZoom();
+						isRefsViewerOpened = true;
+						hideViewerButton.classList.remove('sbgcui_hidden');
+						trashCanButton.classList.remove('sbgcui_hidden');
+						inventoryPopup.classList.add('hidden');
+						hideControls();
+
+						trashCanButton.style.setProperty('--sbgcui-overall-refs-to-del', `"0"`);
+						trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"0"`);
+
+						layers.forEach(layer => {
+							if (/^(lines|points|regions)/.test(layer.get('name'))) { layer.getSource().clear(); }
+						});
+
+						refs.forEach(ref => {
+							const { a: amount, c: coords, g: refGuid, l: pointGuid, ti: title } = ref;
+							const mapCoords = ol.proj.fromLonLat(coords);
+							const feature = new ol.Feature({ geometry: new ol.geom.Point(mapCoords) });
+
+							feature.setId(refGuid);
+							feature.setProperties({ amount, mapCoords, pointGuid, title });
+
+							pointsWithRefsSource.addFeature(feature);
+						});
+
+						map.on('click', mapClickHandler);
+					})
+					.catch(error => {
+						console.log(error);
+					});
+			}
+
+			const pointsWithRefsSource = new ol.source.Vector();
+			const pointsWithRefsLayer = new ol.layer.Vector({
+				className: 'ol-layer__sbgcui_points_with_refs',
+				declutter: true,
+				minZoom: 0,
+				name: 'sbgcui_points_with_refs',
+				source: pointsWithRefsSource,
+				style: (feature, resolution) => {
+					const { amount, isSelected, mapCoords, title } = feature.getProperties();
+					const zoom = view.getZoom();
+					const markerSize = zoom >= 16 ? 20 : 20 * resolution / 2.5;
+					const markerStyle = new ol.style.Style({
+						geometry: new ol.geom.Circle(mapCoords, isSelected ? markerSize * 1.4 : markerSize),
+						fill: new ol.style.Fill({ color: isSelected ? '#BB7100' : '#CCC' }),
+						stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 3 }),
+						zIndex: isSelected ? 3 : 1,
+					});
+					const amountStyle = new ol.style.Style({
+						text: new ol.style.Text({
+							fill: new ol.style.Fill({ color: '#000' }),
+							font: `${zoom >= 15 ? 16 : 12}px Manrope`,
+							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
+							text: zoom >= 15 ? String(amount) : null,
+						}),
+						zIndex: 2,
+					});
+					const titleStyle = new ol.style.Style({
+						text: new ol.style.Text({
+							fill: new ol.style.Fill({ color: '#000' }),
+							font: `12px Manrope`,
+							offsetY: 25 / resolution,
+							stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
+							text: zoom >= 17 ? (title.length <= 12 ? title : title.slice(0, 10).trim() + '...') : null,
+							textBaseline: 'top',
+						}),
+						zIndex: 2,
+					});
+
+					return [markerStyle, amountStyle, titleStyle];
+				},
+				zIndex: 8,
+			});
+			const hideViewerButton = document.createElement('button');
+			const invControls = document.querySelector('.inventory__controls');
+			const invDelete = document.querySelector('#inventory-delete');
+			const showViewerButton = document.createElement('button');
+			const trashCanButton = document.createElement('button');
+			const buttonsWrapper = document.createElement('div');
+			let overallRefsToDelete = 0;
+			let uniqueRefsToDelete = 0;
+			let beforeOpenZoom;
+
+			hideViewerButton.id = 'sbgcui_hide_viewer';
+			hideViewerButton.classList.add('sbgcui_button_reset', 'sbgcui_hidden', 'fa', 'fa-solid-xmark');
+
+			showViewerButton.classList.add('sbgcui_show_viewer');
+			showViewerButton.innerText = 'На карте';
+
+			trashCanButton.classList.add('sbgcui_button_reset', 'sbgcui_hidden', 'fa', 'fa-solid-trash');
+			trashCanButton.id = 'sbgcui_batch_remove';
+
+			showViewerButton.addEventListener('click', showViewer);
+			hideViewerButton.addEventListener('click', hideViewer);
+			trashCanButton.addEventListener('click', deleteRefs);
+
+			invControls.insertBefore(showViewerButton, invDelete);
+			buttonsWrapper.append(hideViewerButton, trashCanButton);
+			document.body.appendChild(buttonsWrapper);
+
+			map.addLayer(pointsWithRefsLayer);
 		}
 
 
