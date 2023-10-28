@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.12.0
+// @version      1.12.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.12.0';
+	const USERSCRIPT_VERSION = '1.12.1';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -4505,7 +4505,7 @@
 						trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"0"`);
 					})
 					.catch(error => {
-						const toast = createToast('Ошибка при удалении ссылок.');
+						const toast = createToast(`Ошибка при удалении ссылок. <br>${error?.message || error}`);
 
 						toast.options.className = 'error-toast';
 						toast.showToast();
@@ -4528,7 +4528,7 @@
 				map.un('click', mapClickHandler);
 
 				view.setZoom(beforeOpenZoom);
-				view.setCenter(playerFeature.getGeometry().getCoordinates());
+				//view.setCenter(playerFeature.getGeometry().getCoordinates());
 
 				window.requestEntities();
 			}
