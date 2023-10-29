@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.12.1
+// @version      1.12.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,7 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.12.1';
+	const USERSCRIPT_VERSION = '1.12.2';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -4492,7 +4492,9 @@
 
 						if ('error' in response) { throw response.error; }
 
-						invTotalSpan.innerText = response.count.total;
+						const invTotal = response.count.total;
+
+						invTotalSpan.innerText = invTotal;
 						if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
 
 						deleteFromCache(refsToDelete);
