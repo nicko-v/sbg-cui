@@ -38,8 +38,8 @@
 	const INVIEW_POINTS_LIMIT = 100;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const HIGHLEVEL_MARKER = 9;
-	const CORES_ENERGY = [ 0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500 ];
-	const CORES_LIMITS = [ 0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1 ];
+	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
+	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
 	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
@@ -1242,7 +1242,7 @@
 			items.forEach(e => {
 				let cachedItem = cache.find(f => f.g == e.guid);
 				if (cachedItem) { cachedItem.a -= e.amount; }
-				
+
 				switch (e.type) {
 					case 1:
 						deploySlider.querySelector(`[data-guid="${e.guid}"]`)?.remove();
@@ -2717,7 +2717,7 @@
 		/* Тонирование интерфейса */
 		{
 			var theme = document.createElement('meta');
-			var viewport = document.querySelector('meta[name="viewport"]')
+			var viewport = document.querySelector('meta[name="viewport"]');
 
 			theme.name = 'theme-color';
 			document.head.appendChild(theme);
