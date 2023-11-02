@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.0
+// @version      1.13.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -24,7 +24,7 @@
 	document.open();
 
 
-	const USERSCRIPT_VERSION = '1.13.0';
+	const USERSCRIPT_VERSION = '1.13.1';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -1243,13 +1243,18 @@
 				let cachedItem = cache.find(f => f.g == e.guid);
 				if (cachedItem) { cachedItem.a -= e.amount; }
 
-				switch (e.type) {
-					case 1:
-						deploySlider.querySelector(`[data-guid="${e.guid}"]`)?.remove();
-						break;
-					case 2:
-						attackSlider.querySelector(`[data-guid="${e.guid}"]`)?.remove();
-						break;
+				if (e.type == 1) {
+					const coreSlide = deploySlider.querySelector(`li[data-guid="${e.guid}"]`);
+					if (coreSlide == null) { return; }
+
+					const amountSpan = coreSlide.querySelector(`li[data-guid="${e.guid}"] > .cores-list__amount`);
+					const amountSpanText = +amountSpan.innerText.slice(1);
+
+					if (amountSpanText - e.amount > 0) {
+						amountSpan.innerText = `x${amountSpanText - e.amount}`;
+					} else {
+						coreSlide.remove();
+					}
 				}
 			});
 			cache = cache.filter(e => e.a > 0);
