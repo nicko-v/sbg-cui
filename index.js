@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.12.2
+// @version      1.13.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -15,7 +15,16 @@
 (function () {
 	'use strict';
 
-	const USERSCRIPT_VERSION = '1.12.2';
+	if (window.location.pathname.startsWith('/login')) { return; }
+	if (document.querySelector('[src="intel.js"]')) { return; }
+
+	window.cuiStatus = 'loading';
+	window.stop();
+	window.navigator.geolocation.clearWatch(1);
+	document.open();
+
+
+	const USERSCRIPT_VERSION = '1.13.0';
 	const LATEST_KNOWN_VERSION = '0.4.2-2';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const INVENTORY_LIMIT = 3000;
@@ -29,106 +38,176 @@
 	const INVIEW_POINTS_LIMIT = 100;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const HIGHLEVEL_MARKER = 9;
-	const LANG = i18next.language;
-	const IS_DARK = matchMedia('(prefers-color-scheme: dark)').matches;
-	const IS_CDB_MAP = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
-	const CORES_ENERGY = { 0: 0, 1: 500, 2: 750, 3: 1000, 4: 1500, 5: 2000, 6: 2500, 7: 3500, 8: 4000, 9: 5250, 10: 6500 };
-	const CORES_LIMITS = { 0: 0, 1: 6, 2: 6, 3: 4, 4: 4, 5: 3, 6: 3, 7: 2, 8: 2, 9: 1, 10: 1 };
+	const CORES_ENERGY = [ 0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500 ];
+	const CORES_LIMITS = [ 0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1 ];
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
-	const ITEMS_TYPES = {
-		1: { eng: 'cores', rus: 'ядра' },
-		2: { eng: 'catalysers', rus: 'катализаторы' },
-		3: { eng: 'refs', rus: 'рефы' },
-		4: { eng: 'brooms', rus: 'веники' },
-	};
-	const ACTIONS_REWARDS = {
-		build: {},
-		destroy: {
-			region: 125,
-			line: 45,
-			core: 10,
-		},
-	};
-	const DEFAULT_CONFIG = {
-		maxAmountInBag: {
-			cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-			refs: { allied: -1, hostile: -1 },
-		},
-		autoSelect: {
-			deploy: 'max',  // min || max || off
-			upgrade: 'min', // min || max || off
-			attack: 'latest',  // max || latest
-		},
-		mapFilters: {
-			invert: IS_DARK && !IS_CDB_MAP ? 1 : 0,
-			hueRotate: IS_DARK ? 180 : 0,
-			brightness: IS_DARK ? 0.75 : 1,
-			grayscale: IS_DARK ? 1 : 0,
-			sepia: 1,
-			blur: 0,
-			branding: 'default', // default || custom
-			brandingColor: '#CCCCCC',
-		},
-		tinting: {
-			map: 1,
-			point: 'level', // level || team || off
-			profile: 1,
-		},
-		vibration: {
-			buttons: 1,
-			notifications: 1,
-		},
-		ui: {
-			doubleClickZoom: 0,
-			pointBgImage: 1,
-			pointBtnsRtl: 0,
-			pointBgImageBlur: 1,
-			pointDischargeTimeout: 1,
-			speedometer: 1,
-		},
-		pointHighlighting: {
-			inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-			outer: 'off',
-			outerTop: 'cores',
-			outerBottom: 'highlevel',
-			text: 'refsAmount', // energy || level || lines || refsAmount || off
-			innerColor: '#E87100',
-			outerColor: '#E87100',
-			outerTopColor: '#EB4DBF',
-			outerBottomColor: '#28C4F4',
-		},
-		drawing: {
-			minDistance: -1,
-			maxDistance: -1,
-		},
-	};
+	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
+	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
 
-	let map, view, playerFeature, tempLinesSource;
-	let isFollow = localStorage.getItem('follow') == 'true';
+
+	const lang = i18next.language;
+	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
+	const isCdbMap = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
 	const portrait = window.matchMedia('(orientation: portrait)');
+	const config = {}, state = {}, favorites = {};
+	let isFollow = localStorage.getItem('follow') == 'true';
+	let map, view, playerFeature, tempLinesSource;
 
-	if (window.location.pathname.startsWith('/login')) { return; }
-	if (document.querySelector('script[src="/intel.js"]')) { return; }
 
-	window.stop();
-	window.cuiStatus = 'loading';
+	window.addEventListener('dbReady', loadPageSource);
+	window.addEventListener('olReady', () => { olInjection(); loadMainScript(); });
+	window.addEventListener('mapReady', main);
 
-	fetch('/app')
-		.then(r => r.text())
-		.then(data => {
-			data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
-			data = data.replace(/(<script src="https:\/\/cdn.jsdelivr.net\/npm\/ol@.+?)(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
 
-			document.open();
+	let database;
+	const openRequest = indexedDB.open('CUI', 1);
 
-			window.addEventListener('olReady', () => { olInjection(); loadMainScript(); });
-			window.addEventListener('mapReady', main);
+	openRequest.addEventListener('upgradeneeded', event => {
+		function initializeDB() {
+			database.createObjectStore('config');
+			database.createObjectStore('state');
+			database.createObjectStore('stats', { keyPath: 'name' });
+			database.createObjectStore('favorites', { keyPath: 'guid' });
 
-			document.write(data);
-			document.close();
+			const transaction = event.target.transaction;
+			const configStore = transaction.objectStore('config');
+			const stateStore = transaction.objectStore('state');
+
+			const defaultConfig = {
+				maxAmountInBag: {
+					cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+					catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+					references: { allied: -1, hostile: -1 },
+				},
+				autoSelect: {
+					deploy: 'max',  // min || max || off
+					upgrade: 'min', // min || max || off
+					attack: 'latest',  // max || latest
+				},
+				mapFilters: {
+					invert: isDarkMode && !isCdbMap ? 1 : 0,
+					hueRotate: isDarkMode ? 180 : 0,
+					brightness: isDarkMode ? 0.75 : 1,
+					grayscale: isDarkMode ? 1 : 0,
+					sepia: 1,
+					blur: 0,
+					branding: 'default', // default || custom
+					brandingColor: '#CCCCCC',
+				},
+				tinting: {
+					map: 1,
+					point: 'level', // level || team || off
+					profile: 1,
+				},
+				vibration: {
+					buttons: 1,
+					notifications: 1,
+				},
+				ui: {
+					doubleClickZoom: 0,
+					pointBgImage: 1,
+					pointBtnsRtl: 0,
+					pointBgImageBlur: 1,
+					pointDischargeTimeout: 1,
+					speedometer: 1,
+				},
+				pointHighlighting: {
+					inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+					outer: 'off',
+					outerTop: 'cores',
+					outerBottom: 'highlevel',
+					text: 'refsAmount', // energy || level || lines || refsAmount || off
+					innerColor: '#E87100',
+					outerColor: '#E87100',
+					outerTopColor: '#EB4DBF',
+					outerBottomColor: '#28C4F4',
+				},
+				drawing: {
+					minDistance: -1,
+					maxDistance: -1,
+				},
+			};
+
+			for (let key in defaultConfig) { configStore.add(defaultConfig[key], key); }
+
+			stateStore.add(new Set(), 'excludedCores');
+			stateStore.add(true, 'isMainToolbarOpened');
+			stateStore.add(false, 'isRotationLocked');
+			stateStore.add(false, 'isStarMode');
+			stateStore.add(null, 'lastUsedCatalyser');
+			stateStore.add(null, 'starModeTarget');
+			stateStore.add(0, 'versionWarns');
+		}
+
+		function updateDB() {
+			return;
+		}
+
+		const { newVersion, oldVersion } = event;
+		database = event.target.result;
+
+		if (oldVersion == 0) { initializeDB(); } else { updateDB(); }
+	});
+	openRequest.addEventListener('success', event => {
+		function getData(event) {
+			const storeName = event.target.source.name;
+			const cursor = event.target.result;
+			let objectToPopulate;
+
+			switch (storeName) {
+				case 'config':
+					objectToPopulate = config;
+					break;
+				case 'state':
+					objectToPopulate = state;
+					break;
+				case 'favorites':
+					objectToPopulate = favorites;
+					break;
+				default:
+					return;
+			}
+
+			if (cursor != undefined) {
+				objectToPopulate[cursor.key] = cursor.value;
+				cursor.continue();
+			}
+		}
+
+		if (database == undefined) { database = event.target.result; }
+
+		database.addEventListener('versionchange', () => {
+			database.close();
+			window.location.reload();
+		});
+		database.addEventListener('error', event => {
+			console.log('Ошибка при работе с БД.', event.target.error);
 		});
 
+		const transaction = database.transaction(['config', 'state', 'favorites'], 'readonly');
+		transaction.addEventListener('complete', () => { window.dispatchEvent(new Event('dbReady')); });
+
+		const configRequest = transaction.objectStore('config').openCursor();
+		const stateRequest = transaction.objectStore('state').openCursor();
+		const favoritesRequest = transaction.objectStore('favorites').openCursor();
+		[configRequest, stateRequest, favoritesRequest].forEach(request => { request.addEventListener('success', getData); });
+	});
+	openRequest.addEventListener('error', () => {
+		console.log('Ошибка открытия базы данных');
+	});
+
+
+	function loadPageSource() {
+		fetch('/app')
+			.then(r => r.text())
+			.then(data => {
+				data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
+				data = data.replace(/(<script src="https:\/\/cdn.jsdelivr.net\/npm\/ol@.+?)(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
+
+				document.write(data);
+				document.close();
+			});
+	}
 
 	function olInjection() {
 		class Map extends ol.Map {
@@ -270,8 +349,6 @@
 					return `z: Math.floor(view.getZoom())`;
 				case `if (area < 1)`:
 					return `if (area < 0)`;
-				case `const persist = [`:
-					return `const persist = [/^sbgcui_/, `;
 				case `if (type == 'osm') {`:
 					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
 				case `class Bitfield`:
@@ -294,7 +371,6 @@
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
-			`(const persist = \\[)`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
@@ -311,6 +387,7 @@
 				console.log(error);
 			});
 	}
+
 
 	async function main() {
 		const thousandSeparator = Intl.NumberFormat(i18next.language).formatToParts(1111)[1].value;
@@ -476,7 +553,6 @@
 
 			constructor(toolbarName) {
 				const container = document.createElement('div');
-				const isExpanded = localStorage.getItem(toolbarName) == 'true';
 
 				container.classList.add('ol-unselectable', 'ol-control', 'sbgcui_toolbar-control');
 				super({ element: container });
@@ -488,7 +564,7 @@
 
 				this.#toolbar.classList.add('sbgcui_toolbar');
 
-				isExpanded ? this.expand() : this.collapse();
+				isMainToolbarOpened ? this.expand() : this.collapse();
 
 				container.append(this.#toolbar, this.#expandButton);
 			}
@@ -505,7 +581,7 @@
 				this.#toolbar.classList.add('sbgcui_hidden');
 
 				this.#isExpanded = false;
-				localStorage.setItem(this.name, false);
+				database.transaction('state', 'readwrite').objectStore('state').put(false, `is${this.name}Opened`);
 			}
 
 			expand() {
@@ -515,7 +591,7 @@
 				this.#toolbar.classList.remove('sbgcui_hidden');
 
 				this.#isExpanded = true;
-				localStorage.setItem(this.name, true);
+				database.transaction('state', 'readwrite').objectStore('state').put(true, `is${this.name}Opened`);
 			}
 
 			handleExpand() {
@@ -610,22 +686,6 @@
 		}
 
 
-		let config;
-		if (localStorage.getItem('sbgcui_config')) {
-			config = JSON.parse(localStorage.getItem('sbgcui_config'), (key, value) => isNaN(+value) ? value : +value);
-			config = { ...DEFAULT_CONFIG, ...config };
-			updateConfigStructure(config, DEFAULT_CONFIG);
-			localStorage.setItem('sbgcui_config', JSON.stringify(config));
-		} else {
-			config = DEFAULT_CONFIG;
-			localStorage.setItem('sbgcui_config', JSON.stringify(config));
-
-			let toast = createToast('Сохранённые настройки не найдены. <br>Загружена стандартная конфигурация.');
-			toast.options.className = 'error-toast';
-			toast.showToast();
-		}
-
-
 		let originalFetch = window.fetch;
 		window.fetch = proxiedFetch;
 
@@ -634,6 +694,7 @@
 		let attackSlider = document.querySelector('.attack-slider-wrp');
 		let blContainer = document.querySelector('.bottom-container');
 		let drawSlider = document.querySelector('.draw-slider-wrp');
+		let deploySlider = document.querySelector('.deploy-slider-wrp');
 		let catalysersList = document.querySelector('#catalysers-list');
 		let coresList = document.querySelector('#cores-list');
 		let refsList = document.querySelector('#refs-list');
@@ -671,19 +732,12 @@
 		let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 		let isRefsViewerOpened = false;
 
-		let starModeTarget = JSON.parse(localStorage.getItem('sbgcui_starModeTarget'));
-		let isStarMode = localStorage.getItem('sbgcui_isStarMode') == 1 && starModeTarget != null;
-
 		let lastOpenedPoint = {};
-		let lastUsedCatalyser = localStorage.getItem('sbgcui_lastUsedCatalyser');
-
-		let excludedCores = new Set(JSON.parse(localStorage.getItem('sbgcui_excludedCores')));
-
 		let discoverModifier;
-
 		let uniques = { c: new Set(), v: new Set() };
 		let inview = {};
 		let inviewRegionsVertexes = [];
+		let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
 
 		let percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
@@ -693,6 +747,8 @@
 			toDecimal(roman) { return this[roman]; },
 			toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
 		};
+
+		isStarMode = isStarMode && starModeTarget != null;
 
 
 		async function proxiedFetch(pathNquery, options) {
@@ -760,7 +816,7 @@
 									break;
 								case '/api/attack2':
 									lastUsedCatalyser = JSON.parse(options.body).guid;
-									localStorage.setItem('sbgcui_lastUsedCatalyser', lastUsedCatalyser);
+									database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 									break;
 								case '/api/discover':
 									if ('loot' in parsedResponse && discoverModifier.isActive) {
@@ -964,7 +1020,7 @@
 			return fetch('/api/self', {
 				headers: {
 					authorization: `Bearer ${localStorage.getItem('auth')}`,
-					'accept-language': LANG
+					'accept-language': lang
 				},
 				method: "GET",
 			})
@@ -983,7 +1039,7 @@
 			return fetch(`/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`, {
 				headers: {
 					authorization: `Bearer ${localStorage.getItem('auth')}`,
-					'accept-language': LANG
+					'accept-language': lang
 				},
 				method: "GET",
 			})
@@ -995,7 +1051,7 @@
 			return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': LANG
+					'accept-language': lang
 				},
 				method: 'GET'
 			}).then(r => r.json()).then(r => r.data);
@@ -1005,10 +1061,10 @@
 			return fetch('/api/inventory', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': LANG
+					'accept-language': lang
 				},
 				method: 'GET',
-				'accept-language': LANG
+				'accept-language': lang
 			}).then(r => r.json()).then(r => r.i);
 		}
 
@@ -1021,8 +1077,8 @@
 
 					if (!forceClear && (INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE)) { throw { silent: true }; }
 
-					if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) { return [inventory, []]; } // Если никакие ключи не надо удалять - не запрашиваем данные точек.
-					if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) { return [inventory, []]; } // Если все ключи надо удалить - не запрашиваем данные точек.
+					if (maxAmount.references.allied == -1 && maxAmount.references.hostile == -1) { return [inventory, []]; } // Если никакие ключи не надо удалять - не запрашиваем данные точек.
+					if (maxAmount.references.allied == 0 && maxAmount.references.hostile == 0) { return [inventory, []]; } // Если все ключи надо удалить - не запрашиваем данные точек.
 
 					let pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);  // У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
 
@@ -1036,20 +1092,20 @@
 					});
 
 					let toDelete = inventory.map(({ t: itemType, l: itemLevel, a: itemAmount, g: itemGuid }) => {
-						if (!itemType in ITEMS_TYPES) { return; };
+						if (itemType > ITEMS_TYPES.length - 1) { return; };
 
 						let itemMaxAmount = -1;
 						let amountToDelete = 0;
-						let itemName = ITEMS_TYPES[itemType].eng;
+						let itemName = ITEMS_TYPES[itemType];
 
-						if (itemName == 'refs') {
+						if (itemName == 'references') {
 							if (isStarMode && (itemLevel == starModeTarget?.guid)) {
 								itemMaxAmount = -1;
 							} else if (favorites[itemLevel]?.isActive) {
 								itemMaxAmount = -1;
-							} else if (maxAmount.refs.allied == -1 && maxAmount.refs.hostile == -1) {
+							} else if (maxAmount.references.allied == -1 && maxAmount.references.hostile == -1) {
 								itemMaxAmount = -1;
-							} else if (maxAmount.refs.allied == 0 && maxAmount.refs.hostile == 0) {
+							} else if (maxAmount.references.allied == 0 && maxAmount.references.hostile == 0) {
 								itemMaxAmount = 0;
 							} else if (Object.keys(pointsData).length) {
 								let pointSide = pointsData[itemLevel].team == player.team ? 'allied' : 'hostile';
@@ -1078,7 +1134,7 @@
 					}
 
 					/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
-					deleteFromCache(deleted);
+					deleteFromCacheAndSliders(deleted);
 
 
 					deleted = deleted.reduce((total, e) => {
@@ -1090,7 +1146,8 @@
 					let message = '';
 
 					for (let key in deleted) {
-						message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${ITEMS_TYPES[key].eng}`;
+						const itemName = i18next.t(`items.types.${ITEMS_TYPES[key].slice(0, -1)}`);
+						message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${itemName}`;
 					}
 
 					let toast = createToast(`Удалено: ${message}`);
@@ -1119,7 +1176,7 @@
 				return fetch('/api/inventory', {
 					headers: {
 						authorization: `Bearer ${player.auth}`,
-						'accept-language': LANG,
+						'accept-language': lang,
 						'content-type': 'application/json',
 					},
 					body: JSON.stringify({ selection: groupedItems[e], tab: e }),
@@ -1132,7 +1189,7 @@
 			return fetch('/api/repair', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': LANG,
+					'accept-language': lang,
 					'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
 				},
 				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
@@ -1179,12 +1236,21 @@
 			}
 		}
 
-		function deleteFromCache(items) {
+		function deleteFromCacheAndSliders(items) {
 			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 
 			items.forEach(e => {
 				let cachedItem = cache.find(f => f.g == e.guid);
 				if (cachedItem) { cachedItem.a -= e.amount; }
+				
+				switch (e.type) {
+					case 1:
+						deploySlider.querySelector(`[data-guid="${e.guid}"]`)?.remove();
+						break;
+					case 2:
+						attackSlider.querySelector(`[data-guid="${e.guid}"]`)?.remove();
+						break;
+				}
 			});
 			cache = cache.filter(e => e.a > 0);
 
@@ -1351,7 +1417,7 @@
 						case 'catalysers':
 							subSectionTitle.innerText = 'Катализаторы';
 							break;
-						case 'refs':
+						case 'references':
 							subSectionTitle.innerText = 'Сноски';
 							subSectionSubTitle.innerHTML = `Сноски от избранных точек удаляться не будут.<br>Для добавления в избранное нажмите звезду на карточке точки.`;
 							break;
@@ -1366,7 +1432,7 @@
 						label.classList.add('sbgcui_settings-amount_label');
 						input.classList.add('sbgcui_settings-amount_input');
 
-						if (key == 'refs') {
+						if (key == 'references') {
 							label.innerText = (type == 'allied') ? 'Свои:' : 'Чужие:';
 							label.classList.add(`sbgcui_settings-amount_label_${type}`);
 						} else {
@@ -1788,7 +1854,9 @@
 						}
 					}
 
-					localStorage.setItem('sbgcui_config', JSON.stringify(config));
+					for (let key in config) {
+						database.transaction('config', 'readwrite').objectStore('config').put(config[key], key);
+					}
 
 					let toast = createToast('Настройки сохранены');
 					toast.showToast();
@@ -1954,16 +2022,6 @@
 			}
 		}
 
-		function updateConfigStructure(storedConfig, defaultConfig) {
-			for (let key in defaultConfig) {
-				if (typeof defaultConfig[key] != typeof storedConfig[key]) {
-					storedConfig[key] = defaultConfig[key];
-				} else if (typeof defaultConfig[key] == 'object') {
-					updateConfigStructure(storedConfig[key], defaultConfig[key]);
-				}
-			}
-		}
-
 		function showXp(amount) {
 			if (amount == 0) { return; }
 
@@ -2021,18 +2079,18 @@
 		/* Данные о себе и версии игры */
 		{
 			var selfData = await getSelfData();
+			const stateStore = database.transaction('state', 'readwrite').objectStore('state');
 
 			if (LATEST_KNOWN_VERSION != selfData.version) {
-				let warns = +localStorage.getItem('sbgcui_version_warns');
-
-				if (warns < 2) {
-					let toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
+				if (versionWarns < 2) {
+					const toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
 					toast.options.className = 'error-toast';
 					toast.showToast();
-					localStorage.setItem('sbgcui_version_warns', warns + 1);
+
+					stateStore.put(versionWarns + 1, 'versionWarns');
 				}
 			} else {
-				localStorage.setItem('sbgcui_version_warns', 0);
+				stateStore.put(0, 'versionWarns');
 			}
 
 			var player = {
@@ -2053,18 +2111,6 @@
 				set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
 				_level: selfData.lvl,
 			};
-
-			if (player.name == 'NickolayV' && config == DEFAULT_CONFIG) {
-				config.maxAmountInBag = {
-					cores: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 50, VIII: 50, IX: 50, X: 50 },
-					catalysers: { I: 0, II: 0, III: 0, IV: 0, V: 0, VI: 0, VII: 0, VIII: 0, IX: -1, X: -1 },
-					refs: { allied: -1, hostile: -1 },
-				};
-				config.autoSelect.upgrade = 'max';
-				config.mapFilters.branding = 'custom';
-				config.mapFilters.brandingColor = '#4433DD';
-				localStorage.setItem('sbgcui_config', JSON.stringify(config));
-			}
 		}
 
 
@@ -2421,7 +2467,7 @@
 		{
 			let attributionControl, rotateControl;
 			var dragPanInteraction, doubleClickZoomInteraction, pinchRotateInteraction;
-			var toolbar = new Toolbar('sbgcui_main_toolbar');
+			var toolbar = new Toolbar('MainToolbar');
 			const controls = map.getControls();
 			const interactions = map.getInteractions();
 
@@ -2542,7 +2588,7 @@
 					}
 
 					toast.showToast();
-					localStorage.setItem('sbgcui_excludedCores', JSON.stringify([...excludedCores]));
+					database.transaction('state', 'readwrite').objectStore('state').put(excludedCores, 'excludedCores');
 				}, 1000);
 
 				coreSlide.addEventListener('touchend', () => {
@@ -2742,9 +2788,11 @@
 
 				if (confirm(confirmMsg)) {
 					getPlayerData(null, playerName).then(stats => {
-						const date = new Date();
-						localStorage.setItem(`sbgcui_stats_${playerName}`, JSON.stringify({ date, stats }));
-						timestamp.innerText = `Последнее сохранение: \n${date.toLocaleString()}`;
+						const timestamp = Date.now();
+						const date = new Date(timestamp).toLocaleString();
+
+						database.transaction('stats', 'readwrite').objectStore('stats').put({ ...stats, timestamp });
+						timestampSpan.innerText = `Последнее сохранение: \n${date}`;
 					});
 				}
 			}
@@ -2752,98 +2800,112 @@
 			function compareStats() {
 				const playerName = profileNameSpan.innerText;
 				const isSelf = playerName == player.name;
-				const previousStats = JSON.parse(localStorage.getItem(`sbgcui_stats_${playerName}`), (key, value) => key == 'date' ? new Date(value) : value);
+				const request = database.transaction('stats', 'readonly').objectStore('stats').get(playerName);
 
-				if (!previousStats) {
-					const toast = createToast(`Вы ещё не сохраняли ${isSelf ? 'свою ' : ''}статистику${isSelf ? '' : ' этого игрока'}.`);
+				request.addEventListener('success', event => {
+					const previousStats = event.target.result;
 
-					toast.options.className = 'error-toast';
-					toast.showToast();
+					if (previousStats == undefined) {
+						const toast = createToast(`Вы ещё не сохраняли ${isSelf ? 'свою ' : ''}статистику${isSelf ? '' : ' этого игрока'}.`);
 
-					return;
-				}
+						toast.options.className = 'error-toast';
+						toast.showToast();
 
-				getPlayerData(null, playerName).then(currentStats => {
-					let ms = new Date() - previousStats.date;
-					let dhms1 = [86400000, 3600000, 60000, 1000];
-					let dhms2 = ['day', 'hr', 'min', 'sec'];
-					let since = '';
-					let diffs = '';
-
-					dhms1.forEach((e, i) => {
-						let amount = Math.trunc(ms / e);
-
-						if (!amount) { return; }
-
-						since += `${since.length ? ', ' : ''}${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}`;
-						ms -= amount * e;
-					});
-
-					for (let key in currentStats) {
-						let diff = currentStats[key] - previousStats.stats[key];
-
-						if (diff) {
-							let isPositive = diff > 0;
-							let statName;
-
-							switch (key) {
-								case 'max_region':
-								case 'regions_area':
-									statName = i18next.t(`profile.stats.${key}`);
-									diff = /*diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : */i18next.t('units.sqkm', { count: diff });
-									break;
-								case 'xp':
-									statName = i18next.t(`profile.stats.total-xp`);
-									break;
-								case 'level':
-									statName = i18next.t('profile.level');
-									break;
-								default:
-									statName = i18next.t(`profile.stats.${key}`);
-							}
-
-							if (statName) {
-								diffs += `
-                <p class="sbgcui_compare_stats-diff-wrp">
-                  <span>${statName}:</span>
-                  <span class="sbgcui_compare_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
-                    ${isPositive ? '+' : ''}${diff}
-                  </span>
-                </p>
-              `;
-							}
-						}
+						return;
 					}
 
-					let toastText = diffs.length ?
-						`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${previousStats.date.toLocaleString()}<br>(${since})<br>${diffs}` :
-						'Ничего не изменилось с прошлого сохранения.';
-					let toast = createToast(toastText, 'bottom center', -1, 'sbgcui_compare_stats-toast');
+					getPlayerData(null, playerName).then(currentStats => {
+						let ms = Date.now() - previousStats.timestamp;
+						let dhms1 = [86400000, 3600000, 60000, 1000];
+						let dhms2 = ['day', 'hr', 'min', 'sec'];
+						let since = '';
+						let diffs = '';
 
-					toast.showToast();
-					toast.toastElement.style.setProperty('--sbgcui-toast-color', `var(--team-${currentStats.team})`);
+						dhms1.forEach((e, i) => {
+							let amount = Math.trunc(ms / e);
+
+							if (!amount) { return; }
+
+							since += `${since.length ? ', ' : ''}${amount} ${dhms2[i] + (amount > 1 ? 's' : '')}`;
+							ms -= amount * e;
+						});
+
+						for (let key in currentStats) {
+							let diff = currentStats[key] - previousStats[key];
+
+							if (diff) {
+								let isPositive = diff > 0;
+								let statName;
+
+								switch (key) {
+									case 'max_region':
+									case 'regions_area':
+										statName = i18next.t(`profile.stats.${key}`);
+										diff = /*diff < 1 ? i18next.t('units.sqm', { count: diff * 1e6 }) : */i18next.t('units.sqkm', { count: diff });
+										break;
+									case 'xp':
+										statName = i18next.t(`profile.stats.total-xp`);
+										break;
+									case 'level':
+										statName = i18next.t('profile.level');
+										break;
+									default:
+										statName = i18next.t(`profile.stats.${key}`);
+								}
+
+								if (statName) {
+									diffs += `
+									<p class="sbgcui_compare_stats-diff-wrp">
+										<span>${statName}:</span>
+										<span class="sbgcui_compare_stats-diff-value${isPositive ? 'Pos' : 'Neg'}">
+											${isPositive ? '+' : ''}${diff}
+										</span>
+									</p>
+								`;
+								}
+							}
+						}
+
+						let toastText = diffs.length ?
+							`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${previousStats.timestamp.toLocaleString()}<br>(${since})<br>${diffs}` :
+							'Ничего не изменилось с прошлого сохранения.';
+						let toast = createToast(toastText, 'bottom center', -1, 'sbgcui_compare_stats-toast');
+
+						toast.showToast();
+						toast.toastElement.style.setProperty('--sbgcui-toast-color', `var(--team-${currentStats.team})`);
+					});
 				});
 			}
 
 			function updateTimestamp() {
 				const playerName = profileNameSpan.innerText;
-				const previousStats = JSON.parse(localStorage.getItem(`sbgcui_stats_${playerName}`), (key, value) => key == 'date' ? new Date(value) : value);
-				timestamp.innerText = previousStats ? `Последнее сохранение: \n${previousStats.date.toLocaleString()}` : '';
+				const request = database.transaction('stats', 'readonly').objectStore('stats').get(playerName);
+
+				request.addEventListener('success', event => {
+					const previousStats = event.target.result;
+
+					if (previousStats != undefined) {
+						const date = new Date(previousStats.timestamp).toLocaleString();
+						timestampSpan.innerText = `Последнее сохранение: \n${date}`;
+					} else {
+						timestampSpan.innerText = '';
+					}
+				});
 			}
 
 			let compareStatsWrp = document.createElement('div');
 			let recordButton = document.createElement('button');
 			let compareButton = document.createElement('button');
-			let timestamp = document.createElement('span');
+			let timestampSpan = document.createElement('span');
 			let prStatsDiv = document.querySelector('.pr-stats');
 
 			recordButton.innerText = 'Записать';
 			compareButton.innerText = 'Сравнить';
 
-			timestamp.classList.add('sbgcui_compare_stats-timestamp');
+			timestampSpan.classList.add('sbgcui_compare_stats-timestamp');
 
 			compareStatsWrp.classList.add('sbgcui_compare_stats');
-			compareStatsWrp.append(timestamp, recordButton, compareButton);
+			compareStatsWrp.append(timestampSpan, recordButton, compareButton);
 
 			profilePopup.insertBefore(compareStatsWrp, prStatsDiv);
 
@@ -2917,21 +2979,21 @@
 
 		/* Избранные точки */
 		{
-			function reviver(guid, cooldown) {
-				return guid ? new Favorite(guid, cooldown) : cooldown;
+			for (let guid in favorites) {
+				favorites[guid] = new Favorite(guid, favorites[guid].cooldown);
 			}
-
-
-			var favorites = JSON.parse(localStorage.getItem('sbgcui_favorites'), reviver) || {};
 			Object.defineProperty(favorites, 'save', {
 				value: function () {
-					let activeFavs = {};
+					const favoritesStore = database.transaction('favorites', 'readwrite').objectStore('favorites');
 
 					for (let guid in this) {
-						if (this[guid].isActive) { activeFavs[guid] = this[guid]; }
+						if (this[guid].isActive) {
+							const cooldown = this[guid].cooldown > Date.now() ? this[guid].cooldown : null;
+							favoritesStore.put({ guid, cooldown });
+						} else {
+							favoritesStore.delete(guid);
+						}
 					}
-
-					localStorage.setItem('sbgcui_favorites', JSON.stringify(activeFavs));
 				},
 			});
 
@@ -3593,11 +3655,12 @@
 
 			button.classList.add('fa', 'fa-solid-rotate');
 
-			button.addEventListener('click', redraw);
+			//button.addEventListener('click', redraw);
+			button.addEventListener('click', () => { window.requestEntities(); });
 
 			toolbar.addItem(button, 3);
 
-			redraw();
+			//redraw();
 		}
 
 
@@ -3820,7 +3883,7 @@
 				let toastMessage;
 
 				isStarMode = !isStarMode;
-				localStorage.setItem('sbgcui_isStarMode', +isStarMode);
+				database.transaction('state', 'readwrite').objectStore('state').put(isStarMode, 'isStarMode');
 
 				if (isStarMode) {
 					starModeButton.style.opacity = 1;
@@ -3857,7 +3920,7 @@
 					guid: pointPopup.dataset.guid,
 					name: pointTitleSpan.innerText
 				};
-				localStorage.setItem('sbgcui_starModeTarget', JSON.stringify(starModeTarget));
+				database.transaction('state', 'readwrite').objectStore('state').put(starModeTarget, 'starModeTarget');
 
 				starModeButton.classList.remove('fa-fade');
 
@@ -4253,7 +4316,6 @@
 
 		/* Вращение карты */
 		{
-			let isRotationLocked = ['true', null].includes(localStorage.getItem('sbgcui_isRotationLocked'));
 			let latestTouchPoint = null;
 			let touches = [];
 			const lockRotationButton = document.createElement('button');
@@ -4282,7 +4344,7 @@
 				if (isRotationLocked) { resetView(); }
 				pinchRotateInteraction.setActive(!isRotationLocked);
 				lockRotationButton.setAttribute('sbgcui_locked', isRotationLocked);
-				localStorage.setItem('sbgcui_isRotationLocked', isRotationLocked);
+				database.transaction('state', 'readwrite').objectStore('state').put(isRotationLocked, 'isRotationLocked');
 			}
 
 			function touchStartHandler(event) {
@@ -4319,7 +4381,11 @@
 				lockRotationButton.style.setProperty('--sbgcui_angle', `${view.getRotation() * 180 / Math.PI}deg`);
 			}
 
-			toggleRotationLock();
+			const request = database.transaction('state', 'readwrite').objectStore('state').get('isRotationLocked');
+			request.addEventListener('success', event => {
+				isRotationLocked = event.target.result;
+				toggleRotationLock();
+			});
 
 			lockRotationButton.classList.add('fa', 'fa-solid-compass', 'sbgcui_lock_rotation');
 			lockRotationButton.addEventListener('click', toggleRotationLock);
@@ -4485,7 +4551,7 @@
 
 				const selectedFeatures = pointsWithRefsSource.getFeatures().filter(feature => feature.get('isSelected') == true);
 				const refsToDelete = selectedFeatures.map(feature => ({ guid: feature.getId(), type: 3, amount: feature.get('amount') }));
-				
+
 				deleteItems(refsToDelete)
 					.then(responses => {
 						const response = responses[0];
@@ -4497,12 +4563,12 @@
 						invTotalSpan.innerText = invTotal;
 						if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
 
-						deleteFromCache(refsToDelete);
+						deleteFromCacheAndSliders(refsToDelete);
 
 						uniqueRefsToDelete = 0;
 						overallRefsToDelete = 0;
 						selectedFeatures.forEach(feature => { pointsWithRefsSource.removeFeature(feature); });
-						
+
 						trashCanButton.style.setProperty('--sbgcui-overall-refs-to-del', `"0"`);
 						trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"0"`);
 					})
@@ -4566,6 +4632,7 @@
 						hideViewerButton.classList.remove('sbgcui_hidden');
 						trashCanButton.classList.remove('sbgcui_hidden');
 						inventoryPopup.classList.add('hidden');
+						if (!attackSlider.classList.contains('hidden')) { click(attackButton); }
 						hideControls();
 
 						trashCanButton.style.setProperty('--sbgcui-overall-refs-to-del', `"0"`);
