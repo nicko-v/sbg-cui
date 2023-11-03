@@ -24,32 +24,32 @@
 	document.open();
 
 
-	const USERSCRIPT_VERSION = '1.13.1';
-	const LATEST_KNOWN_VERSION = '0.4.2-2';
-	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const INVENTORY_LIMIT = 3000;
-	const MIN_FREE_SPACE = 100;
-	const DISCOVERY_COOLDOWN = 90;
-	const PLAYER_RANGE = 45;
-	const HIT_TOLERANCE = 15;
-	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
-	const MAX_DISPLAYED_CLUSTER = 8;
-	const INVIEW_POINTS_DATA_TTL = 7000;
-	const INVIEW_POINTS_LIMIT = 100;
-	const INVIEW_MARKERS_MAX_ZOOM = 16;
-	const HIGHLEVEL_MARKER = 9;
+	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
 	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
-	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+	const DISCOVERY_COOLDOWN = 90;
+	const HIGHLEVEL_MARKER = 9;
+	const HIT_TOLERANCE = 15;
+	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
+	const INVENTORY_LIMIT = 3000;
+	const INVIEW_MARKERS_MAX_ZOOM = 16;
+	const INVIEW_POINTS_DATA_TTL = 7000;
+	const INVIEW_POINTS_LIMIT = 100;
 	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
-	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
+	const LATEST_KNOWN_VERSION = '0.4.2-2';
+	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
+	const MAX_DISPLAYED_CLUSTER = 8;
+	const MIN_FREE_SPACE = 100;
+	const PLAYER_RANGE = 45;
+	const USERSCRIPT_VERSION = '1.13.1';
+	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
-	const lang = i18next.language;
-	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
-	const isCdbMap = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
-	const portrait = window.matchMedia('(orientation: portrait)');
 	const config = {}, state = {}, favorites = {};
+	const isCdbMap = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
+	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
+	const lang = i18next.language;
+	const portrait = window.matchMedia('(orientation: portrait)');
 	let isFollow = localStorage.getItem('follow') == 'true';
 	let map, view, playerFeature, tempLinesSource;
 
