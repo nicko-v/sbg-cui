@@ -722,6 +722,7 @@
 		let selfNameSpan = document.querySelector('#self-info__name');
 		let tlContainer = document.querySelector('.topleft-container')
 		let toggleFollow = document.querySelector('#toggle-follow');
+		let viewportMeta = document.querySelector('meta[name="viewport"]');
 		let xpDiffSpan = document.querySelector('.xp-diff');
 		let zoomContainer = document.querySelector('.ol-zoom');
 
@@ -2020,10 +2021,10 @@
 			color = rgb2hex(color);
 
 			theme.content = color;
-			if (!viewport.content.match(yaRegexp)) {
-				viewport.content += `, ya-title=${color}, ya-dock=${color}`;
+			if (!viewportMeta.content.match(yaRegexp)) {
+				viewportMeta.content += `, ya-title=${color}, ya-dock=${color}`;
 			} else {
-				viewport.content = viewport.content.replace(yaRegexp, `ya-title=${color}, ya-dock=${color}`);
+				viewportMeta.content = viewportMeta.content.replace(yaRegexp, `ya-title=${color}, ya-dock=${color}`);
 			}
 		}
 
@@ -2465,6 +2466,8 @@
 				pagination: true,
 				//perPage: 2,
 			};
+
+			viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
 		}
 
 
@@ -2722,7 +2725,6 @@
 		/* Тонирование интерфейса */
 		{
 			var theme = document.createElement('meta');
-			var viewport = document.querySelector('meta[name="viewport"]');
 
 			theme.name = 'theme-color';
 			document.head.appendChild(theme);

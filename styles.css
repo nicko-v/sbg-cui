@@ -10,7 +10,7 @@
 }
 
 * {
-	touch-action: manipulation !important;
+	touch-action: manipulation;
 }
 
 html {
@@ -79,6 +79,9 @@ body {
 
 #deploy {
 	grid-area: Deploy;
+	-webkit-text-size-adjust: none;
+	text-size-adjust: none;
+	touch-action: manipulation;
 }
 
 #discover {
