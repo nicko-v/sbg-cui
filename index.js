@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.1
+// @version      1.13.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -20,7 +20,7 @@
 
 	window.cuiStatus = 'loading';
 	window.stop();
-	window.navigator.geolocation.clearWatch(1);
+	for (let i = 0; i <= 100; i += 1) { window.navigator.geolocation.clearWatch(i); }
 	document.open();
 
 
@@ -41,7 +41,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.1';
+	const USERSCRIPT_VERSION = '1.13.2';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
