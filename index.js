@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.2
+// @version      1.13.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -41,7 +41,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.2';
+	const USERSCRIPT_VERSION = '1.13.3';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -2874,7 +2874,7 @@
 						}
 
 						let toastText = diffs.length ?
-							`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${previousStats.timestamp.toLocaleString()}<br>(${since})<br>${diffs}` :
+							`${isSelf ? 'Ваша с' : 'С'}татистика ${isSelf ? '' : 'игрока '}с ${new Date(previousStats.timestamp).toLocaleString()}<br>(${since})<br>${diffs}` :
 							'Ничего не изменилось с прошлого сохранения.';
 						let toast = createToast(toastText, 'bottom center', -1, 'sbgcui_compare_stats-toast');
 
