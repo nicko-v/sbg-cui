@@ -28,6 +28,24 @@ body {
 	overflow: hidden;
 }
 
+.toastify span:has(+br+span>.item-icon)~span:nth-of-type(2),
+.toastify span:has(.item-icon):first-of-type,
+.toastify span:has(.type-1)+span:has(.type-2),
+.toastify span:has(.type-2)+span:has(.type-3),
+.toastify span:has(.type-3)+span:has(.type-4) {
+	display: block;
+	margin-top: 7px;
+}
+
+.toastify span:last-of-type:not(:last-child):has(.item-icon) {
+	display: block;
+	margin-bottom: 7px;
+}
+
+.item-icon {
+	margin-right: 5px;
+}
+
 #attack-slider-fire {
 	height: 50px;
 }

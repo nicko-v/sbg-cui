@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.3
+// @version      1.13.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -41,7 +41,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.3';
+	const USERSCRIPT_VERSION = '1.13.4';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -343,6 +343,8 @@
 					return `NickolayV`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
+				case `makeItemTitle(item)`:
+					return `makeShortItemTitle(item)`;
 				case `view.calculateExtent(map.getSize()`:
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
 				case `z: view.getZoom()`:
@@ -368,6 +370,7 @@
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
+			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
