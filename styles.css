@@ -379,6 +379,10 @@ body {
 	direction: var(--sbgcui-point-btns-rtl);
 }
 
+html[lang="ru"] .i-buttons {
+	grid-template-columns: 1fr 1.5fr 1.5fr;
+}
+
 .i-buttons>button {
 	padding: 5px 0;
 	box-shadow: 0 0 2px var(--shadow);
