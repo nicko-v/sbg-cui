@@ -1093,7 +1093,7 @@
 				})
 				.then(([inventory, filteredLoot, ...pointsDataArr]) => {
 					let pointsData = {};
-					
+
 					pointsDataArr.forEach(e => {
 						pointsData[e.g] = { team: e.te };
 					});
@@ -1155,8 +1155,13 @@
 
 
 					deleted = deleted.reduce((total, e) => {
-						if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
-						total[e.type] += (e.amount - e.filtered);
+						const amount = (e.amount - (e.filtered ?? 0));
+
+						if (amount != 0) {
+							if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
+							total[e.type] += amount;
+						}
+
 						return total;
 					}, {});
 
