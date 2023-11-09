@@ -340,7 +340,7 @@
 				case `$('[name="baselayer"]').on('change', e`:
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`:
-					return `hour: '2-digit', second: '2-digit'`;
+					return `hour: '2-digit', hour12: false, second: '2-digit'`;
 				case `function initCompass() {`:
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
