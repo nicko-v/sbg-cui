@@ -9,7 +9,7 @@
 	],
 	"settings": {
 		"window.menuBarVisibility": "toggle",
-		"workbench.editor.showTabs": true,
+		"workbench.editor.showTabs": "multiple",
 		"workbench.colorCustomizations": {
 			"statusBar.background": "#1A1A1A",
 			"statusBar.noFolderBackground": "#212121",

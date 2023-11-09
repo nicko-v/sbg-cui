@@ -623,7 +623,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .notifs__entry {
-	grid-template-columns: 2fr 5fr 1fr;
+	grid-template-columns: 1.5fr 5fr 1fr;
 }
 
 .notifs__entry-view>span {

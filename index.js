@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.5
+// @version      1.13.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -21,7 +21,7 @@
 	window.cuiStatus = 'loading';
 	window.stop();
 	document.open();
-	if (!window.navigator.userAgent.includes('Firefox')) {
+	if (/firefox/i.test(window.navigator.userAgent) == false) {
 		for (let i = 0; i <= 100; i += 1) { window.navigator.geolocation.clearWatch(i); }
 	}
 
@@ -43,7 +43,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.5';
+	const USERSCRIPT_VERSION = '1.13.6';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -339,6 +339,8 @@
 					return `if ($('.attack-slider-wrp').hasClass('hidden')) {return;`;
 				case `$('[name="baselayer"]').on('change', e`:
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
+				case `hour: '2-digit'`:
+					return `hour: '2-digit', second: '2-digit'`;
 				case `function initCompass() {`:
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
@@ -369,6 +371,7 @@
 			`(const draw_slider)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
+			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
