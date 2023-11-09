@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.6
+// @version      1.13.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.6';
+	const USERSCRIPT_VERSION = '1.13.7';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -828,30 +828,21 @@
 									database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 									break;
 								case '/api/discover':
+									let toDelete = [];
+
 									if ('loot' in parsedResponse && discoverModifier.isActive) {
-										let toDelete = parsedResponse.loot
+										toDelete = parsedResponse.loot
 											.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
 											.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
 
-										if (toDelete.length == 0) { return; }
-
-										try {
-											const responses = await deleteItems(toDelete);
-
-											responses.forEach(response => { if ('error' in response) { throw response.error; } });
+										if (toDelete.length != 0) {
 											parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
-
 											const modifiedResponse = createResponse(parsedResponse, response);
-
 											resolve(modifiedResponse);
-										} catch (error) {
-											let toast = createToast('Ошибка при фильтрации лута.');
-											toast.options.className = 'error-toast';
-											toast.showToast();
-
-											console.log('SBG CUI: Ошибка при фильтрации лута.', error);
 										}
 									}
+
+									clearInventory(false, toDelete);
 
 									if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
 										let dateNow = Date.now();
@@ -1077,25 +1068,32 @@
 			}).then(r => r.json()).then(r => r.i);
 		}
 
-		async function clearInventory(event, forceClear = false) {
+		async function clearInventory(forceClear = false, filteredLoot = []) {
 			let maxAmount = config.maxAmountInBag;
 
 			getInventory()
 				.then(inventory => {
-					let itemsAmount = inventory.reduce((total, e) => total + e.a, 0);
+					const itemsAmount = inventory.reduce((total, e) => total + e.a, 0);
+					const isEnoughSpace = INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE;
+					const { allied, hostile } = maxAmount.references;
 
-					if (!forceClear && (INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE)) { throw { silent: true }; }
+					if (isEnoughSpace && !forceClear && filteredLoot.length == 0) { throw { silent: true }; }
 
-					if (maxAmount.references.allied == -1 && maxAmount.references.hostile == -1) { return [inventory, []]; } // Если никакие ключи не надо удалять - не запрашиваем данные точек.
-					if (maxAmount.references.allied == 0 && maxAmount.references.hostile == 0) { return [inventory, []]; } // Если все ключи надо удалить - не запрашиваем данные точек.
+					if (!isEnoughSpace || forceClear) {
+						// Если надо удалить все ключи или вообще никакие не надо удалять - не запрашиваем данные точек.
+						if ((allied == -1 && hostile == -1) || (allied == 0 && hostile == 0)) { return [inventory, filteredLoot, []]; }
 
-					let pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);  // У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
+						// У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
+						const pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);
 
-					return Promise.all([inventory, ...pointsData]);
+						return Promise.all([inventory, filteredLoot, ...pointsData]);
+					} else {
+						return [[], filteredLoot, []];
+					}
 				})
-				.then(([inventory, ...pointsDataArr]) => {
+				.then(([inventory, filteredLoot, ...pointsDataArr]) => {
 					let pointsData = {};
-
+					
 					pointsDataArr.forEach(e => {
 						pointsData[e.g] = { team: e.te };
 					});
@@ -1131,6 +1129,16 @@
 						return { guid: itemGuid, type: itemType, amount: amountToDelete };
 					}).filter(i => i?.amount > 0);
 
+					filteredLoot.forEach(filteredLootItem => {
+						const toDeleteItem = toDelete.find(item => item.guid == filteredLootItem.guid);
+						if (toDeleteItem) {
+							toDeleteItem.amount += filteredLootItem.amount;
+							toDeleteItem.filtered = filteredLootItem.amount; // Эти предметы не будут добавлены в кэш основным скриптом, т.к. удаляются сразу же.
+						} else {
+							toDelete.push({ ...filteredLootItem, filtered: filteredLootItem.amount });
+						}
+					});
+
 					return Promise.all([toDelete, deleteItems(toDelete)]);
 				})
 				.then(([deleted, responses]) => {
@@ -1148,9 +1156,11 @@
 
 					deleted = deleted.reduce((total, e) => {
 						if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
-						total[e.type] += e.amount;
+						total[e.type] += (e.amount - e.filtered);
 						return total;
 					}, {});
+
+					if (Object.entries(deleted).every(type => type[1] == 0)) { return; }
 
 					let message = '';
 
@@ -1249,18 +1259,20 @@
 			let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 
 			items.forEach(e => {
-				let cachedItem = cache.find(f => f.g == e.guid);
-				if (cachedItem) { cachedItem.a -= e.amount; }
+				const cachedItem = cache.find(f => f.g == e.guid);
+				const deletedAmount = e.amount - (e.filtered ?? 0);
 
-				if (e.type == 1) {
+				if (cachedItem) { cachedItem.a -= deletedAmount; }
+
+				if (e.type == 1 && deletedAmount > 0) {
 					const coreSlide = deploySlider.querySelector(`li[data-guid="${e.guid}"]`);
 					if (coreSlide == null) { return; }
 
 					const amountSpan = coreSlide.querySelector(`li[data-guid="${e.guid}"] > .cores-list__amount`);
 					const amountSpanText = +amountSpan.innerText.slice(1);
 
-					if (amountSpanText - e.amount > 0) {
-						amountSpan.innerText = `x${amountSpanText - e.amount}`;
+					if (amountSpanText - deletedAmount > 0) {
+						amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
 					} else {
 						coreSlide.remove();
 					}
@@ -1409,7 +1421,7 @@
 
 					let result = confirm('Произвести очистку инвентаря согласно настройкам?');
 
-					if (result) { clearInventory(undefined, true); }
+					if (result) { clearInventory(true); }
 				});
 				section.appendChild(forceClearButton);
 
@@ -2305,8 +2317,6 @@
 
 		/* Прочие события */
 		{
-			discoverButton.addEventListener('click', event => { if (event.target == discoverButton) { clearInventory(); } });
-
 			attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
 
 			pointPopup.addEventListener('pointPopupOpened', () => {
@@ -2459,6 +2469,7 @@
 				}
 			});
 
+			i18next.addResource('ru', 'main', 'notifs.text', 'нейтрализована $1$');
 			i18next.addResources(i18next.resolvedLanguage, 'main', {
 				'items.catalyser-short': '{{level}}',
 				'items.core-short': '{{level}}',

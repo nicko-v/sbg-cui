@@ -626,13 +626,19 @@ html[lang="ru"] .i-buttons {
 	grid-template-columns: 1.5fr 5fr 1fr;
 }
 
+.notifs__entry-text {
+	color: var(--text-disabled);
+}
+
 .notifs__entry-view>span {
 	display: none;
 }
 
 .notifs__entry-view {
 	appearance: none;
-	border-style: solid;
+	background-color: transparent;
+	border: none;
+	color: var(--text-disabled);
 	height: 35px;
 	font-size: 25px;
 	padding: 0;
