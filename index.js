@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.8
+// @version      1.14.0
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.8';
+	const USERSCRIPT_VERSION = '1.14.0';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -62,7 +62,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 1);
+	const openRequest = indexedDB.open('CUI', 2);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -142,7 +142,13 @@
 		}
 
 		function updateDB() {
-			return;
+			const updateToVersion = {
+				2: () => { database.createObjectStore('logs', { keyPath: 'timestamp' }); },
+			};
+
+			for (let v in updateToVersion) {
+				if (v > oldVersion && v <= newVersion) { updateToVersion[v](); }
+			}
 		}
 
 		const { newVersion, oldVersion } = event;
@@ -819,27 +825,38 @@
 									if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
 										lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 										lastOpenedPoint.selectCore(config.autoSelect.deploy);
+										writeLog(parsedResponse.data.c, parsedResponse.data.g, 'deploy');
 									} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 										lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
 										lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
+										writeLog(parsedResponse.data.c, parsedResponse.data.g, 'upgrade');
 									}
 									break;
 								case '/api/attack2':
+									const coords = JSON.parse(options.body).position;
 									lastUsedCatalyser = JSON.parse(options.body).guid;
 									database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
+									if (parsedResponse.c?.length > 0) { writeLog(coords, lastUsedCatalyser, 'attack'); }
 									break;
 								case '/api/discover':
 									let toDelete = [];
 
-									if ('loot' in parsedResponse && discoverModifier.isActive) {
-										toDelete = parsedResponse.loot
-											.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
-											.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+									if ('loot' in parsedResponse) {
+										const coords = JSON.parse(options.body).position;
+										const guid = JSON.parse(options.body).guid;
 
-										if (toDelete.length != 0) {
-											parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
-											const modifiedResponse = createResponse(parsedResponse, response);
-											resolve(modifiedResponse);
+										writeLog(coords, guid, 'discover');
+
+										if (discoverModifier.isActive) {
+											toDelete = parsedResponse.loot
+												.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
+												.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+
+											if (toDelete.length != 0) {
+												parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
+												const modifiedResponse = createResponse(parsedResponse, response);
+												resolve(modifiedResponse);
+											}
 										}
 									}
 
@@ -945,53 +962,58 @@
 
 									break;
 								case '/api/draw':
-									if (!'data' in parsedResponse) { break; }
+									if ('line' in parsedResponse) {
+										const coords = JSON.parse(options.body).position;
+										const from = JSON.parse(options.body).from;
+										const to = JSON.parse(options.body).to;
+										writeLog(coords, from, 'draw', { to });
+									} else if ('data' in parsedResponse) {
 
-									let { minDistance, maxDistance } = config.drawing;
-									minDistance = minDistance == -1 ? -Infinity : +minDistance;
-									maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+										let { minDistance, maxDistance } = config.drawing;
+										minDistance = minDistance == -1 ? -Infinity : +minDistance;
+										maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
 
-									if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
-										const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
-										const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+										if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
+											const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+											const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
 
-										parsedResponse.data = targetPoint ? [targetPoint] : [];
+											parsedResponse.data = targetPoint ? [targetPoint] : [];
 
-										if (hiddenPoints > 0) {
-											const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+											if (hiddenPoints > 0) {
+												const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
-											const toast = createToast(message, 'top left');
+												const toast = createToast(message, 'top left');
 
-											toast.options.className = 'sbgcui_toast-selection';
-											toast.showToast();
+												toast.options.className = 'sbgcui_toast-selection';
+												toast.showToast();
+											}
+
+											const modifiedResponse = createResponse(parsedResponse, response);
+											resolve(modifiedResponse);
+
+											break;
 										}
 
-										const modifiedResponse = createResponse(parsedResponse, response);
-										resolve(modifiedResponse);
+										if (isFinite(minDistance) || isFinite(maxDistance)) {
+											const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
+											const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
 
-										break;
-									}
-
-									if (isFinite(minDistance) || isFinite(maxDistance)) {
-										const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
-										const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
-
-										if (hiddenPoints > 0) {
-											const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+											if (hiddenPoints > 0) {
+												const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройкам ограничения дальности рисования
 																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
-											const toast = createToast(message, 'top left');
+												const toast = createToast(message, 'top left');
 
-											toast.options.className = 'sbgcui_toast-selection';
-											toast.showToast();
+												toast.options.className = 'sbgcui_toast-selection';
+												toast.showToast();
 
-											parsedResponse.data = suitablePoints;
+												parsedResponse.data = suitablePoints;
+											}
+
+											const modifiedResponse = createResponse(parsedResponse, response);
+											resolve(modifiedResponse);
 										}
-
-										const modifiedResponse = createResponse(parsedResponse, response);
-										resolve(modifiedResponse);
 									}
-
 									break;
 								case '/api/profile':
 									if ('name' in parsedResponse) {
@@ -1013,7 +1035,7 @@
 										delete regions.check;
 
 										const [pointsPlaces, regionsPlaces] = [points, regions].map(scores => Object.fromEntries(Object.entries(scores).sort((a, b) => b[1] - a[1]).map((e, i) => [e[0], i])));
-										
+
 										pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 										regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 									}
@@ -2121,6 +2143,16 @@
 			zoomContainer.childNodes.forEach(e => { e.classList.remove('sbgcui_hidden'); });
 			zoomContainer.style.bottom = '';
 			map.addControl(toolbar);
+		}
+
+		function writeLog(coords, guid, type, rest = {}) {
+			database.transaction('logs', 'readwrite').objectStore('logs').put({
+				coords,
+				guid,
+				type,
+				timestamp: Date.now(),
+				...Object.assign(rest)
+			});
 		}
 
 
