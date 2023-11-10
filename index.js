@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.13.7
+// @version      1.13.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.13.7';
+	const USERSCRIPT_VERSION = '1.13.8';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -725,6 +725,7 @@
 		let profilePopup = document.querySelector('.profile.popup');
 		let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
 		let regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
+		let scoreGraphs = document.querySelector('.score__graphs');
 		let selfExpSpan = document.querySelector('#self-info__exp');
 		let selfLvlSpan = document.querySelector('#self-info__explv');
 		let selfNameSpan = document.querySelector('#self-info__name');
@@ -1001,6 +1002,22 @@
 									if ('data' in parsedResponse && isPointPopupOpened) {
 										lastOpenedPoint.update(parsedResponse.data);
 									}
+									break;
+								case '/api/score':
+									if ('score' in parsedResponse) {
+										const [points, regions] = parsedResponse.score;
+										const pointsStatTds = document.querySelectorAll('.score__table > tbody td:first-of-type');
+										const regionsStatTds = document.querySelectorAll('.score__table > tbody td:last-of-type');
+
+										delete points.check;
+										delete regions.check;
+
+										const [pointsPlaces, regionsPlaces] = [points, regions].map(scores => Object.fromEntries(Object.entries(scores).sort((a, b) => b[1] - a[1]).map((e, i) => [e[0], i])));
+										
+										pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
+										regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
+									}
+
 									break;
 								default:
 									resolve(response);
