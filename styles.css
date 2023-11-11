@@ -982,16 +982,16 @@ html[lang="ru"] .i-buttons {
 
 .sbgcui_no_loot,
 .sbgcui_no_refs {
+	aspect-ratio: 1;
 	position: absolute;
 	font-size: 1.1em;
 	top: 50%;
 	transform: translateY(-50%);
-	width: 20%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	height: 100%;
-	padding: 0 5%;
+	padding: 0 7px;
 	box-sizing: border-box;
 }
 
