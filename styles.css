@@ -483,6 +483,10 @@ html[lang="ru"] .i-buttons {
 	z-index: 2;
 }
 
+#inventory-delete {
+	order: 3;
+}
+
 .info>.popup-close {
 	position: sticky;
 }
@@ -1384,8 +1388,16 @@ html[lang="ru"] .i-buttons {
 	display: none;
 }
 
+.sbgcui_refs-sort-select {
+	order: 2;
+}
+
 .sbgcui_refs-reverse {
 	flex-direction: column-reverse !important;
+}
+
+.sbgcui_show_viewer {
+	order: 1;
 }
 
 .sbgcui_xpdiff-wrapper {
