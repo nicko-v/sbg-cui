@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.1
+// @version      1.14.2
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,8 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.14.1';
+	const TILE_CACHE_SIZE = 2048;
+	const USERSCRIPT_VERSION = '1.14.2';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -331,10 +332,35 @@
 			}
 		}
 
+		class XYZ extends ol.source.XYZ {
+			constructor(options) {
+				options.cacheSize = TILE_CACHE_SIZE;
+				super(options);
+			}
+		}
+
+		class OSM extends ol.source.OSM {
+			constructor(options) {
+				options.cacheSize = TILE_CACHE_SIZE;
+				super(options);
+			}
+		}
+
+		class StadiaMaps extends ol.source.StadiaMaps {
+			constructor(options) {
+				options.cacheSize = TILE_CACHE_SIZE;
+				super(options);
+			}
+		}
+
+
 		ol.Map = Map;
 		ol.Feature = Feature;
 		ol.View = View;
 		ol.layer.Tile = Tile;
+		ol.source.XYZ = XYZ;
+		ol.source.OSM = OSM;
+		ol.source.StadiaMaps = StadiaMaps;
 	}
 
 	function loadMainScript() {
@@ -776,13 +802,15 @@
 		async function proxiedFetch(pathNquery, options) {
 			return new Promise((resolve, reject) => {
 				const url = new URL(window.location.origin + pathNquery);
+				let isBroom;
 
 				switch (url.pathname) {
 					case '/api/attack2':
 						const guid = JSON.parse(options.body).guid;
 						const invCache = JSON.parse(localStorage.getItem('inventory-cache'));
-						const isBroom = invCache.find(e => e.t == 4 && e.g == guid) !== undefined;
 						const message = `Использовать "${i18next.t('items.brooms_one')}"?`;
+
+						isBroom = invCache.find(e => e.t == 4 && e.g == guid) !== undefined;
 
 						if (isBroom && !confirm(message)) {
 							resolve();
@@ -848,7 +876,7 @@
 										if (points.length > 0) {
 											const lines = parsedResponse.l.map(line => { delete line['created_at']; return line; });
 											const regions = parsedResponse.r.map(region => { delete region['created_at']; return region; });
-											logAction({ type: 'destroy', points, lines, regions });
+											logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions });
 										}
 									}
 
