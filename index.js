@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.0
+// @version      1.14.1
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
-	const USERSCRIPT_VERSION = '1.14.0';
+	const USERSCRIPT_VERSION = '1.14.1';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -61,7 +61,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 2);
+	const openRequest = indexedDB.open('CUI', 3);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -142,7 +142,14 @@
 
 		function updateDB() {
 			const updateToVersion = {
-				2: () => { database.createObjectStore('logs', { keyPath: 'timestamp' }); },
+				2: () => {
+					database.createObjectStore('logs', { keyPath: 'timestamp' });
+				},
+				3: () => {
+					const logsStore = event.target.transaction.objectStore('logs');
+					logsStore.clear();
+					logsStore.createIndex('action_type', 'type');
+				},
 			};
 
 			for (let v in updateToVersion) {
@@ -153,7 +160,8 @@
 		const { newVersion, oldVersion } = event;
 		database = event.target.result;
 
-		if (oldVersion == 0) { initializeDB(); } else { updateDB(); }
+		if (oldVersion == 0) { initializeDB(); }
+		updateDB();
 	});
 	openRequest.addEventListener('success', event => {
 		function getData(event) {
@@ -730,7 +738,6 @@
 		let profilePopup = document.querySelector('.profile.popup');
 		let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
 		let regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
-		let scoreGraphs = document.querySelector('.score__graphs');
 		let selfExpSpan = document.querySelector('#self-info__exp');
 		let selfLvlSpan = document.querySelector('#self-info__explv');
 		let selfNameSpan = document.querySelector('#self-info__name');
@@ -824,27 +831,35 @@
 									if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
 										lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 										lastOpenedPoint.selectCore(config.autoSelect.deploy);
-										writeLog(parsedResponse.data.c, parsedResponse.data.g, 'deploy');
+										logAction({ type: 'deploy', coords: parsedResponse.data.c, point: parsedResponse.data.g });
 									} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 										lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
 										lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-										writeLog(parsedResponse.data.c, parsedResponse.data.g, 'upgrade');
+										logAction({ type: 'upgrade', coords: parsedResponse.data.c, point: parsedResponse.data.g });
 									}
 									break;
 								case '/api/attack2':
-									const coords = JSON.parse(options.body).position;
 									lastUsedCatalyser = JSON.parse(options.body).guid;
 									database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
-									if (parsedResponse.c?.length > 0) { writeLog(coords, lastUsedCatalyser, 'attack'); }
+
+									if ('c' in parsedResponse) {
+										const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
+
+										if (points.length > 0) {
+											const lines = parsedResponse.l.map(line => { delete line['created_at']; return line; });
+											const regions = parsedResponse.r.map(region => { delete region['created_at']; return region; });
+											logAction({ type: 'destroy', points, lines, regions });
+										}
+									}
+
 									break;
 								case '/api/discover':
 									let toDelete = [];
 
 									if ('loot' in parsedResponse) {
-										const coords = JSON.parse(options.body).position;
-										const guid = JSON.parse(options.body).guid;
+										const point = JSON.parse(options.body).guid;
 
-										writeLog(coords, guid, 'discover');
+										logAction({ type: 'discover', point });
 
 										if (discoverModifier.isActive) {
 											toDelete = parsedResponse.loot
@@ -962,10 +977,9 @@
 									break;
 								case '/api/draw':
 									if ('line' in parsedResponse) {
-										const coords = JSON.parse(options.body).position;
-										const from = JSON.parse(options.body).from;
-										const to = JSON.parse(options.body).to;
-										writeLog(coords, from, 'draw', { to });
+										const { from, to } = JSON.parse(options.body);
+										const { line, reg: regions } = parsedResponse;
+										logAction({ type: 'draw', from, to, line, regions });
 									} else if ('data' in parsedResponse) {
 
 										let { minDistance, maxDistance } = config.drawing;
@@ -2144,14 +2158,10 @@
 			map.addControl(toolbar);
 		}
 
-		function writeLog(coords, guid, type, rest = {}) {
-			database.transaction('logs', 'readwrite').objectStore('logs').put({
-				coords,
-				guid,
-				type,
-				timestamp: Date.now(),
-				...Object.assign(rest)
-			});
+		function logAction(action) {
+			const timestamp = Date.now();
+
+			database.transaction('logs', 'readwrite').objectStore('logs').put({ timestamp, ...action });
 		}
 
 
