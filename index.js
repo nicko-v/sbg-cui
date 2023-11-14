@@ -50,7 +50,6 @@
 	const config = {}, state = {}, favorites = {};
 	const isCdbMap = JSON.parse(localStorage.getItem('settings'))?.base == 'cdb';
 	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
-	const lang = i18next.language;
 	const portrait = window.matchMedia('(orientation: portrait)');
 	let isFollow = localStorage.getItem('follow') == 'true';
 	let map, view, playerFeature, tempLinesSource;
@@ -1059,7 +1058,7 @@
 			return fetch('/api/self', {
 				headers: {
 					authorization: `Bearer ${localStorage.getItem('auth')}`,
-					'accept-language': lang
+					'accept-language': i18next.language
 				},
 				method: "GET",
 			})
@@ -1078,7 +1077,7 @@
 			return fetch(`/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`, {
 				headers: {
 					authorization: `Bearer ${localStorage.getItem('auth')}`,
-					'accept-language': lang
+					'accept-language': i18next.language
 				},
 				method: "GET",
 			})
@@ -1090,7 +1089,7 @@
 			return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': lang
+					'accept-language': i18next.language
 				},
 				method: 'GET'
 			}).then(r => r.json()).then(r => r.data);
@@ -1100,10 +1099,10 @@
 			return fetch('/api/inventory', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': lang
+					'accept-language': i18next.language
 				},
 				method: 'GET',
-				'accept-language': lang
+				'accept-language': i18next.language
 			}).then(r => r.json()).then(r => r.i);
 		}
 
@@ -1239,7 +1238,7 @@
 				return fetch('/api/inventory', {
 					headers: {
 						authorization: `Bearer ${player.auth}`,
-						'accept-language': lang,
+						'accept-language': i18next.language,
 						'content-type': 'application/json',
 					},
 					body: JSON.stringify({ selection: groupedItems[e], tab: e }),
@@ -1252,7 +1251,7 @@
 			return fetch('/api/repair', {
 				headers: {
 					authorization: `Bearer ${player.auth}`,
-					'accept-language': lang,
+					'accept-language': i18next.language,
 					'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
 				},
 				body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
@@ -4167,7 +4166,7 @@
 
 			function formatStatValue(key, value) {
 				const lang = i18next.resolvedLanguage;
-				const formatter = new Intl.NumberFormat(lang);
+				const formatter = new Intl.NumberFormat(i18next.language);
 
 				if (/^guard_/.test(key)) {
 					return i18next.t('units.n-days', { count: value });
@@ -4182,7 +4181,7 @@
 					case 'xp':
 						return `${formatter.format(value)} ${i18next.t('units.pts-xp')}`;
 					case 'created_at':
-						return new Date(value).toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' });
+						return new Date(value).toLocaleDateString(i18next.language, { day: 'numeric', month: 'long', year: 'numeric' });
 					default:
 						return formatter.format(value);
 				}
