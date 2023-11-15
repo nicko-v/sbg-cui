@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.2
+// @version      1.14.3
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.2';
+	const USERSCRIPT_VERSION = '1.14.3';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -62,7 +62,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 3);
+	const openRequest = indexedDB.open('CUI', 4);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -150,6 +150,14 @@
 					const logsStore = event.target.transaction.objectStore('logs');
 					logsStore.clear();
 					logsStore.createIndex('action_type', 'type');
+				},
+				4: () => {
+					const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
+					const baselayer = `${base}_${theme}`;
+					const stateStore = event.target.transaction.objectStore('state');
+
+					stateStore.add(baselayer, 'baselayer');
+					database.createObjectStore('tiles');
 				},
 			};
 
@@ -334,25 +342,63 @@
 
 		class XYZ extends ol.source.XYZ {
 			constructor(options) {
-				options.cacheSize = TILE_CACHE_SIZE;
-				super(options);
+				super({ ...options, ...cachingOptions });
 			}
 		}
 
 		class OSM extends ol.source.OSM {
 			constructor(options) {
-				options.cacheSize = TILE_CACHE_SIZE;
-				super(options);
+				super({ ...options, ...cachingOptions });
 			}
 		}
 
 		class StadiaMaps extends ol.source.StadiaMaps {
 			constructor(options) {
-				options.cacheSize = TILE_CACHE_SIZE;
-				super(options);
+				super({ ...options, ...cachingOptions });
 			}
 		}
 
+
+		function loadTile(tile, src) {
+			const coords = tile.getTileCoord().join();
+			const tilesStore = database.transaction('tiles', 'readonly').objectStore('tiles');
+			const request = tilesStore.get(coords);
+
+			request.addEventListener('success', event => {
+				const cachedBlob = event.target.result;
+
+				if (cachedBlob == undefined) {
+					fetch(src)
+						.then(response => {
+							if (response.ok) {
+								return response.blob()
+							} else {
+								throw new Error(`[${response.status}] Не удалось загрузить тайл ${coords}.`);
+							}
+						})
+						.then(blob => {
+							setTileSrc(tile, blob);
+							database.transaction('tiles', 'readwrite').objectStore('tiles').put(blob, coords);
+						})
+						.catch(error => { console.log(error); });
+				} else {
+					setTileSrc(tile, cachedBlob);
+				}
+			});
+		}
+
+		function setTileSrc(tile, blob) {
+			const image = tile.getImage();
+			const objUrl = URL.createObjectURL(blob);
+			image.addEventListener('load', () => { URL.revokeObjectURL(objUrl); });
+			image.src = objUrl;
+		}
+
+		
+		const cachingOptions = {
+			cacheSize: TILE_CACHE_SIZE,
+			tileLoadFunction: loadTile,
+		};
 
 		ol.Map = Map;
 		ol.Feature = Feature;
@@ -2408,7 +2454,7 @@
 
 		/* Прочие события */
 		{
-			attackButton.addEventListener('click', _ => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
+			attackButton.addEventListener('click', () => { attackButton.classList.toggle('sbgcui_attack-menu-rotate'); });
 
 			pointPopup.addEventListener('pointPopupOpened', () => {
 				let settings = JSON.parse(localStorage.getItem('settings')) || {};
@@ -2496,6 +2542,22 @@
 			portrait.addEventListener('change', () => {
 				portrait.matches ? view.setTopPadding() : view.removePadding();
 				view.setCenter(playerFeature.getGeometry().getCoordinates());
+			});
+
+			map.getAllLayers()[0].on('change', () => {
+				const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
+				const baselayer = `${base}_${theme}`;
+
+				if (state.baselayer != baselayer) {
+					const transaction = database.transaction(['state', 'tiles'], 'readwrite');
+					const stateStore = transaction.objectStore('state');
+					const tilesStore = transaction.objectStore('tiles');
+
+					stateStore.put(baselayer, 'baselayer');
+					tilesStore.clear();
+
+					state.baselayer = baselayer;
+				}
 			});
 		}
 
