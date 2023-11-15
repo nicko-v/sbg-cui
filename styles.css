@@ -484,7 +484,7 @@ html[lang="ru"] .i-buttons {
 }
 
 #inventory-delete {
-	order: 3;
+	order: 1;
 }
 
 .info>.popup-close {
@@ -1397,7 +1397,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_show_viewer {
-	order: 1;
+	order: 3;
 }
 
 .sbgcui_xpdiff-wrapper {
