@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.4
+// @version      1.14.5
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.4';
+	const USERSCRIPT_VERSION = '1.14.5';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -903,9 +903,10 @@
 									break;
 								case '/api/deploy':
 									if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
+										const actionType = parsedResponse.data.co.length == 1 ? 'capture' : 'deploy';
 										lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 										lastOpenedPoint.selectCore(config.autoSelect.deploy);
-										logAction({ type: 'deploy', coords: parsedResponse.data.c, point: parsedResponse.data.g });
+										logAction({ type: actionType, coords: parsedResponse.data.c, point: parsedResponse.data.g });
 									} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 										lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
 										lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);

@@ -106,6 +106,10 @@
   --fa-url: url("../svg/solid/star.svg");
 }
 
+.fa-solid-table-list {
+  --fa-url: url("../svg/solid/table-list.svg");
+}
+
 .fa-solid-trash {
   --fa-url: url("../svg/solid/trash.svg");
 }
