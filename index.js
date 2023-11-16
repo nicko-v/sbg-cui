@@ -430,8 +430,6 @@
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
 					return `NickolayV`;
-				case `if ($('#info')`:
-					return `if ($('.info')`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `makeItemTitle(item)`:
@@ -461,7 +459,6 @@
 			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
-			`(if \\(\\$\\('#info'\\))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
