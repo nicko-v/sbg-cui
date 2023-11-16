@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.3
+// @version      1.14.4
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.3';
+	const USERSCRIPT_VERSION = '1.14.4';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -430,6 +430,8 @@
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
 					return `NickolayV`;
+				case `if ($('#info')`:
+					return `if ($('.info')`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `makeItemTitle(item)`:
@@ -459,6 +461,7 @@
 			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
+			`(if \\(\\$\\('#info'\\))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
@@ -2727,12 +2730,8 @@
 
 		/* Автовыбор */
 		{
-			attackSlider.addEventListener('attackSliderOpened', _ => {
+			attackSlider.addEventListener('attackSliderOpened', () => {
 				click(chooseCatalyser(config.autoSelect.attack));
-			});
-
-			pointPopup.addEventListener('pointPopupOpened', _ => {
-				lastOpenedPoint.selectCore(config.autoSelect.deploy);
 			});
 
 			pointCores.addEventListener('click', event => {
@@ -2778,6 +2777,7 @@
 						coreSlide.setAttribute('sbgcui-excluded-core', '');
 					}
 				});
+				lastOpenedPoint.selectCore(config.autoSelect.deploy);
 			});
 		}
 
