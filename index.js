@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.5
+// @version      1.14.6
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.5';
+	const USERSCRIPT_VERSION = '1.14.6';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -394,7 +394,7 @@
 			image.src = objUrl;
 		}
 
-		
+
 		const cachingOptions = {
 			cacheSize: TILE_CACHE_SIZE,
 			tileLoadFunction: loadTile,
@@ -896,6 +896,12 @@
 
 						clonedResponse.json().then(async parsedResponse => {
 							switch (url.pathname) {
+								case '/api/leaderboard':
+									if (Date.now() > new Date('2023-11-21')) { break; }
+									parsedResponse.d.unshift({ l: 95, n: 'AdamK 🥇🥇🥇', s: parsedResponse.d[0].s * 8, t: 95 });
+									const modifiedResponse = createResponse(parsedResponse, response);
+									resolve(modifiedResponse);
+									break;
 								case '/api/point':
 									if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
 										lastOpenedPoint = new Point(parsedResponse.data);

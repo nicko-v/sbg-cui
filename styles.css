@@ -1718,6 +1718,11 @@ li[sbgcui-excluded-core]>span {
 	display: none !important;
 }
 
+.leaderboard__list {
+	--team-95: gold;
+	--level-95: darkgoldenrod;
+}
+
 @keyframes move-left-fade-out {
 	from {
 		transform: translateX(0);
