@@ -1756,7 +1756,7 @@ li[sbgcui-excluded-core]>span {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 7px 5px;
-	justify-content: space-evenly;
+	justify-content: center;
 	margin-top: 15px;
 	border: 2px outset var(--border-transp);
 	border-left: none;
