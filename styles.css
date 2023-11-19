@@ -1755,7 +1755,7 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_log-tags {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 7px 5px;
+	gap: 8px 15px;
 	justify-content: center;
 	margin-top: 15px;
 	border: 2px outset var(--border-transp);
