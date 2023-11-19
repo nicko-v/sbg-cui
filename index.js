@@ -4943,7 +4943,6 @@
 					popup.classList.add('sbgcui_hidden');
 					logContent.innerHTML = '';
 					log = undefined;
-					datePicker.setAttribute('value', undefined);
 				}
 
 				function showPopup() {
@@ -4960,6 +4959,7 @@
 						datePicker.setAttribute('min', firstEntryDate);
 						datePicker.setAttribute('max', latestEntryDate);
 						datePicker.setAttribute('value', latestEntryDate);
+						datePicker.value = latestEntryDate;
 
 						datePicker.dispatchEvent(new Event('change'));
 
