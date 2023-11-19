@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.6
+// @version      1.14.7
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.6';
+	const USERSCRIPT_VERSION = '1.14.7';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -418,6 +418,10 @@
 					return `window.TeamColors`;
 				case `if (zoom % 1 != 0)`:
 					return `//if (zoom % 1 != 0)`;
+				case `const attack_slider`:
+					return `window.attack_slider`;
+				case `const deploy_slider`:
+					return `window.deploy_slider`;
 				case `const draw_slider`:
 					return `window.draw_slider`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
@@ -425,7 +429,7 @@
 				case `$('[name="baselayer"]').on('change', e`:
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`:
-					return `hour: '2-digit', hour12: false, second: '2-digit'`;
+					return `hour: '2-digit', hourCycle: 'h23', second: '2-digit'`;
 				case `function initCompass() {`:
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
@@ -443,7 +447,7 @@
 				case `if (type == 'osm') {`:
 					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
 				case `class Bitfield`:
-					return `window.requestEntities = requestEntities; window.Bitfield = class Bitfield`;
+					return `window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
 				default:
 					return match;
 			}
@@ -453,6 +457,8 @@
 			`(const Catalysers)`,
 			`(const TeamColors)`,
 			`(if \\(zoom % 1 != 0\\))`,
+			`(const attack_slider)`,
+			`(const deploy_slider)`,
 			`(const draw_slider)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
@@ -503,6 +509,8 @@
 				this.guid = pointData.g;
 				this.level = pointData.l;
 				this.team = pointData.te;
+				this.title = pointData.t;
+				this.possibleLines = [];
 				this.lines = {
 					in: pointData.li.i,
 					out: pointData.li.o,
@@ -896,12 +904,6 @@
 
 						clonedResponse.json().then(async parsedResponse => {
 							switch (url.pathname) {
-								case '/api/leaderboard':
-									if (Date.now() > new Date('2023-11-21')) { break; }
-									parsedResponse.d.unshift({ l: 95, n: 'AdamK 🥇🥇🥇', s: parsedResponse.d[0].s * 8, t: 95 });
-									const modifiedResponse = createResponse(parsedResponse, response);
-									resolve(modifiedResponse);
-									break;
 								case '/api/point':
 									if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
 										lastOpenedPoint = new Point(parsedResponse.data);
@@ -912,11 +914,11 @@
 										const actionType = parsedResponse.data.co.length == 1 ? 'capture' : 'deploy';
 										lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 										lastOpenedPoint.selectCore(config.autoSelect.deploy);
-										logAction({ type: actionType, coords: parsedResponse.data.c, point: parsedResponse.data.g });
+										logAction({ type: actionType, coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
 									} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 										lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
 										lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-										logAction({ type: 'upgrade', coords: parsedResponse.data.c, point: parsedResponse.data.g });
+										logAction({ type: 'upgrade', coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
 									}
 									break;
 								case '/api/attack2':
@@ -927,8 +929,8 @@
 										const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
 
 										if (points.length > 0) {
-											const lines = parsedResponse.l.map(line => { delete line['created_at']; return line; });
-											const regions = parsedResponse.r.map(region => { delete region['created_at']; return region; });
+											const lines = parsedResponse.l.length;
+											const regions = parsedResponse.r.length;
 											logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions });
 										}
 									}
@@ -938,9 +940,7 @@
 									let toDelete = [];
 
 									if ('loot' in parsedResponse) {
-										const point = JSON.parse(options.body).guid;
-
-										logAction({ type: 'discover', point });
+										logAction({ type: 'discover', point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
 
 										if (discoverModifier.isActive) {
 											toDelete = parsedResponse.loot
@@ -1059,8 +1059,11 @@
 								case '/api/draw':
 									if ('line' in parsedResponse) {
 										const { from, to } = JSON.parse(options.body);
-										const { line, reg: regions } = parsedResponse;
-										logAction({ type: 'draw', from, to, line, regions });
+										const regions = parsedResponse.reg.length;
+										const fromTitle = from == lastOpenedPoint.guid ? lastOpenedPoint.title : undefined;
+										const toTitle = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.title;
+
+										logAction({ type: 'draw', from, to, fromTitle, toTitle, regions });
 									} else if ('data' in parsedResponse) {
 
 										let { minDistance, maxDistance } = config.drawing;
@@ -1083,6 +1086,7 @@
 											}
 
 											const modifiedResponse = createResponse(parsedResponse, response);
+											lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
 											resolve(modifiedResponse);
 
 											break;
@@ -1107,6 +1111,8 @@
 											const modifiedResponse = createResponse(parsedResponse, response);
 											resolve(modifiedResponse);
 										}
+
+										lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
 									}
 									break;
 								case '/api/profile':
@@ -1399,20 +1405,22 @@
 			items.forEach(e => {
 				const cachedItem = cache.find(f => f.g == e.guid);
 				const deletedAmount = e.amount - (e.filtered ?? 0);
+				const slider = e.type == 1 ? deploySlider : e.type == 2 ? attackSlider : undefined;
 
 				if (cachedItem) { cachedItem.a -= deletedAmount; }
 
-				if (e.type == 1 && deletedAmount > 0) {
-					const coreSlide = deploySlider.querySelector(`li[data-guid="${e.guid}"]`);
-					if (coreSlide == null) { return; }
+				if (slider != undefined && deletedAmount > 0) {
+					const slide = slider.querySelector(`li[data-guid="${e.guid}"]`);
+					if (slide == null) { return; }
 
-					const amountSpan = coreSlide.querySelector(`li[data-guid="${e.guid}"] > .cores-list__amount`);
+					const amountSpan = slide.querySelector(`li[data-guid="${e.guid}"] > .${e.type == 1 ? 'cores' : 'catalysers'}-list__amount`);
 					const amountSpanText = +amountSpan.innerText.slice(1);
 
 					if (amountSpanText - deletedAmount > 0) {
 						amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
 					} else {
-						coreSlide.remove();
+						slide.remove();
+						window[`${slider == attackSlider ? 'attack' : 'deploy'}_slider`].refresh();
 					}
 				}
 			});
@@ -2629,7 +2637,24 @@
 				}
 			});
 
-			i18next.addResource('ru', 'main', 'notifs.text', 'нейтрализована $1$');
+			i18next.addResources('ru', 'main', {
+				'notifs.text': 'нейтрализована $1$',
+				'sbgcui.point': 'Точка',
+				'sbgcui.points': 'Точки',
+				'sbgcui.line': 'Линия',
+				'sbgcui.lines': 'Линии',
+				'sbgcui.region': 'Регион',
+				'sbgcui.regions': 'Регионы',
+			});
+			i18next.addResources('en', 'main', {
+				'notifs.text': 'нейтрализована $1$',
+				'sbgcui.point': 'Point',
+				'sbgcui.points': 'Points',
+				'sbgcui.line': 'Line',
+				'sbgcui.lines': 'Lines',
+				'sbgcui.region': 'Region',
+				'sbgcui.regions': 'Regions',
+			});
 			i18next.addResources(i18next.resolvedLanguage, 'main', {
 				'items.catalyser-short': '{{level}}',
 				'items.core-short': '{{level}}',
@@ -3350,7 +3375,7 @@
 				let guid = event.target.closest('.inventory__item').dataset.ref;
 
 				if (!guid) { return; }
-				if (confirm('Открыть карточку точки? Нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
+				if (confirm('Открыть карточку точки? Либо нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
 			});
 		}
 
@@ -4908,6 +4933,199 @@
 			document.body.appendChild(buttonsWrapper);
 
 			map.addLayer(pointsWithRefsLayer);
+		}
+
+
+		/* Показ логов */
+		{
+			try {
+				function hidePopup() {
+					popup.classList.add('sbgcui_hidden');
+					logContent.innerHTML = '';
+					log = undefined;
+					datePicker.setAttribute('value', undefined);
+				}
+
+				function showPopup() {
+					const logsStore = database.transaction('logs', 'readonly').objectStore('logs');
+					const request = logsStore.getAllKeys();
+
+					request.addEventListener('success', event => {
+						const timestamps = event.target.result;
+						const firstEntryTimestamp = timestamps[0] || Date.now();
+						const latestEntryTimestamp = timestamps[timestamps.length - 1] || Date.now();
+						const firstEntryDate = new Date(firstEntryTimestamp).toISOString().slice(0, 10);
+						const latestEntryDate = new Date(latestEntryTimestamp).toISOString().slice(0, 10);
+
+						datePicker.setAttribute('min', firstEntryDate);
+						datePicker.setAttribute('max', latestEntryDate);
+						datePicker.setAttribute('value', latestEntryDate);
+
+						datePicker.dispatchEvent(new Event('change'));
+
+						popup.classList.remove('sbgcui_hidden');
+					});
+				}
+
+				function showLog() {
+					const upperBound = new Date(datePicker.value).setHours(0, 0, 0, 0);
+					const lowerBound = new Date(datePicker.value).setHours(23, 59, 59, 999);
+					const keyRange = IDBKeyRange.bound(upperBound, lowerBound);
+					const logsStore = database.transaction('logs', 'readonly').objectStore('logs');
+					const request = logsStore.getAll(keyRange);
+
+					logContent.innerHTML = '';
+
+					request.addEventListener('success', event => {
+						const logs = event.target.result;
+						if (logs.length == 0) { return; }
+
+						const guidsTitles = {};
+						const pointsWithoutTitle = [];
+
+						logs.map(action => {
+							switch (action.type) {
+								case 'capture':
+								case 'deploy':
+								case 'upgrade':
+								case 'discover':
+									guidsTitles[action.point] = guidsTitles[action.point] || action.title;
+									break;
+								case 'draw':
+									guidsTitles[action.from] = guidsTitles[action.fromTitle] || action.fromTitle;
+									guidsTitles[action.to] = guidsTitles[action.toTitle] || action.toTitle;
+									break;
+								case 'destroy':
+								case 'broom':
+									action.points.forEach(guid => { guidsTitles[guid] = guidsTitles[guid] || undefined; });
+									break;
+							}
+						});
+						for (let guid in guidsTitles) {
+							if (guidsTitles[guid] == undefined) { pointsWithoutTitle.push(guid); }
+						}
+
+						const promises = pointsWithoutTitle.map(guid => getPointData(guid));
+						Promise.all(promises)
+							.then(results => {
+								results.forEach(point => { guidsTitles[point.g] = point.t; });
+								logs.forEach(action => {
+									const entry = document.createElement('p');
+									const entryTime = document.createElement('span');
+									const entryDescr = document.createElement('div');
+
+									entry.classList.add('sbgcui_log-content-entry');
+									entryTime.classList.add('sbgcui_log-content-entry-time');
+									entryDescr.classList.add('sbgcui_log-content-entry-description');
+
+									entry.style.setProperty('--action-type', `"${action.type}"`);
+									entry.style.setProperty('--action-color', `var(--${action.type})`);
+									entry.setAttribute('data-action', action.type);
+
+									const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+									entryTime.innerText = new Date(action.timestamp).toLocaleString(i18next.language, format);
+
+									switch (action.type) {
+										case 'capture':
+										case 'deploy':
+										case 'upgrade':
+										case 'discover': {
+											const link = document.createElement('a');
+
+											link.innerText = guidsTitles[action.point] || action.point;
+											link.setAttribute('data-guid', action.point);
+
+											entryDescr.appendChild(link);
+
+											break;
+										}
+										case 'draw': {
+											const fromLink = document.createElement('a');
+											const toLink = document.createElement('a');
+											const fromToSpan = document.createElement('span');
+											const regions = action.regions instanceof Array ? action.regions.length : action.regions; // Раньше сохранялся массив.
+
+											fromLink.innerText = guidsTitles[action.from];
+											toLink.innerText = guidsTitles[action.to];
+
+											fromLink.setAttribute('data-guid', action.from);
+											toLink.setAttribute('data-guid', action.to);
+
+											fromToSpan.classList.add('sbgcui_log-content-entry-description-fromto');
+
+											fromToSpan.append(fromLink, '->', toLink);
+											entryDescr.appendChild(fromToSpan);
+											if (regions > 0) { entryDescr.append(`${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`); }
+
+											break;
+										}
+										case 'destroy':
+										case 'broom': {
+											const points = action.points;
+											const lines = action.lines instanceof Array ? action.lines.length : action.lines; // Раньше сохранялся массив.
+											const regions = action.regions instanceof Array ? action.regions.length : action.regions;
+											const linesString = `${i18next.t('sbgcui.line' + (lines > 1 ? 's' : ''))}: ${lines}`;
+											const regionsString = `${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`;
+
+											entryDescr.innerText = i18next.t('sbgcui.point' + (points.length > 1 ? 's' : '')) + ': ';
+											points.forEach((guid, index) => {
+												const link = document.createElement('a');
+
+												link.innerText = guidsTitles[guid] || guid;
+												link.setAttribute('data-guid', guid);
+
+												entryDescr.appendChild(link);
+												if (index < points.length - 1) { entryDescr.append(', '); }
+											});
+											if (lines > 0) { entryDescr.append(document.createElement('br'), linesString); }
+											if (regions > 0) { entryDescr.append(', ', regionsString.toLowerCase()); }
+
+											break;
+										}
+									}
+
+									entry.append(entryTime, entryDescr);
+									logContent.appendChild(entry);
+								});
+							})
+							.catch(error => { console.log('SBG CUI: ошибка при получении данных точек (логи).', error); });
+					});
+				}
+
+				function showPointInfo(event) {
+					const guid = event.target.dataset.guid;
+					if (guid != undefined) { window.showInfo(guid); }
+				}
+
+				function toggleTag(event) {
+					if (!event.target.dataset.hasOwnProperty('action')) { return; }
+					const tag = event.target;
+					tag.toggleAttribute('data-hidden');
+				}
+
+				const popup = await fetchHTMLasset('log');
+				const closeButton = popup.querySelector('.sbgcui_log-close');
+				const datePicker = popup.querySelector('input[type="date"]');
+				const logContent = popup.querySelector('.sbgcui_log-content');
+				const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
+				const toolbarButton = document.createElement('button');
+				let log;
+
+				toolbarButton.classList.add('fa', 'fa-solid-table-list');
+
+				toolbarButton.addEventListener('click', showPopup);
+				closeButton.addEventListener('click', hidePopup);
+				tagsWrapper.addEventListener('click', toggleTag);
+				logContent.addEventListener('click', showPointInfo);
+				datePicker.addEventListener('keydown', event => { event.preventDefault(); });
+				datePicker.addEventListener('change', showLog);
+
+				toolbar.addItem(toolbarButton, 6);
+
+				document.body.appendChild(popup);
+			} catch (error) {
+				console.log(error);
+			}
 		}
 
 

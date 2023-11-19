@@ -457,6 +457,7 @@ html[lang="ru"] .i-buttons {
 .leaderboard .popup-close,
 .notifs .popup-close,
 .profile .popup-close,
+.sbgcui_log-close,
 #sbgcui_hide_viewer,
 #sbgcui_batch_remove,
 #inventory__close {
@@ -485,6 +486,10 @@ html[lang="ru"] .i-buttons {
 
 #inventory-delete {
 	order: 1;
+}
+
+.info {
+	z-index: 4;
 }
 
 .info>.popup-close {
@@ -1718,10 +1723,170 @@ li[sbgcui-excluded-core]>span {
 	display: none !important;
 }
 
-.leaderboard__list {
-	--team-95: gold;
-	--level-95: darkgoldenrod;
+.sbgcui_log {
+	--capture: darkgreen;
+	--deploy: darkgoldenrod;
+	--upgrade: darkslategrey;
+	--discover: darkcyan;
+	--draw: darkmagenta;
+	--destroy: darkred;
+	--broom: darkslateblue;
+	background: var(--background);
+	border: 2px solid var(--border-transp);
+	box-sizing: border-box;
+	color: var(--text);
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	left: 0;
+	padding: 10px;
+	position: absolute;
+	top: 0;
+	width: 100%;
+	z-index: 3;
 }
+
+.sbgcui_log-header {
+	color: var(--sbgcui-branding-color);
+	margin: 0px;
+	text-align: center;
+}
+
+.sbgcui_log-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 7px 5px;
+	justify-content: space-evenly;
+	margin-top: 15px;
+	border: 2px outset var(--border-transp);
+	border-left: none;
+	border-right: none;
+	padding: 10px 0;
+}
+
+.sbgcui_log-tags>span {
+	border-radius: 50px;
+	color: #D1D1D1;
+	padding: 3px 8px;
+	text-transform: lowercase;
+}
+
+.sbgcui_log-tags>span[data-hidden] {
+	background-color: dimgray !important;
+	opacity: 0.3;
+	text-decoration: line-through;
+}
+
+.sbgcui_log-tags>span[data-action="capture"] {
+	background-color: var(--capture);
+}
+
+.sbgcui_log-tags>span[data-action="deploy"] {
+	background-color: var(--deploy);
+}
+
+.sbgcui_log-tags>span[data-action="upgrade"] {
+	background-color: var(--upgrade);
+}
+
+.sbgcui_log-tags>span[data-action="discover"] {
+	background-color: var(--discover);
+}
+
+.sbgcui_log-tags>span[data-action="draw"] {
+	background-color: var(--draw);
+}
+
+.sbgcui_log-tags>span[data-action="destroy"] {
+	background-color: var(--destroy);
+}
+
+.sbgcui_log-tags>span[data-action="broom"] {
+	background-color: var(--broom);
+}
+
+.sbgcui_log-content {
+	overflow-y: auto;
+	padding-bottom: 65px;
+}
+
+.sbgcui_log-content:empty::before {
+	color: var(--text-disabled);
+	content: "Действий не найдено. \AВыберите другую дату.";
+	display: block;
+	font-size: 1.3em;
+	margin-top: 50%;
+	text-align: center;
+	white-space: pre-wrap;
+}
+
+.sbgcui_log-content-entry {
+	align-items: center;
+	border-bottom: 1px solid var(--border-transp);
+	display: flex;
+	flex-wrap: nowrap;
+	font-size: 0.8em;
+	gap: 10px;
+	margin: 0;
+	padding: 5px;
+}
+
+.sbgcui_log-content-entry-time {
+	align-items: center;
+	color: var(--action-color);
+	display: flex;
+	flex-basis: 20%;
+	flex-direction: column;
+}
+
+.sbgcui_log-content-entry-time::after {
+	content: var(--action-type);
+	display: block;
+	text-align: center;
+	text-transform: capitalize;
+}
+
+.sbgcui_log-content-entry-description {
+	flex-basis: calc(80% - 10px);
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sbgcui_log-content-entry-description-fromto {
+	display: flex;
+	gap: 5px;
+	justify-content: space-between;
+	white-space: nowrap;
+}
+
+.sbgcui_log-content-entry-description-fromto>a {
+	flex: calc(50% - 20px) 1 0;
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+}
+
+.sbgcui_log-content-entry:not(:is([data-action="destroy"], [data-action="broom"]))>.sbgcui_log-content-entry-description {
+	display: flex;
+	flex-direction: column;
+}
+
+.sbgcui_log-close {
+	bottom: 15px;
+	left: 50%;
+	position: absolute;
+	transform: translateX(-50%);
+}
+
+.sbgcui_log:has(span[data-action="capture"][data-hidden]) .sbgcui_log-content-entry[data-action="capture"],
+.sbgcui_log:has(span[data-action="deploy"][data-hidden]) .sbgcui_log-content-entry[data-action="deploy"],
+.sbgcui_log:has(span[data-action="upgrade"][data-hidden]) .sbgcui_log-content-entry[data-action="upgrade"],
+.sbgcui_log:has(span[data-action="discover"][data-hidden]) .sbgcui_log-content-entry[data-action="discover"],
+.sbgcui_log:has(span[data-action="draw"][data-hidden]) .sbgcui_log-content-entry[data-action="draw"],
+.sbgcui_log:has(span[data-action="destroy"][data-hidden]) .sbgcui_log-content-entry[data-action="destroy"],
+.sbgcui_log:has(span[data-action="broom"][data-hidden]) .sbgcui_log-content-entry[data-action="broom"] {
+	display: none;
+}
+
 
 @keyframes move-left-fade-out {
 	from {
