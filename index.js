@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.7
+// @version      1.14.8
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.7';
+	const USERSCRIPT_VERSION = '1.14.8';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -4950,11 +4950,12 @@
 					const request = logsStore.getAllKeys();
 
 					request.addEventListener('success', event => {
+						const offsetMs = new Date().getTimezoneOffset() * 60 * 1000;
 						const timestamps = event.target.result;
 						const firstEntryTimestamp = timestamps[0] || Date.now();
 						const latestEntryTimestamp = timestamps[timestamps.length - 1] || Date.now();
-						const firstEntryDate = new Date(firstEntryTimestamp).toISOString().slice(0, 10);
-						const latestEntryDate = new Date(latestEntryTimestamp).toISOString().slice(0, 10);
+						const firstEntryDate = new Date(firstEntryTimestamp - offsetMs).toISOString().slice(0, 10);
+						const latestEntryDate = new Date(latestEntryTimestamp - offsetMs).toISOString().slice(0, 10);
 
 						datePicker.setAttribute('min', firstEntryDate);
 						datePicker.setAttribute('max', latestEntryDate);
