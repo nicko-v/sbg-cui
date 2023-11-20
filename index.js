@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.9
+// @version      1.14.10
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.9';
+	const USERSCRIPT_VERSION = '1.14.10';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -4603,8 +4603,15 @@
 		}
 
 
-		/* Навигация к точке */
+		/* Навигация и переход к точке */
 		{
+			function jumpTo() {
+				if (isFollow) { click(toggleFollow); }
+				pointPopup.classList.add('hidden');
+				view.setCenter(ol.proj.fromLonLat(lastOpenedPoint.coords));
+				view.adjustCenter([0, VIEW_PADDING / -2]);
+			}
+			
 			try {
 				if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
 
@@ -4699,6 +4706,12 @@
 			} catch (error) {
 				console.log(error);
 			}
+
+			const jumpToButton = document.createElement('button');
+
+			jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
+			jumpToButton.addEventListener('click', jumpTo);
+			pointPopup.appendChild(jumpToButton);
 		}
 
 
@@ -5110,6 +5123,7 @@
 				const datePicker = popup.querySelector('input[type="date"]');
 				const logContent = popup.querySelector('.sbgcui_log-content');
 				const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
+				const jumpToButton = document.querySelector('.info > .sbgcui_jumpToButton');
 				const toolbarButton = document.createElement('button');
 				let log;
 
@@ -5117,6 +5131,7 @@
 
 				toolbarButton.addEventListener('click', showPopup);
 				closeButton.addEventListener('click', hidePopup);
+				jumpToButton.addEventListener('click', hidePopup);
 				tagsWrapper.addEventListener('click', toggleTag);
 				logContent.addEventListener('click', showPointInfo);
 				datePicker.addEventListener('keydown', event => { event.preventDefault(); });

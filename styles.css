@@ -1621,15 +1621,23 @@ li[sbgcui-excluded-core]>span {
 	display: block;
 }
 
-.sbgcui_navbutton {
+.sbgcui_navbutton,
+.sbgcui_jumpToButton {
 	bottom: 10px;
 	color: var(--text);
 	font-size: 30px;
 	height: 1em;
-	left: 10px;
 	padding: 0;
 	position: absolute;
 	width: 1em;
+}
+
+.sbgcui_navbutton {
+	left: 10px;
+}
+
+.sbgcui_jumpToButton {
+	right: 10px;
 }
 
 .sbgcui_navigate {
