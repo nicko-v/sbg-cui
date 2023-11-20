@@ -411,15 +411,16 @@
 
 	function loadMainScript() {
 		function replacer(match) {
+			replacesMade += 1;
 			switch (match) {
 				case `const Catalysers`:
 					return `window.Catalysers`;
 				case `const TeamColors`:
 					return `window.TeamColors`;
 				case `if (zoom % 1 != 0)`:
-					return `//if (zoom % 1 != 0)`;
+					return `//${match}`;
 				case `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden')`:
-					return `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden');}
+					return `${match};}
 									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
@@ -431,17 +432,19 @@
 				case `const draw_slider`:
 					return `window.draw_slider`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
-					return `if ($('.attack-slider-wrp').hasClass('hidden')) {return;`;
+					return `${match}return;`;
 				case `$('[name="baselayer"]').on('change', e`:
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`:
-					return `hour: '2-digit', hourCycle: 'h23', second: '2-digit'`;
+					return `${match}, hourCycle: 'h23', second: '2-digit'`;
 				case `function initCompass() {`:
-					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
+					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`:
 					return `NickolayV`;
 				case `timers.info_controls = setInterval(() => {`:
 					return `timers.info_controls = setTimeout(() => {`;
+				case `delete cooldowns[guid]`:
+					return `${match}; manageControls();`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `makeItemTitle(item)`:
@@ -457,6 +460,7 @@
 				case `class Bitfield`:
 					return `window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
 				default:
+					replacesMade -= 1;
 					return match;
 			}
 		}
@@ -475,6 +479,7 @@
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
+			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
@@ -483,12 +488,16 @@
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
+		
+		const replacesShouldBe = 22;
+		let replacesMade = 0;
 
 		fetch('/app/script.js')
 			.then(r => r.text())
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
+				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
