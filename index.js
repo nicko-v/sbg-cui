@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.10
+// @version      1.14.11
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -44,7 +44,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.10';
+	const USERSCRIPT_VERSION = '1.14.11';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -418,6 +418,12 @@
 					return `window.TeamColors`;
 				case `if (zoom % 1 != 0)`:
 					return `//if (zoom % 1 != 0)`;
+				case `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden')`:
+					return `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden');}
+									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
+										manageControls();
+          					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
+									}{`;
 				case `const attack_slider`:
 					return `window.attack_slider`;
 				case `const deploy_slider`:
@@ -434,6 +440,8 @@
 					return DeviceOrientationEvent ? `function initCompass() {return;` : match;
 				case `testuser`:
 					return `NickolayV`;
+				case `timers.info_controls = setInterval(() => {`:
+					return `timers.info_controls = setTimeout(() => {`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `makeItemTitle(item)`:
@@ -457,6 +465,7 @@
 			`(const Catalysers)`,
 			`(const TeamColors)`,
 			`(if \\(zoom % 1 != 0\\))`,
+			`(if \\(getSettings\\('plrhid'\\) == true\\) \\$\\('\\.ol-layer__player'\\)\\.addClass\\('hidden'\\))`,
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
@@ -465,6 +474,7 @@
 			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
+			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
@@ -1059,11 +1069,12 @@
 								case '/api/draw':
 									if ('line' in parsedResponse) {
 										const { from, to } = JSON.parse(options.body);
-										const regions = parsedResponse.reg.length;
+										const regions = parsedResponse.reg.map(region => region.a);
 										const fromTitle = from == lastOpenedPoint.guid ? lastOpenedPoint.title : undefined;
 										const toTitle = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.title;
+										const distance = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.distance;
 
-										logAction({ type: 'draw', from, to, fromTitle, toTitle, regions });
+										logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
 									} else if ('data' in parsedResponse) {
 
 										let { minDistance, maxDistance } = config.drawing;
@@ -1112,7 +1123,7 @@
 											resolve(modifiedResponse);
 										}
 
-										lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
+										lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
 									}
 									break;
 								case '/api/profile':
@@ -2645,6 +2656,10 @@
 				'sbgcui.lines': 'Линии',
 				'sbgcui.region': 'Регион',
 				'sbgcui.regions': 'Регионы',
+				'sbgcui.max': 'Макс.',
+				'sbgcui.total': 'Всего',
+				'sbgcui.area': 'Площадь',
+				'sbgcui.distance': 'Расстояние',
 			});
 			i18next.addResources('en', 'main', {
 				'notifs.text': 'нейтрализована $1$',
@@ -2654,6 +2669,10 @@
 				'sbgcui.lines': 'Lines',
 				'sbgcui.region': 'Region',
 				'sbgcui.regions': 'Regions',
+				'sbgcui.max': 'Max',
+				'sbgcui.total': 'Total',
+				'sbgcui.area': 'Area',
+				'sbgcui.distance': 'Distance',
 			});
 			i18next.addResources(i18next.resolvedLanguage, 'main', {
 				'items.catalyser-short': '{{level}}',
@@ -4611,7 +4630,7 @@
 				view.setCenter(ol.proj.fromLonLat(lastOpenedPoint.coords));
 				view.adjustCenter([0, VIEW_PADDING / -2]);
 			}
-			
+
 			try {
 				if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
 
@@ -5058,7 +5077,10 @@
 											const fromLink = document.createElement('a');
 											const toLink = document.createElement('a');
 											const fromToSpan = document.createElement('span');
-											const regions = action.regions instanceof Array ? action.regions.length : action.regions; // Раньше сохранялся массив.
+											const distance = action.distance;
+											const distanceString = i18next.t(`units.${distance >= 1000 ? 'km' : 'm'}`, { count: distance >= 1000 ? distance / 1000 : distance });
+											const regionsAmount = action.regions instanceof Array ? action.regions.length : action.regions;
+											// Сначала регионы хранились в виде массива объектов, затем в виде числа - количество регионов, сейчас в виде массива площадей.
 
 											fromLink.innerText = guidsTitles[action.from];
 											toLink.innerText = guidsTitles[action.to];
@@ -5070,7 +5092,23 @@
 
 											fromToSpan.append(fromLink, '->', toLink);
 											entryDescr.appendChild(fromToSpan);
-											if (regions > 0) { entryDescr.append(`${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`); }
+											if (distance != undefined) { entryDescr.append(`${i18next.t('sbgcui.distance')}: ${distanceString}`, document.createElement('br')); }
+											if (regionsAmount > 0) {
+												entryDescr.append(`${i18next.t('sbgcui.region' + (regionsAmount > 1 ? 's' : ''))}: ${regionsAmount}`);
+
+												if (typeof action.regions == 'number') { break; } // Временно регионы сохранялись просто количеством.
+
+												const areas = action.regions.map(region => typeof region == 'number' ? region : region.a);
+												const maxArea = i18next.t('units.sqkm', { count: Math.max(...areas) });
+												const totalArea = i18next.t('units.sqkm', { count: areas.reduce((acc, current) => acc + current, 0) });
+
+												if (regionsAmount == 1) {
+													entryDescr.append(`. ${i18next.t('sbgcui.area')}: ${maxArea}`);
+												} else {
+													const br = document.createElement('br');
+													entryDescr.append(br, `${i18next.t('sbgcui.max')}: ${maxArea}, ${i18next.t('sbgcui.total').toLowerCase()}: ${totalArea}`);
+												}
+											}
 
 											break;
 										}
@@ -5115,7 +5153,19 @@
 				function toggleTag(event) {
 					if (!event.target.dataset.hasOwnProperty('action')) { return; }
 					const tag = event.target;
-					tag.toggleAttribute('data-hidden');
+					const action = tag.dataset.action;
+					const isHidden = tag.hasAttribute('data-hidden');
+
+					if (isHidden) {
+						state.hiddenLogs.delete(action);
+						tag.removeAttribute('data-hidden');
+					} else {
+						state.hiddenLogs.add(action);
+						tag.setAttribute('data-hidden', '');
+					}
+
+					const stateStore = database.transaction('state', 'readwrite').objectStore('state');
+					stateStore.put(state.hiddenLogs, 'hiddenLogs');
 				}
 
 				const popup = await fetchHTMLasset('log');
@@ -5127,7 +5177,14 @@
 				const toolbarButton = document.createElement('button');
 				let log;
 
+				state.hiddenLogs = state.hiddenLogs || new Set();
+
 				toolbarButton.classList.add('fa', 'fa-solid-table-list');
+
+				[...tagsWrapper.children].forEach(tag => {
+					const action = tag.dataset.action;
+					if (state.hiddenLogs.has(action)) { tag.setAttribute('data-hidden', ''); }
+				});
 
 				toolbarButton.addEventListener('click', showPopup);
 				closeButton.addEventListener('click', hidePopup);
