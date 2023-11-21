@@ -950,7 +950,8 @@
 										if (points.length > 0) {
 											const lines = parsedResponse.l.length;
 											const regions = parsedResponse.r.length;
-											logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions });
+											const xp = parsedResponse.xp.diff;
+											logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions, xp });
 										}
 									}
 
@@ -5129,6 +5130,7 @@
 											const points = action.points;
 											const lines = action.lines instanceof Array ? action.lines.length : action.lines; // Раньше сохранялся массив.
 											const regions = action.regions instanceof Array ? action.regions.length : action.regions;
+											const xp = action.xp;
 											const linesString = `${i18next.t('sbgcui.line' + (lines > 1 ? 's' : ''))}: ${lines}`;
 											const regionsString = `${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`;
 
@@ -5142,8 +5144,11 @@
 												entryDescr.appendChild(link);
 												if (index < points.length - 1) { entryDescr.append(', '); }
 											});
-											if (lines > 0) { entryDescr.append(document.createElement('br'), linesString); }
-											if (regions > 0) { entryDescr.append(', ', regionsString.toLowerCase()); }
+											if (lines > 0) {
+												entryDescr.appendChild(document.createElement('br'));
+												entryDescr.append(linesString, (regions > 0) ? `, ${regionsString.toLowerCase()}` : '', (xp != undefined) ? `. XP: ${xp}` : '');
+											}
+											
 
 											break;
 										}
