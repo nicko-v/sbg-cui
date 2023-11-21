@@ -39,7 +39,7 @@
 	console.log = logDecorator(console.log);
 	console.warn = logDecorator(console.warn);
 	console.error = logDecorator(console.error);
-	window.addEventListener('error', error => { pushMessage([`${error.message}${error.stack ? '<br>' + error.stack : ''}`]); });
+	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
 	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
