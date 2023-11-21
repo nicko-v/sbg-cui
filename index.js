@@ -2003,7 +2003,7 @@
 					return section;
 				}
 
-				function createNotificationsSection(notifications) {
+				function createNotificationsSection(notifications = {}) {
 					const section = createSection(
 						'Уведомления',
 						`Показ всплывающих уведомлений о том, что ваша точка была кем-то уничтожена.`
