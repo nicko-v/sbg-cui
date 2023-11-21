@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.13
+// @version      1.14.14
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.13';
+	const USERSCRIPT_VERSION = '1.14.14';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -78,7 +78,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 4);
+	const openRequest = indexedDB.open('CUI', 5);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -90,65 +90,6 @@
 			const transaction = event.target.transaction;
 			const configStore = transaction.objectStore('config');
 			const stateStore = transaction.objectStore('state');
-
-			const defaultConfig = {
-				maxAmountInBag: {
-					cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-					catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-					references: { allied: -1, hostile: -1 },
-				},
-				autoSelect: {
-					deploy: 'max',  // min || max || off
-					upgrade: 'min', // min || max || off
-					attack: 'latest',  // max || latest
-				},
-				mapFilters: {
-					invert: isDarkMode && !isCdbMap ? 1 : 0,
-					hueRotate: isDarkMode ? 180 : 0,
-					brightness: isDarkMode ? 0.75 : 1,
-					grayscale: isDarkMode ? 1 : 0,
-					sepia: 1,
-					blur: 0,
-					branding: 'default', // default || custom
-					brandingColor: '#CCCCCC',
-				},
-				tinting: {
-					map: 1,
-					point: 'level', // level || team || off
-					profile: 1,
-				},
-				vibration: {
-					buttons: 1,
-					notifications: 1,
-				},
-				ui: {
-					doubleClickZoom: 0,
-					pointBgImage: 1,
-					pointBtnsRtl: 0,
-					pointBgImageBlur: 1,
-					pointDischargeTimeout: 1,
-					speedometer: 1,
-				},
-				pointHighlighting: {
-					inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
-					outer: 'off',
-					outerTop: 'cores',
-					outerBottom: 'highlevel',
-					text: 'refsAmount', // energy || level || lines || refsAmount || off
-					innerColor: '#E87100',
-					outerColor: '#E87100',
-					outerTopColor: '#EB4DBF',
-					outerBottomColor: '#28C4F4',
-				},
-				drawing: {
-					minDistance: -1,
-					maxDistance: -1,
-				},
-				notifications: {
-					status: 'off', // all || fav || off
-					interval: 30000,
-				},
-			};
 
 			for (let key in defaultConfig) { configStore.add(defaultConfig[key], key); }
 
@@ -179,12 +120,76 @@
 					stateStore.add(baselayer, 'baselayer');
 					database.createObjectStore('tiles');
 				},
+				5: () => {
+					const configStore = event.target.transaction.objectStore('config');
+					configStore.put(defaultConfig.notifications, 'notifications');
+				},
 			};
 
 			for (let v in updateToVersion) {
 				if (v > oldVersion && v <= newVersion) { updateToVersion[v](); }
 			}
 		}
+
+		const defaultConfig = {
+			maxAmountInBag: {
+				cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+				catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+				references: { allied: -1, hostile: -1 },
+			},
+			autoSelect: {
+				deploy: 'max',  // min || max || off
+				upgrade: 'min', // min || max || off
+				attack: 'latest',  // max || latest
+			},
+			mapFilters: {
+				invert: isDarkMode && !isCdbMap ? 1 : 0,
+				hueRotate: isDarkMode ? 180 : 0,
+				brightness: isDarkMode ? 0.75 : 1,
+				grayscale: isDarkMode ? 1 : 0,
+				sepia: 1,
+				blur: 0,
+				branding: 'default', // default || custom
+				brandingColor: '#CCCCCC',
+			},
+			tinting: {
+				map: 1,
+				point: 'level', // level || team || off
+				profile: 1,
+			},
+			vibration: {
+				buttons: 1,
+				notifications: 1,
+			},
+			ui: {
+				doubleClickZoom: 0,
+				pointBgImage: 1,
+				pointBtnsRtl: 0,
+				pointBgImageBlur: 1,
+				pointDischargeTimeout: 1,
+				speedometer: 1,
+			},
+			pointHighlighting: {
+				inner: 'uniqc', // fav || ref || uniqc || uniqv || cores || highlevel || off
+				outer: 'off',
+				outerTop: 'cores',
+				outerBottom: 'highlevel',
+				text: 'refsAmount', // energy || level || lines || refsAmount || off
+				innerColor: '#E87100',
+				outerColor: '#E87100',
+				outerTopColor: '#EB4DBF',
+				outerBottomColor: '#28C4F4',
+			},
+			drawing: {
+				minDistance: -1,
+				maxDistance: -1,
+			},
+			notifications: {
+				status: 'all', // all || fav || off
+				interval: 30000,
+				duration: 7000,
+			},
+		};
 
 		const { newVersion, oldVersion } = event;
 		database = event.target.result;
@@ -2003,7 +2008,7 @@
 					return section;
 				}
 
-				function createNotificationsSection(notifications = {}) {
+				function createNotificationsSection(notifications) {
 					const section = createSection(
 						'Уведомления',
 						`Показ всплывающих уведомлений о том, что ваша точка была кем-то уничтожена.`
@@ -5372,11 +5377,6 @@
 							toast.showToast();
 						});
 					}
-				}
-
-				if (config.notifications == undefined) {
-					config.notifications = { status: 'all', interval: 30000, duration: 7000 };
-					database.transaction('config', 'readwrite').objectStore('config').put(config.notifications, 'notifications');
 				}
 
 				let notifsCount = 0;
