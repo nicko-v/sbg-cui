@@ -110,6 +110,10 @@
   --fa-url: url("../svg/solid/table-list.svg");
 }
 
+.fa-solid-terminal {
+  --fa-url: url("../svg/solid/terminal.svg");
+}
+
 .fa-solid-trash {
   --fa-url: url("../svg/solid/trash.svg");
 }
