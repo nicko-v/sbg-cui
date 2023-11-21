@@ -5012,7 +5012,10 @@
 							if (confirm('Подтвердите удаление истории действий за всё время.')) {
 								const logsStore = database.transaction('logs', 'readwrite').objectStore('logs');
 								const request = logsStore.clear();
-								request.addEventListener('success', () => { alert('История действий очищена.'); });
+								request.addEventListener('success', () => {
+									alert('История действий очищена.');
+									hidePopup();
+								});
 							}
 						};
 					}
