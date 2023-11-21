@@ -924,6 +924,16 @@ html[lang="ru"] .i-buttons {
 	color: var(--text);
 }
 
+.sbgcui_destroy_notif_toast {
+	background: var(--background-transp);
+	border: 1px solid var(--border-transp);
+	border-radius: 5px;
+	overflow-x: hidden;
+	padding: 4px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .sbgcui_button_reset {
 	background: none;
 	border: none;
