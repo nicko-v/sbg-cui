@@ -488,7 +488,7 @@
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
-		
+
 		const replacesShouldBe = 22;
 		let replacesMade = 0;
 
@@ -4193,7 +4193,7 @@
 				const pointsHit = map.getFeaturesAtPixel(playerPixel, {
 					hitTolerance,
 					layerFilter: layer => layer.get('name') == 'points',
-				});
+				}).filter(point => point.getId() != lastOpenedPoint.guid);
 
 				const pointsInRange = pointsHit.filter(isPointInRange);
 
@@ -4235,9 +4235,12 @@
 
 				const pointsInRange = getPointsInRange();
 
-				if (pointsInRange.every(point => shownPoints.has(point.getId()))) { shownPoints.clear(); }
-				if (pointsInRange.every(point => !shownPoints.has(point.getId()))) { shownPoints.clear(); }
-
+				if (
+					pointsInRange.every(point => shownPoints.has(point.getId())) ||
+					pointsInRange.every(point => !shownPoints.has(point.getId()))
+				) {
+					shownPoints.clear();
+				}
 				const nextPoint = pointsInRange.find(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
 
 				if (nextPoint == undefined) { return; }
