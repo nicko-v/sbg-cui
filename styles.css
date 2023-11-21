@@ -458,6 +458,8 @@ html[lang="ru"] .i-buttons {
 .notifs .popup-close,
 .profile .popup-close,
 .sbgcui_log-close,
+.sbgcui_log-buttons-console,
+.sbgcui_log-buttons-trash,
 #sbgcui_hide_viewer,
 #sbgcui_batch_remove,
 #inventory__close {
@@ -1813,7 +1815,8 @@ li[sbgcui-excluded-core]>span {
 	background-color: var(--broom);
 }
 
-.sbgcui_log-content {
+.sbgcui_log-content,
+.sbgcui_log-console {
 	overflow-y: auto;
 	padding-bottom: 65px;
 }
@@ -1883,6 +1886,24 @@ li[sbgcui-excluded-core]>span {
 	left: 50%;
 	position: absolute;
 	transform: translateX(-50%);
+}
+
+.sbgcui_log-buttons {
+	bottom: 80px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	position: absolute;
+	right: 15px;
+}
+
+.sbgcui_log-buttons > button {
+	font-size: 40px !important;
+}
+
+.sbgcui_log-header:has(input[data-totalEntries="0"]) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash,
+.sbgcui_log-console:not(.sbgcui_hidden) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash {
+	display: none;
 }
 
 .sbgcui_log:has(span[data-action="capture"][data-hidden]) .sbgcui_log-content-entry[data-action="capture"],

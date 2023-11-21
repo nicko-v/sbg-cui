@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.11
+// @version      1.14.12
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -25,6 +25,22 @@
 		for (let i = 0; i <= 100; i += 1) { window.navigator.geolocation.clearWatch(i); }
 	}
 
+	
+	const consoleLogsAndErrors = [];
+	const pushMessage = messages => {
+		consoleLogsAndErrors.push({ timestamp: Date.now(), messages });
+	};
+	const logDecorator = genuineFunction => {
+		return function (...args) {
+			pushMessage(args.map(arg => typeof arg == 'string' ? arg : arg.toString()));
+			return genuineFunction(...args);
+		};
+	};
+	console.log = logDecorator(console.log);
+	console.warn = logDecorator(console.warn);
+	console.error = logDecorator(console.error);
+	window.addEventListener('error', error => { pushMessage([error.toString()]); });
+
 
 	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
@@ -44,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.11';
+	const USERSCRIPT_VERSION = '1.14.12';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -4984,10 +5000,60 @@
 		/* Показ логов */
 		{
 			try {
+				function clearStorage() {
+					const date = datePicker.getAttribute('min');
+					const totalEntries = datePicker.dataset.totalentries;
+
+					if (totalEntries == 0) { alert('Записей не обнаружено.'); return; }
+
+					if (confirm(`Очистить всю историю действий? \nВы удалите ${totalEntries} записей с ${date}.`)) {
+						if (confirm('Подтвердите удаление истории действий за всё время.')) {
+							const logsStore = database.transaction('logs', 'readwrite').objectStore('logs');
+							const request = logsStore.clear();
+							request.addEventListener('success', () => { alert('История действий очищена.'); });
+						}
+					};
+				}
+
+				function showConsole() {
+					consoleLogsAndErrors.forEach(data => {
+						const entry = document.createElement('p');
+						const entryTime = document.createElement('span');
+						const entryDescr = document.createElement('div');
+	
+						entry.classList.add('sbgcui_log-content-entry');
+						entryTime.classList.add('sbgcui_log-content-entry-time');
+						entryDescr.classList.add('sbgcui_log-content-entry-description');
+
+						const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+						entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format);
+
+						entryDescr.innerHTML = data.messages.join('<br>');
+	
+						entry.append(entryTime, entryDescr);
+						consoleContent.prepend(entry);
+					});
+
+					[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
+					consoleContent.classList.remove('sbgcui_hidden');
+				}
+
+				function hideConsole() {
+					consoleContent.innerHTML = '';
+					[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
+					consoleContent.classList.add('sbgcui_hidden');
+				}
+
+				function toggleConsole() {
+					const isConsoleHidden = consoleContent.classList.contains('sbgcui_hidden');
+					isConsoleHidden ? showConsole() : hideConsole();
+				}
+
 				function hidePopup() {
 					popup.classList.add('sbgcui_hidden');
 					logContent.innerHTML = '';
 					log = undefined;
+					hideConsole();
 				}
 
 				function showPopup() {
@@ -5005,6 +5071,7 @@
 						datePicker.setAttribute('min', firstEntryDate);
 						datePicker.setAttribute('max', latestEntryDate);
 						datePicker.setAttribute('value', latestEntryDate);
+						datePicker.setAttribute('data-totalEntries', timestamps.length);
 						datePicker.value = latestEntryDate;
 
 						datePicker.dispatchEvent(new Event('change'));
@@ -5148,7 +5215,7 @@
 												entryDescr.appendChild(document.createElement('br'));
 												entryDescr.append(linesString, (regions > 0) ? `, ${regionsString.toLowerCase()}` : '', (xp != undefined) ? `. XP: ${xp}` : '');
 											}
-											
+
 
 											break;
 										}
@@ -5187,9 +5254,13 @@
 
 				const popup = await fetchHTMLasset('log');
 				const closeButton = popup.querySelector('.sbgcui_log-close');
+				const clearButton = popup.querySelector('.sbgcui_log-buttons-trash');
+				const consoleButton = popup.querySelector('.sbgcui_log-buttons-console');
 				const datePicker = popup.querySelector('input[type="date"]');
 				const logContent = popup.querySelector('.sbgcui_log-content');
+				const consoleContent = popup.querySelector('.sbgcui_log-console');
 				const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
+				const header = popup.querySelector('.sbgcui_log-header');
 				const jumpToButton = document.querySelector('.info > .sbgcui_jumpToButton');
 				const toolbarButton = document.createElement('button');
 				let log;
@@ -5205,6 +5276,8 @@
 
 				toolbarButton.addEventListener('click', showPopup);
 				closeButton.addEventListener('click', hidePopup);
+				clearButton.addEventListener('click', clearStorage);
+				consoleButton.addEventListener('click', toggleConsole);
 				jumpToButton.addEventListener('click', hidePopup);
 				tagsWrapper.addEventListener('click', toggleTag);
 				logContent.addEventListener('click', showPointInfo);
