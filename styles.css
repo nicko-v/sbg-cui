@@ -1821,14 +1821,22 @@ li[sbgcui-excluded-core]>span {
 	padding-bottom: 65px;
 }
 
-.sbgcui_log-content:empty::before {
+.sbgcui_log-content:empty::before,
+.sbgcui_log-console:empty::before {
 	color: var(--text-disabled);
-	content: "Действий не найдено. \AВыберите другую дату.";
 	display: block;
 	font-size: 1.3em;
 	margin-top: 50%;
 	text-align: center;
 	white-space: pre-wrap;
+}
+
+.sbgcui_log-content:empty::before {
+	content: "Действий не найдено. \AВыберите другую дату.";
+}
+
+.sbgcui_log-console:empty::before {
+	content: "Здесь будут выводиться ошибки и сообщения, отправляемые в консоль.";
 }
 
 .sbgcui_log-content-entry {
@@ -1892,7 +1900,7 @@ li[sbgcui-excluded-core]>span {
 	bottom: 80px;
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: 15px;
 	position: absolute;
 	right: 15px;
 }
@@ -1904,6 +1912,10 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_log-header:has(input[data-totalEntries="0"]) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash,
 .sbgcui_log-console:not(.sbgcui_hidden) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash {
 	display: none;
+}
+
+.sbgcui_log-console:not(.sbgcui_hidden) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-console {
+	color: var(--selection);
 }
 
 .sbgcui_log:has(span[data-action="capture"][data-hidden]) .sbgcui_log-content-entry[data-action="capture"],

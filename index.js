@@ -32,14 +32,14 @@
 	};
 	const logDecorator = genuineFunction => {
 		return function (...args) {
-			pushMessage(args.map(arg => typeof arg == 'string' ? arg : arg.toString()));
+			pushMessage(args.map(arg => arg?.message ? `${arg.message}${arg.stack ? '<br>' + arg.stack : ''}` : arg.toString()));
 			return genuineFunction(...args);
 		};
 	};
 	console.log = logDecorator(console.log);
 	console.warn = logDecorator(console.warn);
 	console.error = logDecorator(console.error);
-	window.addEventListener('error', error => { pushMessage([error.toString()]); });
+	window.addEventListener('error', error => { pushMessage([`${error.message}${error.stack ? '<br>' + error.stack : ''}`]); });
 
 
 	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
