@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.12
+// @version      1.14.13
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.12';
+	const USERSCRIPT_VERSION = '1.14.13';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -143,6 +143,10 @@
 				drawing: {
 					minDistance: -1,
 					maxDistance: -1,
+				},
+				notifications: {
+					status: 'off', // all || fav || off
+					interval: 30000,
 				},
 			};
 
@@ -873,6 +877,7 @@
 
 			let lastOpenedPoint = {};
 			let discoverModifier;
+			let latestNotifId;
 			let uniques = { c: new Set(), v: new Set() };
 			let inview = {};
 			let inviewRegionsVertexes = [];
@@ -1519,6 +1524,29 @@
 					return wrapper;
 				}
 
+				function createRangeInput(type, name, min, max, step, value, text, onChange) {
+					let wrapper = document.createElement('div');
+					let label = document.createElement('label');
+					let input = document.createElement('input');
+
+					wrapper.classList.add('sbgcui_settings-range_input_wrp');
+
+					input.type = type;
+					input.name = name;
+					input.min = min;
+					input.max = max;
+					input.step = step;
+					input.value = value;
+
+					label.innerText = text;
+
+					if (onChange != undefined) { input.addEventListener('input', onChange); }
+
+					wrapper.append(label, input);
+
+					return wrapper;
+				}
+
 				function createColorPicker(name, value) {
 					let colorPicker = document.createElement('input');
 
@@ -1722,41 +1750,20 @@
 						html.style.setProperty(`--sbgcui-${filter}`, `${value}${units}`);
 					}
 
-					function createInput(type, name, min, max, step, value, text) {
-						let wrapper = document.createElement('div');
-						let label = document.createElement('label');
-						let input = document.createElement('input');
-
-						wrapper.classList.add('sbgcui_settings-mapfilters_input_wrp');
-
-						input.type = type;
-						input.name = name;
-						input.min = min;
-						input.max = max;
-						input.step = step;
-						input.value = value;
-
-						label.innerText = text;
-
-						input.addEventListener('input', event => { setCssVar(name, event.target.value); });
-
-						wrapper.append(label, input);
-
-						return wrapper;
-					}
-
 					let section = createSection(
 						'Цветовая схема',
 						'Настройте цвет своей команды и оттенок карты.'
 					);
 					let subSection = document.createElement('section');
 
-					let invert = createInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия');
-					let hueRotate = createInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность');
-					let brightness = createInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость');
-					let grayscale = createInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого');
-					let sepia = createInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия');
-					let blur = createInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие');
+					let onChange = event => { setCssVar(event.target.name, event.target.value); };
+
+					let invert = createRangeInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия', onChange);
+					let hueRotate = createRangeInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность', onChange);
+					let brightness = createRangeInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость', onChange);
+					let grayscale = createRangeInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого', onChange);
+					let sepia = createRangeInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия', onChange);
+					let blur = createRangeInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие', onChange);
 					let branding = createDropdown('Цвет вашей команды:', [['Стандартный', 'default'], ['Собственный', 'custom']], 'mapFilters_branding', mapFilters.branding);
 					let brandingColorPicker = createColorPicker('mapFilters_brandingColor', mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor));
 
@@ -1996,6 +2003,36 @@
 					return section;
 				}
 
+				function createNotificationsSection(notifications) {
+					const section = createSection(
+						'Уведомления',
+						`Показ всплывающих уведомлений о том, что ваша точка была кем-то уничтожена.`
+					);
+					const subSection = document.createElement('section');
+					const statusDropdown = createDropdown(
+						'Статус уведомлений:',
+						[
+							['Все точки', 'all'],
+							['Избранные', 'fav'],
+							['Отключены', 'off'],
+						],
+						'notifications_status',
+						notifications.status
+					);
+					const onIntervalChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value / 1000} сек.`); };
+					const onDurationChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`); };
+					const intervalInput = createRangeInput('range', 'notifications_interval', 5000, 100000, 1000, notifications.interval, 'Интервал проверки', onIntervalChange);
+					const durationInput = createRangeInput('range', 'notifications_duration', -1, 60000, 1000, notifications.duration, 'Время показа', onDurationChange);
+
+					subSection.classList.add('sbgcui_settings-subsection');
+
+					subSection.append(statusDropdown, intervalInput, durationInput);
+
+					section.appendChild(subSection);
+
+					return section;
+				}
+
 
 				let form = document.createElement('form');
 				form.classList.add('sbgcui_settings', 'sbgcui_hidden');
@@ -2035,7 +2072,8 @@
 					createVibrationSection(config.vibration),
 					createUISection(config.ui),
 					createPointHighlightingSection(config.pointHighlighting),
-					createDrawingSection(config.drawing)
+					createDrawingSection(config.drawing),
+					createNotificationsSection(config.notifications)
 				];
 
 				sections.forEach(e => {
@@ -2059,7 +2097,7 @@
 							let path = key.split('_');
 							if (path[0] == 'maxAmountInBag') {
 								config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-							} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting|drawing/)) {
+							} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting|drawing|notifications/)) {
 								let value = formEntries[key];
 								config[path[0]][path[1]] = isNaN(+value) ? value : +value;
 							}
@@ -4212,7 +4250,7 @@
 					const pointsHit = map.getFeaturesAtPixel(playerPixel, {
 						hitTolerance,
 						layerFilter: layer => layer.get('name') == 'points',
-					}).filter(point => point.getId() != lastOpenedPoint.guid);
+					});
 
 					const pointsInRange = pointsHit.filter(isPointInRange);
 
@@ -4252,7 +4290,8 @@
 					if (maxX - minX < 50) { return; }
 
 
-					const pointsInRange = getPointsInRange();
+					let pointsInRange = getPointsInRange();
+					shownPoints.add(lastOpenedPoint.guid);
 
 					if (
 						pointsInRange.every(point => shownPoints.has(point.getId())) ||
@@ -5295,6 +5334,56 @@
 				} catch (error) {
 					console.log('SBG CUI: Ошибка (логи).', error);
 				}
+			}
+
+
+			/* Уведомления о сносе точек */
+			{
+				async function getNotifs(latest) {
+					return fetch(`/api/notifs${latest == undefined ? '' : '?latest=' + latest}`, {
+						headers: {
+							authorization: `Bearer ${player.auth}`,
+							'accept-language': i18next.language
+						},
+						method: 'GET'
+					}).then(r => r.json()).then(r => r.count ?? r.list);
+				}
+
+				async function checkAndShow() {
+					if (config.notifications.status == 'off') { return; }
+					if (config.notifications.status == 'fav' && Object.keys(favorites).length == 0) { return; }
+
+					notifsCount = await getNotifs(latestNotifId);
+
+					if (notifsCount > 0) {
+						const notifs = await getNotifs();
+
+						latestNotifId = notifs[0].id;
+
+						notifs.slice(0, notifsCount).reverse().forEach(notif => {
+							if (config.notifications.status == 'fav' && !(notif.g in favorites)) { return; }
+
+							const message = `
+								<span style="color: var(--team-${notif.ta})">${notif.na}</span>
+								<span>${notif.t}</span>
+							`;
+							const toast = createToast(message, 'bottom left', config.notifications.duration, 'sbgcui_destroy_notif_toast');
+
+							toast.showToast();
+						});
+					}
+				}
+
+				if (config.notifications == undefined) {
+					config.notifications = { status: 'all', interval: 30000, duration: 7000 };
+					database.transaction('config', 'readwrite').objectStore('config').put(config.notifications, 'notifications');
+				}
+
+				let notifsCount = 0;
+				const notifs = await getNotifs();
+				latestNotifId = notifs[0].id;
+
+				setInterval(checkAndShow, config.notifications.interval);
 			}
 
 

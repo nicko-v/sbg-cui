@@ -928,8 +928,25 @@ html[lang="ru"] .i-buttons {
 	background: var(--background-transp);
 	border: 1px solid var(--border-transp);
 	border-radius: 5px;
-	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
+	font-size: 0.7em;
+	max-width: 30%;
 	padding: 4px;
+	text-align: center;
+	width: 30%;
+}
+
+.sbgcui_destroy_notif_toast:nth-child(2) {
+	translate: 0 10px;
+}
+
+.sbgcui_destroy_notif_toast:nth-child(3) {
+	translate: 0 20px;
+}
+
+.sbgcui_destroy_notif_toast>span:last-child {
+	overflow-x: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -1141,6 +1158,19 @@ html[lang="ru"] .i-buttons {
 	margin-top: 10px;
 }
 
+input[type="range"][name="notifications_interval"],
+input[type="range"][name="notifications_duration"] {
+	position: relative;
+}
+
+input[type="range"][name="notifications_interval"]::after,
+input[type="range"][name="notifications_duration"]::after {
+	content: attr(label);
+	position: absolute;
+	right: 0;
+	top: -100%;
+}
+
 .sbgcui_settings-maxamounts {
 	padding-left: 15px;
 	margin-top: 5px;
@@ -1170,7 +1200,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_settings-input_wrp,
-.sbgcui_settings-mapfilters_input_wrp {
+.sbgcui_settings-range_input_wrp {
 	font-size: 0.8em;
 	display: flex;
 	margin-top: 10px;
@@ -1218,15 +1248,15 @@ html[lang="ru"] .i-buttons {
 	margin-top: 10px;
 }
 
-.sbgcui_settings-mapfilters_input_wrp {
+.sbgcui_settings-range_input_wrp {
 	justify-content: space-between;
 }
 
-.sbgcui_settings-mapfilters_input_wrp>label {
+.sbgcui_settings-range_input_wrp>label {
 	word-break: break-all;
 }
 
-.sbgcui_settings-mapfilters_input_wrp>input {
+.sbgcui_settings-range_input_wrp>input {
 	flex-basis: 60%;
 	flex-shrink: 0;
 }
@@ -1915,16 +1945,16 @@ li[sbgcui-excluded-core]>span {
 	right: 15px;
 }
 
-.sbgcui_log-buttons > button {
+.sbgcui_log-buttons>button {
 	font-size: 40px !important;
 }
 
-.sbgcui_log-header:has(input[data-totalEntries="0"]) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash,
-.sbgcui_log-console:not(.sbgcui_hidden) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-trash {
+.sbgcui_log-header:has(input[data-totalEntries="0"])~.sbgcui_log-buttons>.sbgcui_log-buttons-trash,
+.sbgcui_log-console:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-trash {
 	display: none;
 }
 
-.sbgcui_log-console:not(.sbgcui_hidden) ~ .sbgcui_log-buttons > .sbgcui_log-buttons-console {
+.sbgcui_log-console:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-console {
 	color: var(--selection);
 }
 
