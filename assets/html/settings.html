@@ -1,0 +1,400 @@
+<form class="sbgcui_settings sbgcui_hidden">
+  <span class="sbgcui_settings-version"></span>
+  <h3 class="sbgcui_settings-header">Настройки</h3>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Автоудаление</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Когда в инвентаре останется меньше <span id="sbgcui_min_free_space"></span> мест, будут удалены предметы, превышающие указанное количество.
+      <br>
+      Значение "-1" предотвращает удаление.
+    </h6>
+    <button id="sbgcui_forceclear">Очистить сейчас</button>
+    <section class="sbgcui_settings-subsection">
+      <h4 class="sbgcui_settings-title">Ядра</h4>
+      <div class="sbgcui_settings-maxamounts">
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-1);">L1:</label>
+          <input name="maxAmountInBag_cores_1" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-2);">L2:</label>
+          <input name="maxAmountInBag_cores_2" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-3);">L3:</label>
+          <input name="maxAmountInBag_cores_3" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-4);">L4:</label>
+          <input name="maxAmountInBag_cores_4" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-5);">L5:</label>
+          <input name="maxAmountInBag_cores_5" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-6);">L6:</label>
+          <input name="maxAmountInBag_cores_6" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-7);">L7:</label>
+          <input name="maxAmountInBag_cores_7" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-8);">L8:</label>
+          <input name="maxAmountInBag_cores_8" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-9);">L9:</label>
+          <input name="maxAmountInBag_cores_9" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-10);">L10:</label>
+          <input name="maxAmountInBag_cores_10" type="number" min="-1">
+        </div>
+      </div>
+    </section>
+    <section class="sbgcui_settings-subsection">
+      <h4 class="sbgcui_settings-title">Катализаторы</h4>
+      <div class="sbgcui_settings-maxamounts">
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-1);">L1:</label>
+          <input name="maxAmountInBag_catalysers_1" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-2);">L2:</label>
+          <input name="maxAmountInBag_catalysers_2" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-3);">L3:</label>
+          <input name="maxAmountInBag_catalysers_3" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-4);">L4:</label>
+          <input name="maxAmountInBag_catalysers_4" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-5);">L5:</label>
+          <input name="maxAmountInBag_catalysers_5" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-6);">L6:</label>
+          <input name="maxAmountInBag_catalysers_6" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-7);">L7:</label>
+          <input name="maxAmountInBag_catalysers_7" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-8);">L8:</label>
+          <input name="maxAmountInBag_catalysers_8" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-9);">L9:</label>
+          <input name="maxAmountInBag_catalysers_9" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--level-10);">L10:</label>
+          <input name="maxAmountInBag_catalysers_10" type="number" min="-1">
+        </div>
+      </div>
+    </section>
+    <section class="sbgcui_settings-subsection">
+      <h4 class="sbgcui_settings-title">Сноски</h4>
+      <h6 class="sbgcui_settings-subtitle">
+        Сноски от избранных точек удаляться не будут.
+        <br>
+        Для добавления в избранное нажмите звезду на карточке точки.
+      </h6>
+      <div class="sbgcui_settings-maxamounts">
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: #666;">Свои:</label>
+          <input name="maxAmountInBag_references_allied" type="number" min="-1">
+        </div>
+        <div class="sbgcui_settings-amount_input_wrp">
+          <label style="color: var(--sbgcui-branding-color);">Чужие:</label>
+          <input name="maxAmountInBag_references_hostile" type="number" min="-1">
+        </div>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Автовыбор</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Можно автоматически выбирать самый мощный катализатор при атаке,
+      самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде.
+      <br>
+      Вы можете исключить конкретное ядро из автовыбора:
+      нажмите на него в карусели и удерживайте 1 секунду до появления уведомления.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Катализатор при атаке:</h5>
+        <select name="autoSelect_attack">
+          <option value="max">Самый мощный</option>
+          <option value="latest">Последний использованный</option>
+        </select>
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Ядро при деплое:</h5>
+        <select name="autoSelect_deploy">
+          <option value="min">Наименьшее</option>
+          <option value="max">Наибольшее</option>
+          <option value="off">Вручную</option>
+        </select>
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Ядро при апгрейде:</h5>
+        <select name="autoSelect_upgrade">
+          <option value="min">Наименьшее</option>
+          <option value="max">Наибольшее</option>
+          <option value="off">Вручную</option>
+        </select>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Цветовая схема</summary>
+    <h6 class="sbgcui_settings-subtitle">Настройте цвет своей команды и оттенок карты.</h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Цвет вашей команды:</h5>
+        <select name="mapFilters_branding">
+          <option value="default">Стандартный</option>
+          <option value="custom">Собственный</option>
+        </select>
+        <input type="color" name="mapFilters_brandingColor">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Инверсия</label>
+        <input type="range" name="mapFilters_invert" min="0" max="1" step="0.01" data-role="colorfilter">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Цветность</label>
+        <input type="range" name="mapFilters_hueRotate" min="0" max="360" step="1" data-role="colorfilter">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Яркость</label>
+        <input type="range" name="mapFilters_brightness" min="0" max="5" step="0.01" data-role="colorfilter">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Оттенок серого</label>
+        <input type="range" name="mapFilters_grayscale" min="0" max="1" step="0.01" data-role="colorfilter">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Сепия</label>
+        <input type="range" name="mapFilters_sepia" min="0" max="1" step="0.01" data-role="colorfilter">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Размытие</label>
+        <input type="range" name="mapFilters_blur" min="0" max="4" step="0.1" data-role="colorfilter">
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Тонирование</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Интерфейс браузера будет окрашиваться в зависимости от того, что происходит на экране.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-input_wrp">
+        <input name="tinting_map" type="hidden" value="0">
+        <input id="tinting_map" name="tinting_map" type="checkbox" value="1">
+        <label for="tinting_map">При просмотре карты</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="tinting_profile" type="hidden" value="0">
+        <input id="tinting_profile" name="tinting_profile" type="checkbox" value="1">
+        <label for="tinting_profile">При просмотре профиля</label>
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">При просмотре точки:</h5>
+        <select name="tinting_point">
+          <option value="level">Цвет уровня</option>
+          <option value="team">Цвет команды</option>
+          <option value="off">Нет</option>
+        </select>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Вибрация</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Устройство будет откликаться на ваши действия. Может потребоваться выдача соответствующего разрешения в браузере
+      или системе.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-input_wrp">
+        <input name="vibration_buttons" type="hidden" value="0">
+        <input id="vibration_buttons" name="vibration_buttons" type="checkbox" value="1">
+        <label for="vibration_buttons">При нажатии кнопок</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="vibration_notifications" type="hidden" value="0">
+        <input id="vibration_notifications" name="vibration_notifications" type="checkbox" value="1">
+        <label for="vibration_notifications">При уведомлениях</label>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Интерфейс</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Некоторые аспекты дизайна можно отключить или изменить для большего удобства.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_doubleClickZoom" type="hidden" value="0">
+        <input id="ui_doubleClickZoom" name="ui_doubleClickZoom" type="checkbox" value="1">
+        <label for="ui_doubleClickZoom">Зум карты по двойному нажатию</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_pointBgImage" type="hidden" value="0">
+        <input id="ui_pointBgImage" name="ui_pointBgImage" type="checkbox" value="1">
+        <label for="ui_pointBgImage">Фото точки вместо фона</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_pointBgImageBlur" type="hidden" value="0">
+        <input id="ui_pointBgImageBlur" name="ui_pointBgImageBlur" type="checkbox" value="1">
+        <label for="ui_pointBgImageBlur">Размытие фонового фото</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_pointBtnsRtl" type="hidden" value="0">
+        <input id="ui_pointBtnsRtl" name="ui_pointBtnsRtl" type="checkbox" value="1">
+        <label for="ui_pointBtnsRtl">Отразить кнопки в карточке точки</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_pointDischargeTimeout" type="hidden" value="0">
+        <input id="ui_pointDischargeTimeout" name="ui_pointDischargeTimeout" type="checkbox" value="1">
+        <label for="ui_pointDischargeTimeout">Показывать примерное время разрядки точки</label>
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="ui_speedometer" type="hidden" value="0">
+        <input id="ui_speedometer" name="ui_speedometer" type="checkbox" value="1">
+        <label for="ui_speedometer">Показывать скорость движения</label>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Подсветка точек</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом.
+      <br>
+      Выберите, что будет обозначать каждый из них.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Внутренний маркер (точка):</h5>
+        <select name="pointHighlighting_inner">
+          <option value="off">Нет</option>
+          <option value="highlevel">Уровень <span data-role="highlevel_marker"></span>+</option>
+          <option value="fav">Избранная</option>
+          <option value="ref">Имеется реф</option>
+          <option value="uniqc">Не захвачена</option>
+          <option value="uniqv">Не исследована</option>
+          <option value="cores">Полностью проставлена</option>
+        </select>
+        <input type="color" name="pointHighlighting_innerColor">
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Наружный маркер (кольцо):</h5>
+        <select name="pointHighlighting_outer">
+          <option value="off">Нет</option>
+          <option value="highlevel">Уровень <span data-role="highlevel_marker"></span>+</option>
+          <option value="fav">Избранная</option>
+          <option value="ref">Имеется реф</option>
+          <option value="uniqc">Не захвачена</option>
+          <option value="uniqv">Не исследована</option>
+          <option value="cores">Полностью проставлена</option>
+        </select>
+        <input type="color" name="pointHighlighting_outerColor">
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Наружный маркер (верхнее полукольцо):</h5>
+        <select name="pointHighlighting_outerTop">
+          <option value="off">Нет</option>
+          <option value="highlevel">Уровень <span data-role="highlevel_marker"></span>+</option>
+          <option value="fav">Избранная</option>
+          <option value="ref">Имеется реф</option>
+          <option value="uniqc">Не захвачена</option>
+          <option value="uniqv">Не исследована</option>
+          <option value="cores">Полностью проставлена</option>
+        </select>
+        <input type="color" name="pointHighlighting_outerTopColor">
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Наружный маркер (нижнее полукольцо):</h5>
+        <select name="pointHighlighting_outerBottom">
+          <option value="off">Нет</option>
+          <option value="highlevel">Уровень <span data-role="highlevel_marker"></span>+</option>
+          <option value="fav">Избранная</option>
+          <option value="ref">Имеется реф</option>
+          <option value="uniqc">Не захвачена</option>
+          <option value="uniqv">Не исследована</option>
+          <option value="cores">Полностью проставлена</option>
+        </select>
+        <input type="color" name="pointHighlighting_outerBottomColor">
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Текстовый маркер:</h5>
+        <select name="pointHighlighting_text">
+          <option value="off">Нет</option>
+          <option value="level">Уровень</option>
+          <option value="energy">Энергия</option>
+          <option value="lines">Линии вх. + исх.</option>
+          <option value="refsAmount">Количество рефов</option>
+        </select>
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Рисование</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Настройки, касающиеся рисования линий. Значение "-1" в текстовом поле отключает ограничение.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-textfield_wrapper">
+        <h5 class="sbgcui_settings-textfield-title">Скрывать рефы ближе, чем (м):</h5>
+        <input name="drawing_minDistance" type="number" min="-1">
+      </div>
+      <div class="sbgcui_settings-textfield_wrapper">
+        <h5 class="sbgcui_settings-textfield-title">Скрывать рефы дальше, чем (м):</h5>
+        <input name="drawing_maxDistance" type="number" min="-1">
+      </div>
+    </section>
+  </details>
+  <details class="sbgcui_settings-section">
+    <summary class="sbgcui_settings-title">Уведомления</summary>
+    <h6 class="sbgcui_settings-subtitle">
+      Показ всплывающих уведомлений о том, что ваша точка была кем-то уничтожена.
+    </h6>
+    <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Статус уведомлений:</h5>
+        <select name="notifications_status">
+          <option value="all">Все точки</option>
+          <option value="fav">Избранные</option>
+          <option value="off">Отключены</option>
+        </select>
+      </div>
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">При нажатии на уведомление:</h5>
+        <select name="notifications_onClick">
+          <option value="close">Закрыть</option>
+          <option value="jumpto">Место на карте</option>
+        </select>
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Интервал проверки</label>
+        <input type="range" name="notifications_interval" min="5000" max="100000" step="1000">
+      </div>
+      <div class="sbgcui_settings-range_input_wrp">
+        <label>Время показа</label>
+        <input type="range" name="notifications_duration" min="-1" max="60000" step="1000">
+      </div>
+    </section>
+  </details>
+  <div class="sbgcui_settings-buttons_wrp">
+    <button>Сохранить</button>
+    <button id="sbgcui_settings-close">Закрыть</button>
+  </div>
+</form>
