@@ -186,7 +186,7 @@
 			},
 			notifications: {
 				status: 'all', // all || fav || off
-				onClick: 'close', // close || jumpto
+				onClick: 'jumpto', // close || jumpto
 				interval: 30000,
 				duration: 7000,
 			},
@@ -2032,7 +2032,7 @@
 							['Место на карте', 'jumpto'],
 						],
 						'notifications_onClick',
-						notifications.onClick || 'close'
+						notifications.onClick || 'jumpto'
 					);
 					const onIntervalChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value / 1000} сек.`); };
 					const onDurationChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`); };
