@@ -4706,6 +4706,12 @@
 					view.adjustCenter([0, VIEW_PADDING / -2]);
 				}
 
+				const jumpToButton = document.createElement('button');
+
+				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
+				jumpToButton.addEventListener('click', jumpTo);
+				pointPopup.appendChild(jumpToButton);
+
 				try {
 					if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
 
@@ -4794,18 +4800,13 @@
 						}
 					});
 
-					pointPopupCloseButton.addEventListener('click', closeNavPopup)
+					pointPopupCloseButton.addEventListener('click', closeNavPopup);
+					jumpToButton.addEventListener('click', closeNavPopup);
 
 					document.body.appendChild(navPopup);
 				} catch (error) {
 					console.log('SBG CUI: Ошибка (меню навигации к точке).', error);
 				}
-
-				const jumpToButton = document.createElement('button');
-
-				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', jumpTo);
-				pointPopup.appendChild(jumpToButton);
 			}
 
 

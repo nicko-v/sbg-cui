@@ -1696,7 +1696,7 @@ li[sbgcui-excluded-core]>span {
 	top: 50%;
 	transform: translate(-50%, -50%);
 	width: 90%;
-	z-index: 3;
+	z-index: 5;
 }
 
 .sbgcui_navigate>hgroup {
