@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.14
+// @version      1.14.15
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.14';
+	const USERSCRIPT_VERSION = '1.14.15';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -186,6 +186,7 @@
 			},
 			notifications: {
 				status: 'all', // all || fav || off
+				onClick: 'close', // close || jumpto
 				interval: 30000,
 				duration: 7000,
 			},
@@ -2024,6 +2025,15 @@
 						'notifications_status',
 						notifications.status
 					);
+					const clickDropdown = createDropdown(
+						'При нажатии на уведомление:',
+						[
+							['Закрыть', 'close'],
+							['Место на карте', 'jumpto'],
+						],
+						'notifications_onClick',
+						notifications.onClick || 'close'
+					);
 					const onIntervalChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value / 1000} сек.`); };
 					const onDurationChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`); };
 					const intervalInput = createRangeInput('range', 'notifications_interval', 5000, 100000, 1000, notifications.interval, 'Интервал проверки', onIntervalChange);
@@ -2031,7 +2041,7 @@
 
 					subSection.classList.add('sbgcui_settings-subsection');
 
-					subSection.append(statusDropdown, intervalInput, durationInput);
+					subSection.append(statusDropdown, clickDropdown, intervalInput, durationInput);
 
 					section.appendChild(subSection);
 
@@ -2333,6 +2343,13 @@
 				const timestamp = Date.now();
 
 				database.transaction('logs', 'readwrite').objectStore('logs').put({ timestamp, ...action });
+			}
+
+			function jumpTo(coords) {
+				if (isFollow) { click(toggleFollow); }
+				document.querySelectorAll('.popup').forEach(popup => { popup.classList.add('hidden'); });
+				view.setCenter(ol.proj.fromLonLat(coords));
+				view.adjustCenter([0, VIEW_PADDING / -2]);
 			}
 
 
@@ -4699,17 +4716,10 @@
 
 			/* Навигация и переход к точке */
 			{
-				function jumpTo() {
-					if (isFollow) { click(toggleFollow); }
-					pointPopup.classList.add('hidden');
-					view.setCenter(ol.proj.fromLonLat(lastOpenedPoint.coords));
-					view.adjustCenter([0, VIEW_PADDING / -2]);
-				}
-
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', jumpTo);
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
@@ -5356,8 +5366,9 @@
 				}
 
 				async function checkAndShow() {
-					if (config.notifications.status == 'off') { return; }
-					if (config.notifications.status == 'fav' && Object.keys(favorites).length == 0) { return; }
+					const { status, duration, onClick } = config.notifications;
+					if (status == 'off') { return; }
+					if (status == 'fav' && Object.keys(favorites).length == 0) { return; }
 
 					notifsCount = await getNotifs(latestNotifId);
 
@@ -5367,13 +5378,16 @@
 						latestNotifId = notifs[0].id;
 
 						notifs.slice(0, notifsCount).reverse().forEach(notif => {
-							if (config.notifications.status == 'fav' && !(notif.g in favorites)) { return; }
+							const { g: guid, na: attackerName, ta: attackerTeam, c: coords, t: pointTitle } = notif;
+
+							if (status == 'fav' && !(guid in favorites)) { return; }
 
 							const message = `
-								<span style="color: var(--team-${notif.ta})">${notif.na}</span>
-								<span>${notif.t}</span>
+								<span style="color: var(--team-${attackerTeam})">${attackerName}</span>
+								<span>${pointTitle}</span>
 							`;
-							const toast = createToast(message, 'bottom left', config.notifications.duration, 'sbgcui_destroy_notif_toast');
+							const toast = createToast(message, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
+							if (onClick == 'jumpto') { toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); }; }
 
 							toast.showToast();
 						});
