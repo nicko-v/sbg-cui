@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.15
+// @version      1.14.16
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.15';
+	const USERSCRIPT_VERSION = '1.14.16';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -78,21 +78,30 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 5);
+	const openRequest = indexedDB.open('CUI', 6);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
 			database.createObjectStore('config');
+			database.createObjectStore('logs', { keyPath: 'timestamp' });
 			database.createObjectStore('state');
 			database.createObjectStore('stats', { keyPath: 'name' });
+			database.createObjectStore('tiles');
 			database.createObjectStore('favorites', { keyPath: 'guid' });
 
 			const transaction = event.target.transaction;
 			const configStore = transaction.objectStore('config');
+			const logsStore = transaction.objectStore('logs');
 			const stateStore = transaction.objectStore('state');
 
 			for (let key in defaultConfig) { configStore.add(defaultConfig[key], key); }
 
+			logsStore.createIndex('action_type', 'type');
+
+			const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
+			const baselayer = `${base}_${theme}`;
+
+			stateStore.add(baselayer, 'baselayer');
 			stateStore.add(new Set(), 'excludedCores');
 			stateStore.add(true, 'isMainToolbarOpened');
 			stateStore.add(false, 'isRotationLocked');
@@ -124,6 +133,24 @@
 					const configStore = event.target.transaction.objectStore('config');
 					configStore.put(defaultConfig.notifications, 'notifications');
 				},
+				6: () => {
+					const configStore = event.target.transaction.objectStore('config');
+					const request = configStore.get('maxAmountInBag');
+
+					request.addEventListener('success', event => {
+						const maxAmountInBag = event.target.result;
+						['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'].forEach((romanLevel, index) => {
+							const arabicLevel = index + 1;
+
+							maxAmountInBag.catalysers[arabicLevel] = maxAmountInBag.catalysers[romanLevel];
+							maxAmountInBag.cores[arabicLevel] = maxAmountInBag.cores[romanLevel];
+							delete maxAmountInBag.catalysers[romanLevel];
+							delete maxAmountInBag.cores[romanLevel];
+						});
+
+						configStore.put(maxAmountInBag, 'maxAmountInBag');
+					});
+				},
 			};
 
 			for (let v in updateToVersion) {
@@ -133,8 +160,8 @@
 
 		const defaultConfig = {
 			maxAmountInBag: {
-				cores: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
-				catalysers: { I: -1, II: -1, III: -1, IV: -1, V: -1, VI: -1, VII: -1, VIII: -1, IX: -1, X: -1 },
+				cores: { 1: -1, 2: -1, 3: -1, 4: -1, 5: -1, 6: -1, 7: -1, 8: -1, 9: -1, 10: -1 },
+				catalysers: { 1: -1, 2: -1, 3: -1, 4: -1, 5: -1, 6: -1, 7: -1, 8: -1, 9: -1, 10: -1 },
 				references: { allied: -1, hostile: -1 },
 			},
 			autoSelect: {
@@ -195,8 +222,7 @@
 		const { newVersion, oldVersion } = event;
 		database = event.target.result;
 
-		if (oldVersion == 0) { initializeDB(); }
-		updateDB();
+		if (oldVersion == 0) { initializeDB(); } else { updateDB(); }
 	});
 	openRequest.addEventListener('success', event => {
 		function getData(event) {
@@ -835,42 +861,43 @@
 			window.fetch = fetchDecorator(window.fetch);
 			window.Toastify = toastifyDecorator(window.Toastify);
 
-			let html = document.documentElement;
-			let attackButton = document.querySelector('#attack-menu');
-			let attackSlider = document.querySelector('.attack-slider-wrp');
-			let blContainer = document.querySelector('.bottom-container');
-			let drawSlider = document.querySelector('.draw-slider-wrp');
-			let deploySlider = document.querySelector('.deploy-slider-wrp');
-			let catalysersList = document.querySelector('#catalysers-list');
-			let coresList = document.querySelector('#cores-list');
-			let refsList = document.querySelector('#refs-list');
-			let discoverButton = document.querySelector('#discover');
-			let inventoryButton = document.querySelector('#ops');
-			let invCloseButton = document.querySelector('#inventory__close');
-			let inventoryContent = document.querySelector('.inventory__content');
-			let inventoryPopup = document.querySelector('.inventory.popup');
-			let invTotalSpan = document.querySelector('#self-info__inv');
-			let pointCores = document.querySelector('.i-stat__cores');
-			let pointImage = document.querySelector('#i-image');
-			let pointImageBox = document.querySelector('.i-image-box');
-			let pointEnergyValue = document.createElement('span');
-			let pointLevelSpan = document.querySelector('#i-level');
-			let pointOwnerSpan = document.querySelector('#i-stat__owner');
-			let pointTitleSpan = document.querySelector('#i-title');
-			let pointPopup = document.querySelector('.info.popup');
-			let pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
-			let profileNameSpan = document.querySelector('#pr-name');
-			let profilePopup = document.querySelector('.profile.popup');
-			let profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
-			let regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
-			let selfExpSpan = document.querySelector('#self-info__exp');
-			let selfLvlSpan = document.querySelector('#self-info__explv');
-			let selfNameSpan = document.querySelector('#self-info__name');
-			let tlContainer = document.querySelector('.topleft-container')
-			let toggleFollow = document.querySelector('#toggle-follow');
-			let viewportMeta = document.querySelector('meta[name="viewport"]');
-			let xpDiffSpan = document.querySelector('.xp-diff');
-			let zoomContainer = document.querySelector('.ol-zoom');
+			const html = document.documentElement;
+			const attackButton = document.querySelector('#attack-menu');
+			const attackSlider = document.querySelector('.attack-slider-wrp');
+			const blContainer = document.querySelector('.bottom-container');
+			const drawSlider = document.querySelector('.draw-slider-wrp');
+			const deploySlider = document.querySelector('.deploy-slider-wrp');
+			const catalysersList = document.querySelector('#catalysers-list');
+			const coresList = document.querySelector('#cores-list');
+			const refsList = document.querySelector('#refs-list');
+			const discoverButton = document.querySelector('#discover');
+			const inventoryButton = document.querySelector('#ops');
+			const invCloseButton = document.querySelector('#inventory__close');
+			const inventoryContent = document.querySelector('.inventory__content');
+			const inventoryPopup = document.querySelector('.inventory.popup');
+			const invTotalSpan = document.querySelector('#self-info__inv');
+			const notifsButton = document.querySelector('#notifs-menu');
+			const pointCores = document.querySelector('.i-stat__cores');
+			const pointImage = document.querySelector('#i-image');
+			const pointImageBox = document.querySelector('.i-image-box');
+			const pointEnergyValue = document.createElement('span');
+			const pointLevelSpan = document.querySelector('#i-level');
+			const pointOwnerSpan = document.querySelector('#i-stat__owner');
+			const pointTitleSpan = document.querySelector('#i-title');
+			const pointPopup = document.querySelector('.info.popup');
+			const pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
+			const profileNameSpan = document.querySelector('#pr-name');
+			const profilePopup = document.querySelector('.profile.popup');
+			const profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
+			const regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
+			const selfExpSpan = document.querySelector('#self-info__exp');
+			const selfLvlSpan = document.querySelector('#self-info__explv');
+			const selfNameSpan = document.querySelector('#self-info__name');
+			const tlContainer = document.querySelector('.topleft-container')
+			const toggleFollow = document.querySelector('#toggle-follow');
+			const viewportMeta = document.querySelector('meta[name="viewport"]');
+			const xpDiffSpan = document.querySelector('.xp-diff');
+			const zoomContainer = document.querySelector('.ol-zoom');
 
 			let isInventoryPopupOpened = !inventoryPopup.classList.contains('hidden');
 			let isPointPopupOpened = !pointPopup.classList.contains('hidden');
@@ -882,19 +909,13 @@
 			let lastOpenedPoint = {};
 			let discoverModifier;
 			let latestNotifId;
-			let uniques = { c: new Set(), v: new Set() };
-			let inview = {};
 			let inviewRegionsVertexes = [];
 			let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
+			const uniques = { c: new Set(), v: new Set() };
+			const inview = {};
 
-			let percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
+			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
-
-			let numbersConverter = {
-				I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
-				toDecimal(roman) { return this[roman]; },
-				toRoman(decimal) { return Object.keys(this).find(key => this[key] == decimal); }
-			};
 
 			isStarMode = isStarMode && starModeTarget != null;
 
@@ -1002,7 +1023,7 @@
 									itemMaxAmount = maxAmount[itemName][pointSide];
 								}
 							} else {
-								itemMaxAmount = maxAmount[itemName]?.[numbersConverter.toRoman(itemLevel)];
+								itemMaxAmount = maxAmount[itemName]?.[itemLevel];
 							}
 
 							if (itemMaxAmount != -1 && itemAmount > itemMaxAmount) {
@@ -1171,709 +1192,6 @@
 				localStorage.setItem('inventory-cache', JSON.stringify(cache));
 			}
 
-			function createSettingsMenu() {
-				function createSection(title, subtitle) {
-					let section = document.createElement('details');
-					section.classList.add('sbgcui_settings-section');
-
-					let sectionTitle = document.createElement('summary');
-					sectionTitle.classList.add('sbgcui_settings-title');
-					sectionTitle.innerText = title;
-
-					let sectionSubTitle = document.createElement('h6');
-					sectionSubTitle.classList.add('sbgcui_settings-subtitle');
-					sectionSubTitle.innerHTML = subtitle;
-
-					section.appendChild(sectionTitle);
-					section.appendChild(sectionSubTitle);
-
-					return section;
-				}
-
-				function createInput(type, name, checked, text, value) {
-					let isCheckbox = type == 'checkbox';
-					let wrapper = document.createElement('div');
-					let label = document.createElement('label');
-					let input = document.createElement('input');
-
-					wrapper.classList.add('sbgcui_settings-input_wrp');
-
-					input.id = isCheckbox ? name : name + Math.random().toString().slice(2);
-					input.name = name;
-					input.type = type;
-					input.value = isCheckbox ? 1 : value;
-					input.checked = checked;
-
-					label.htmlFor = input.id;
-					label.innerText = text;
-
-					if (isCheckbox) {
-						let hiddenInput = document.createElement('input');
-
-						hiddenInput.name = name;
-						hiddenInput.type = 'hidden';
-						hiddenInput.value = 0;
-
-						wrapper.appendChild(hiddenInput);
-					}
-
-					wrapper.append(input, label);
-
-					return wrapper;
-				}
-
-				function createRangeInput(type, name, min, max, step, value, text, onChange) {
-					let wrapper = document.createElement('div');
-					let label = document.createElement('label');
-					let input = document.createElement('input');
-
-					wrapper.classList.add('sbgcui_settings-range_input_wrp');
-
-					input.type = type;
-					input.name = name;
-					input.min = min;
-					input.max = max;
-					input.step = step;
-					input.value = value;
-
-					label.innerText = text;
-
-					if (onChange != undefined) { input.addEventListener('input', onChange); }
-
-					wrapper.append(label, input);
-
-					return wrapper;
-				}
-
-				function createColorPicker(name, value) {
-					let colorPicker = document.createElement('input');
-
-					colorPicker.type = 'color';
-					colorPicker.name = name;
-					colorPicker.value = value;
-
-					return colorPicker;
-				}
-
-				function createRadioGroup(title, inputs = []) {
-					let header = document.createElement('h5');
-					let inputsWrp = document.createElement('div');
-					let radioGroup = document.createElement('div');
-
-					header.classList.add('sbgcui_settings-radio_group-title');
-					inputsWrp.classList.add('sbgcui_settings-inputs_group');
-					radioGroup.classList.add('sbgcui_settings-radio_group');
-
-					header.innerText = title;
-
-					inputs.forEach(e => { inputsWrp.appendChild(e); });
-
-					radioGroup.append(header, inputsWrp);
-
-					return radioGroup;
-				}
-
-				function createDropdown(title, options = [], name, value) {
-					let header = document.createElement('h5');
-					let select = document.createElement('select');
-					let selectWrapper = document.createElement('div');
-
-					header.classList.add('sbgcui_settings-dropdown-title');
-					header.innerText = title;
-
-					options.forEach(e => {
-						let option = document.createElement('option');
-
-						option.innerText = e[0];
-						option.value = e[1];
-
-						select.appendChild(option);
-					});
-
-					select.name = name;
-					select.value = value;
-
-					selectWrapper.classList.add('sbgcui_settings-dropdown_wrapper');
-					selectWrapper.append(header, select);
-
-					return selectWrapper;
-				}
-
-				function createTextField(title, name, value) {
-					let header = document.createElement('h5');
-					let input = document.createElement('input');
-					let wrapper = document.createElement('div');
-
-					header.classList.add('sbgcui_settings-textfield-title');
-					header.innerText = title;
-
-					input.name = name;
-					input.type = 'number';
-					input.min = -1;
-					input.value = value;
-
-					wrapper.classList.add('sbgcui_settings-textfield_wrapper');
-					wrapper.append(header, input);
-
-					return wrapper;
-				}
-
-				function createAutoDeleteSection(maxAmountInBag) {
-					let section = createSection(
-						'Автоудаление',
-						`Когда в инвентаре останется меньше ${MIN_FREE_SPACE} мест, будут удалены предметы, превышающие указанное количество. <br>Значение "-1" предотвращает удаление.`
-					);
-					let forceClearButton = document.createElement('button');
-
-					forceClearButton.classList.add('sbgcui_settings-forceclear');
-					forceClearButton.innerText = 'Очистить сейчас';
-					forceClearButton.addEventListener('click', function (event) {
-						event.preventDefault();
-
-						let result = confirm('Произвести очистку инвентаря согласно настройкам?');
-
-						if (result) { clearInventory(true); }
-					});
-					section.appendChild(forceClearButton);
-
-					for (let key in maxAmountInBag) {
-						let subSection = document.createElement('section');
-						let subSectionTitle = document.createElement('h4');
-						let subSectionSubTitle = document.createElement('h6');
-						let maxAmounts = document.createElement('div');
-
-						subSection.classList.add('sbgcui_settings-subsection');
-						subSectionTitle.classList.add('sbgcui_settings-title');
-						subSectionSubTitle.classList.add('sbgcui_settings-subtitle');
-						maxAmounts.classList.add('sbgcui_settings-maxamounts');
-
-						switch (key) {
-							case 'cores':
-								subSectionTitle.innerText = 'Ядра';
-								break;
-							case 'catalysers':
-								subSectionTitle.innerText = 'Катализаторы';
-								break;
-							case 'references':
-								subSectionTitle.innerText = 'Сноски';
-								subSectionSubTitle.innerHTML = `Сноски от избранных точек удаляться не будут.<br>Для добавления в избранное нажмите звезду на карточке точки.`;
-								break;
-						}
-
-						for (let type in maxAmountInBag[key]) {
-							let wrapper = document.createElement('div');
-							let label = document.createElement('label');
-							let input = document.createElement('input');
-
-							wrapper.classList.add('sbgcui_settings-amount_input_wrp');
-							label.classList.add('sbgcui_settings-amount_label');
-							input.classList.add('sbgcui_settings-amount_input');
-
-							if (key == 'references') {
-								label.innerText = (type == 'allied') ? 'Свои:' : 'Чужие:';
-								label.classList.add(`sbgcui_settings-amount_label_${type}`);
-							} else {
-								label.innerText = type + ':';
-								label.style.color = `var(--level-${numbersConverter.toDecimal(type)})`;
-							}
-
-							input.name = `maxAmountInBag_${key}_${type}`;
-							input.type = 'number';
-							input.min = -1;
-							input.value = maxAmountInBag[key][type];
-
-							wrapper.append(label, input);
-
-							maxAmounts.appendChild(wrapper);
-						}
-
-						subSection.append(subSectionTitle, subSectionSubTitle, maxAmounts);
-
-						section.appendChild(subSection);
-					}
-
-					return section;
-				}
-
-				function createAutoSelectSection(autoSelect) {
-					let section = createSection(
-						'Автовыбор',
-						'Можно автоматически выбирать самый мощный катализатор при атаке, самое маленькое ядро при деплое или следующий уровень ядра при каждом апгрейде. Вы можете исключить конкретное ядро из автовыбора: нажмите на него в карусели и удерживайте 1 секунду до появления уведомления.'
-					);
-					let subSection = document.createElement('section');
-
-					let attackDropdown = createDropdown(
-						'Катализатор при атаке:',
-						[
-							['Самый мощный', 'max'],
-							['Последний использованный', 'latest'],
-						],
-						'autoSelect_attack',
-						autoSelect.attack
-					);
-					let deployDropdown = createDropdown(
-						'Ядро при деплое:',
-						[
-							['Наименьшее', 'min'],
-							['Наибольшее', 'max'],
-							['Вручную', 'off'],
-						],
-						'autoSelect_deploy',
-						autoSelect.deploy
-					);
-					let upgradeDropdown = createDropdown(
-						'Ядро при апгрейде:',
-						[
-							['Наименьшее', 'min'],
-							['Наибольшее', 'max'],
-							['Вручную', 'off'],
-						],
-						'autoSelect_upgrade',
-						autoSelect.upgrade
-					);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(attackDropdown, deployDropdown, upgradeDropdown);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createColorSchemeSection(mapFilters) {
-					function setCssVar(cssVar, value) {
-						let filter = cssVar.split('_')[1];
-						let units = (filter == 'blur') ? 'px' : (filter == 'hueRotate') ? 'deg' : '';
-						html.style.setProperty(`--sbgcui-${filter}`, `${value}${units}`);
-					}
-
-					let section = createSection(
-						'Цветовая схема',
-						'Настройте цвет своей команды и оттенок карты.'
-					);
-					let subSection = document.createElement('section');
-
-					let onChange = event => { setCssVar(event.target.name, event.target.value); };
-
-					let invert = createRangeInput('range', 'mapFilters_invert', 0, 1, 0.01, +mapFilters.invert, 'Инверсия', onChange);
-					let hueRotate = createRangeInput('range', 'mapFilters_hueRotate', 0, 360, 1, +mapFilters.hueRotate, 'Цветность', onChange);
-					let brightness = createRangeInput('range', 'mapFilters_brightness', 0, 5, 0.01, +mapFilters.brightness, 'Яркость', onChange);
-					let grayscale = createRangeInput('range', 'mapFilters_grayscale', 0, 1, 0.01, +mapFilters.grayscale, 'Оттенок серого', onChange);
-					let sepia = createRangeInput('range', 'mapFilters_sepia', 0, 1, 0.01, +mapFilters.sepia, 'Сепия', onChange);
-					let blur = createRangeInput('range', 'mapFilters_blur', 0, 4, 0.1, +mapFilters.blur, 'Размытие', onChange);
-					let branding = createDropdown('Цвет вашей команды:', [['Стандартный', 'default'], ['Собственный', 'custom']], 'mapFilters_branding', mapFilters.branding);
-					let brandingColorPicker = createColorPicker('mapFilters_brandingColor', mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor));
-
-					let brandingSelect = branding.querySelector('select');
-
-					brandingSelect.addEventListener('change', event => {
-						if (event.target.value == 'default') {
-							brandingColorPicker.value = hex326(player.teamColor);
-							html.style.setProperty(`--sbgcui-branding-color`, player.teamColor);
-						} else {
-							brandingColorPicker.value = mapFilters.brandingColor;
-							html.style.setProperty(`--sbgcui-branding-color`, mapFilters.brandingColor);
-						}
-					});
-
-					brandingColorPicker.addEventListener('input', event => {
-						if (brandingSelect.value == 'default') { brandingSelect.value = 'custom' }
-						html.style.setProperty(`--sbgcui-branding-color`, hex623(event.target.value));
-					});
-					brandingColorPicker.addEventListener('change', () => {
-						// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
-						brandingColorPicker.value = hex623(brandingColorPicker.value, false);
-					});
-
-					branding.appendChild(brandingColorPicker);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(branding, invert, hueRotate, brightness, grayscale, sepia, blur);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createTintingSection(tinting) {
-					let section = createSection(
-						'Тонирование',
-						'Интерфейс браузера будет окрашиваться в зависимости от того, что происходит на экране.'
-					);
-					let subSection = document.createElement('section');
-
-					let mapTinting = createInput('checkbox', 'tinting_map', +tinting.map, 'При просмотре карты');
-					let profileTinting = createInput('checkbox', 'tinting_profile', +tinting.profile, 'При просмотре профиля');
-
-					mapTinting.addEventListener('change', e => {
-						if (e.target.checked) {
-							addTinting('map');
-						} else {
-							addTinting('');
-						}
-					});
-
-					let pointTintingDropdown = createDropdown(
-						'При просмотре точки:',
-						[
-							['Цвет уровня', 'level'],
-							['Цвет команды', 'team'],
-							['Нет', 'off'],
-						],
-						'tinting_point',
-						tinting.point
-					);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(mapTinting, profileTinting, pointTintingDropdown);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createVibrationSection(vibration) {
-					let section = createSection(
-						'Вибрация',
-						'Устройство будет откликаться на ваши действия. Может потребоваться выдача соответствующего разрешения в браузере или системе.'
-					);
-					let subSection = document.createElement('section');
-
-					let buttonsVibration = createInput('checkbox', 'vibration_buttons', +vibration.buttons, 'При нажатии кнопок');
-					let notificationsVibration = createInput('checkbox', 'vibration_notifications', +vibration.notifications, 'При уведомлениях');
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(buttonsVibration, notificationsVibration);
-
-					section.appendChild(subSection);
-
-					if (!('vibrate' in window.navigator)) { section.classList.add('sbgcui_hidden'); }
-
-					return section;
-				}
-
-				function createUISection(ui) {
-					let section = createSection(
-						'Интерфейс',
-						'Некоторые аспекты дизайна можно отключить или изменить для большего удобства.'
-					);
-					let subSection = document.createElement('section');
-
-					let doubleClickZoom = createInput('checkbox', 'ui_doubleClickZoom', +ui.doubleClickZoom, 'Зум карты по двойному нажатию');
-					let pointBgImage = createInput('checkbox', 'ui_pointBgImage', +ui.pointBgImage, 'Фото точки вместо фона');
-					let pointBgImageBlur = createInput('checkbox', 'ui_pointBgImageBlur', +ui.pointBgImageBlur, 'Размытие фонового фото');
-					let pointBtnsRtl = createInput('checkbox', 'ui_pointBtnsRtl', +ui.pointBtnsRtl, 'Отразить кнопки в карточке точки');
-					let pointDischargeTimeout = createInput('checkbox', 'ui_pointDischargeTimeout', +ui.pointDischargeTimeout, 'Показывать примерное время разрядки точки');
-					let speedometer = createInput('checkbox', 'ui_speedometer', +ui.speedometer, 'Показывать скорость движения');
-
-					pointBgImage.addEventListener('click', event => {
-						if (event.target.id == 'ui_pointBgImage') {
-							if (event.target.checked) {
-								pointBgImageBlur.childNodes[1].removeAttribute('disabled');
-							} else {
-								pointBgImageBlur.childNodes[1].checked = 0;
-								pointBgImageBlur.childNodes[1].setAttribute('disabled', '');
-							}
-						}
-					});
-
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(doubleClickZoom, pointBgImage, pointBgImageBlur, pointBtnsRtl, pointDischargeTimeout, speedometer);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createPointHighlightingSection(pointHighlighting) {
-					function switchOff(selects, option) {
-						selects.forEach(select => {
-							switch (option) {
-								case 'uniqc':
-									if (select.value == 'uniqv') { select.value = 'off' }
-									break;
-								case 'uniqv':
-									if (select.value == 'uniqc') { select.value = 'off' }
-									break;
-								default: select.value = 'off';
-							}
-						});
-					}
-
-					let section = createSection(
-						'Подсветка точек',
-						'Точки на карте могут отображать несколько маркеров, например кольцо снаружи точки, кружок внутри неё или текст рядом. Выберите, что будет обозначать каждый из них.'
-					);
-					let subSection = document.createElement('section');
-					let innerMarkerColorPicker = createColorPicker('pointHighlighting_innerColor', pointHighlighting.innerColor);
-					let outerMarkerColorPicker = createColorPicker('pointHighlighting_outerColor', pointHighlighting.outerColor);
-					let outerTopMarkerColorPicker = createColorPicker('pointHighlighting_outerTopColor', pointHighlighting.outerTopColor);
-					let outerBottomMarkerColorPicker = createColorPicker('pointHighlighting_outerBottomColor', pointHighlighting.outerBottomColor);
-
-					let markerOptions = [
-						['Нет', 'off'],
-						[`Уровень ${HIGHLEVEL_MARKER}+`, 'highlevel'],
-						['Избранная', 'fav'],
-						['Имеется реф', 'ref'],
-						['Не захвачена', 'uniqc'],
-						['Не исследована', 'uniqv'],
-						['Полностью проставлена', 'cores'],
-					];
-
-					let innerMarker = createDropdown('Внутренний маркер (точка):', markerOptions, 'pointHighlighting_inner', pointHighlighting.inner);
-					let outerMarker = createDropdown('Наружный маркер (кольцо):', markerOptions, 'pointHighlighting_outer', pointHighlighting.outer);
-					let outerTopMarker = createDropdown('Наружный маркер (верхнее полукольцо):', markerOptions, 'pointHighlighting_outerTop', pointHighlighting.outerTop);
-					let outerBottomMarker = createDropdown('Наружный маркер (нижнее полукольцо):', markerOptions, 'pointHighlighting_outerBottom', pointHighlighting.outerBottom);
-					let textMarker = createDropdown(
-						'Текстовый маркер:',
-						[
-							['Нет', 'off'],
-							['Уровень', 'level'],
-							['Энергия', 'energy'],
-							['Линии вх. + исх.', 'lines'],
-							['Количество рефов', 'refsAmount'],
-						],
-						'pointHighlighting_text',
-						pointHighlighting.text
-					);
-
-					let innerMarkerSelect = innerMarker.querySelector('select');
-					let outerMarkerSelect = outerMarker.querySelector('select');
-					let outerTopMarkerSelect = outerTopMarker.querySelector('select');
-					let outerBottomMarkerSelect = outerBottomMarker.querySelector('select');
-
-					let selects = [innerMarkerSelect, outerMarkerSelect, outerTopMarkerSelect, outerBottomMarkerSelect];
-
-					selects.forEach(select => {
-						select.addEventListener('change', event => {
-							switch (event.target) {
-								case outerMarkerSelect:
-									switchOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
-									break;
-								case outerTopMarkerSelect:
-								case outerBottomMarkerSelect:
-									switchOff([outerMarkerSelect]);
-									break;
-							}
-
-							if (['uniqc', 'uniqv'].includes(event.target.value)) {
-								let selectsToOff = selects.filter(e => e != select);
-								switchOff(selectsToOff, event.target.value);
-							}
-						});
-					});
-
-					innerMarker.appendChild(innerMarkerColorPicker);
-					outerMarker.appendChild(outerMarkerColorPicker);
-					outerTopMarker.appendChild(outerTopMarkerColorPicker);
-					outerBottomMarker.appendChild(outerBottomMarkerColorPicker);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(innerMarker, outerMarker, outerTopMarker, outerBottomMarker, textMarker);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createDrawingSection(drawing) {
-					const section = createSection(
-						'Рисование',
-						`Настройки, касающиеся рисования линий. Значение "-1" в текстовом поле отключает ограничение.`
-					);
-					const subSection = document.createElement('section');
-					const minDistanceTextField = createTextField('Скрывать рефы ближе, чем (м):', 'drawing_minDistance', drawing.minDistance);
-					const maxDistanceTextField = createTextField('Скрывать рефы дальше, чем (м):', 'drawing_maxDistance', drawing.maxDistance);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(minDistanceTextField, maxDistanceTextField);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-				function createNotificationsSection(notifications) {
-					const section = createSection(
-						'Уведомления',
-						`Показ всплывающих уведомлений о том, что ваша точка была кем-то уничтожена.`
-					);
-					const subSection = document.createElement('section');
-					const statusDropdown = createDropdown(
-						'Статус уведомлений:',
-						[
-							['Все точки', 'all'],
-							['Избранные', 'fav'],
-							['Отключены', 'off'],
-						],
-						'notifications_status',
-						notifications.status
-					);
-					const clickDropdown = createDropdown(
-						'При нажатии на уведомление:',
-						[
-							['Закрыть', 'close'],
-							['Место на карте', 'jumpto'],
-						],
-						'notifications_onClick',
-						notifications.onClick || 'jumpto'
-					);
-					const onIntervalChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value / 1000} сек.`); };
-					const onDurationChange = event => { const value = event.target.value; event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`); };
-					const intervalInput = createRangeInput('range', 'notifications_interval', 5000, 100000, 1000, notifications.interval, 'Интервал проверки', onIntervalChange);
-					const durationInput = createRangeInput('range', 'notifications_duration', -1, 60000, 1000, notifications.duration, 'Время показа', onDurationChange);
-
-					subSection.classList.add('sbgcui_settings-subsection');
-
-					subSection.append(statusDropdown, clickDropdown, intervalInput, durationInput);
-
-					section.appendChild(subSection);
-
-					return section;
-				}
-
-
-				let form = document.createElement('form');
-				form.classList.add('sbgcui_settings', 'sbgcui_hidden');
-
-				let version = document.createElement('span');
-				version.classList.add('sbgcui_settings-version');
-				version.innerText = `v${USERSCRIPT_VERSION}`;
-
-				let formHeader = document.createElement('h3');
-				formHeader.classList.add('sbgcui_settings-header');
-				formHeader.innerText = 'Настройки';
-
-				let submitButton = document.createElement('button');
-				submitButton.innerText = 'Сохранить';
-
-				let closeButton = document.createElement('button');
-				closeButton.innerText = 'Закрыть';
-
-
-				closeButton.addEventListener('click', event => {
-					event.preventDefault();
-					event.stopPropagation();
-					closeSettingsMenu();
-				});
-
-
-				let buttonsWrp = document.createElement('div');
-				buttonsWrp.classList.add('sbgcui_settings-buttons_wrp');
-				buttonsWrp.append(submitButton, closeButton);
-
-
-				let sections = [
-					createAutoDeleteSection(config.maxAmountInBag),
-					createAutoSelectSection(config.autoSelect),
-					createColorSchemeSection(config.mapFilters),
-					createTintingSection(config.tinting),
-					createVibrationSection(config.vibration),
-					createUISection(config.ui),
-					createPointHighlightingSection(config.pointHighlighting),
-					createDrawingSection(config.drawing),
-					createNotificationsSection(config.notifications)
-				];
-
-				sections.forEach(e => {
-					e.addEventListener('click', event => {
-						sections.forEach(e => {
-							if (event.currentTarget != e) { e.removeAttribute('open'); }
-						});
-					});
-				});
-
-				form.append(version, formHeader, ...sections, buttonsWrp);
-
-				form.addEventListener('submit', e => {
-					e.preventDefault();
-
-					try {
-						let formData = new FormData(e.target);
-						let formEntries = Object.fromEntries(formData);
-
-						for (let key in formEntries) {
-							let path = key.split('_');
-							if (path[0] == 'maxAmountInBag') {
-								config.maxAmountInBag[path[1]][path[2]] = Number.isInteger(+formEntries[key]) ? formEntries[key] : -1;
-							} else if (path[0].match(/autoSelect|mapFilters|tinting|vibration|ui|pointHighlighting|drawing|notifications/)) {
-								let value = formEntries[key];
-								config[path[0]][path[1]] = isNaN(+value) ? value : +value;
-							}
-						}
-
-						for (let key in config) {
-							database.transaction('config', 'readwrite').objectStore('config').put(config[key], key);
-						}
-
-						let toast = createToast('Настройки сохранены');
-						toast.showToast();
-					} catch (error) {
-						let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`, undefined, undefined, 'error-toast');
-						toast.showToast();
-
-						console.log('SBG CUI: Ошибка при сохранении настроек.', error);
-					}
-				});
-
-				return form;
-			}
-
-			function closeSettingsMenu() {
-				let { mapFilters, ui } = config;
-
-				for (let key in mapFilters) {
-					let units = (key == 'blur') ? 'px' : (key == 'hueRotate') ? 'deg' : '';
-					html.style.setProperty(`--sbgcui-${key}`, `${mapFilters[key]}${units}`);
-				}
-
-				html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
-				html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
-				html.style.setProperty('--sbgcui-show-speedometer', ui.speedometer);
-				html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
-				window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
-				window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
-
-				doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
-
-				if (+config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
-
-				document.querySelector('.sbgcui_settings').classList.add('sbgcui_hidden');
-				document.querySelectorAll('.sbgcui_settings > details').forEach(e => { e.open = false; });
-
-				document.querySelectorAll('.sbgcui_settings input:not([type="hidden"]), .sbgcui_settings select').forEach(e => {
-					let path = e.name.split('_');
-					let value = path.reduce((obj, prop) => obj[prop], config);
-
-					switch (e.type) {
-						case 'number':
-						case 'range':
-							e.value = +value;
-							break;
-						case 'color':
-							e.value = value;
-							break;
-						case 'checkbox':
-							e.checked = +value;
-							break;
-						case 'radio':
-							e.checked = e.value == value;
-							break;
-						case 'select-one':
-							e.value = value;
-							break;
-					}
-				});
-			}
-
 			function chooseCatalyser(type) {
 				let cachedCatalysers = JSON.parse(localStorage.getItem('inventory-cache')).filter(e => e.t == 2 && e.l <= player.level).sort((a, b) => a.l - b.l);
 				let catalyser;
@@ -1913,6 +1231,10 @@
 				toast.options.id = Math.round(Math.random() * 1e5);;
 				toast.options.onClick = () => toast.hideToast();
 				return toast;
+			}
+
+			function showToast(...options) {
+				createToast(...options).showToast();
 			}
 
 			function updateExpBar(playerExp) {
@@ -2684,7 +2006,6 @@
 				const ops = document.querySelector('#ops');
 				const rotateArrow = document.querySelector('.ol-rotate');
 				const layersButton = document.querySelector('#layers');
-				const notifsButton = document.querySelector('#notifs-menu');
 				const attackSliderClose = document.querySelector('#attack-slider-close');
 				const pointEnergy = document.createElement('div');
 				const pointEnergyLabel = document.createElement('span');
@@ -2875,7 +2196,8 @@
 
 				pointCores.addEventListener('click', event => {
 					if (event.target.classList.contains('selected')) {
-						let currentLvl = event.target.innerText.match(/^[0-9]{1,2}$/) ? +event.target.innerText : numbersConverter.toDecimal(event.target.innerText);
+						const guid = event.target.dataset.guid;
+						const currentLvl = lastOpenedPoint.cores[guid].level;
 						lastOpenedPoint.selectCore(config.autoSelect.upgrade, currentLvl);
 					}
 				});
@@ -3000,29 +2322,265 @@
 
 			/* Меню настроек */
 			{
-				let isSettingsMenuOpened = false;
+				function closeDetails(event) {
+					// Если передан event - будут закрыты все details кроме нажатого.
+					// Если не передан - будут закрыты все details.
+					if (event != undefined && !event.target.matches('summary')) { return; }
 
-				let settingsMenu = createSettingsMenu();
-				tlContainer.appendChild(settingsMenu);
+					settingsMenu.querySelectorAll('details').forEach(element => {
+						if (event == undefined || element != event.target.closest('details')) {
+							element.removeAttribute('open');
+						}
+					});
+				}
 
-				let settingsButton = document.createElement('button');
-				settingsButton.classList.add('fa', 'fa-solid-gears');
-				settingsButton.addEventListener('click', () => {
+				function onBrandingInputChange() {
+					// Приводим цвет к виду #RRGGBB, т.к. основной скрипт для линий использует четырёхзначную нотацию (RGB + альфа).
+					brandingInput.value = hex623(brandingInput.value, false);
+				}
+
+				function onBrandingInputInput(event) {
+					if (brandingSelect.value == 'default') { brandingSelect.value = 'custom'; }
+					html.style.setProperty(`--sbgcui-branding-color`, hex623(event.target.value));
+				}
+
+				function onBrandingSelectChange(event) {
+					if (event.target.value == 'default') {
+						brandingInput.value = hex326(player.teamColor);
+						html.style.setProperty('--sbgcui-branding-color', player.teamColor);
+					} else {
+						brandingInput.value = mapFilters.brandingColor;
+						html.style.setProperty('--sbgcui-branding-color', mapFilters.brandingColor);
+					}
+				}
+
+				function onCloseButtonClick(event) {
+					event.preventDefault();
+					event.stopPropagation();
+
+					const { mapFilters, ui } = config;
+
+					// Возвращаем фильтрам последние сохранённые значения, т.к. CSS переменные
+					// меняются, чтобы в процессе показать, как будет выглядеть.
+					for (let filter in mapFilters) {
+						setFilterCSSVar(filter, mapFilters[filter]);
+					}
+
+					html.style.setProperty('--sbgcui-point-btns-rtl', ui.pointBtnsRtl ? 'rtl' : 'ltr');
+					html.style.setProperty('--sbgcui-point-image-blur', ui.pointBgImageBlur ? '2px' : '0px');
+					html.style.setProperty('--sbgcui-show-speedometer', ui.speedometer);
+					html.style.setProperty('--sbgcui-branding-color', mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor);
+					window.TeamColors[player.team].fill = `${mapFilters.branding == 'custom' ? mapFilters.brandingColor : hex326(player.teamColor)}80`;
+					window.TeamColors[player.team].stroke = mapFilters.branding == 'custom' ? hex623(mapFilters.brandingColor) : player.teamColor;
+
+					doubleClickZoomInteraction.setActive(Boolean(ui.doubleClickZoom));
+
+					if (config.tinting.map && !isPointPopupOpened && !isProfilePopupOpened) { addTinting('map'); }
+
+					closeDetails();
+					setStoredInputsValues();
+
+					settingsMenu.classList.add('sbgcui_hidden');
+				}
+
+				function onColorFilterInput(event) {
+					const { name, value } = event.target;
+					const filter = name.split('_')[1];
+					setFilterCSSVar(filter, value);
+				}
+
+				function onForceClearButtonClick(event) {
+					event.preventDefault();
+					confirm('Произвести очистку инвентаря согласно настройкам?') && clearInventory(true);
+				}
+
+				function onFormSubmit(event) {
+					event.preventDefault();
+
+					try {
+						const formData = new FormData(event.target);
+						const formEntries = Object.fromEntries(formData);
+
+						for (let entry in formEntries) {
+							const path = entry.split('_');
+							const section = path[0];
+
+							if (section == 'maxAmountInBag') {
+								const item = path[1], level = path[2];
+								const amount = Number.isInteger(+formEntries[entry]) ? +formEntries[entry] : -1;
+
+								config.maxAmountInBag[item][level] = amount;
+							} else {
+								const param = path[1];
+								const value = formEntries[entry];
+
+								config[section][param] = isNaN(+value) ? value : +value;
+							}
+						}
+
+						for (let section in config) {
+							database.transaction('config', 'readwrite').objectStore('config').put(config[section], section);
+						}
+
+						showToast('Настройки сохранены');
+					} catch (error) {
+						showToast(`Ошибка при сохранении настроек. <br>${error.message}`, undefined, undefined, 'error-toast');
+						console.log('SBG CUI: Ошибка при сохранении настроек.', error);
+					}
+				}
+
+				function onMapTintingInputChange(event) {
+					event.target.checked ? addTinting('map') : addTinting('');
+				}
+
+				function onMarkerSelectChange(event) {
+					const select = event.target;
+					const value = select.value;
+
+					// Можно использовать либо один целый наружный маркер (outerMarker), либо два полукольца –
+					// верхнее и нижнее (outerTop, outerBottom). Если выбран целый маркер, отключаем селекты полуколец.
+					// Если выбраны полукольца – отключаем селект целого.
+					switch (select) {
+						case outerMarkerSelect:
+							switchMarkersSelectsOff([outerTopMarkerSelect, outerBottomMarkerSelect]);
+							break;
+						case outerTopMarkerSelect:
+						case outerBottomMarkerSelect:
+							switchMarkersSelectsOff([outerMarkerSelect]);
+							break;
+					}
+
+					// Можно узнать только одно значение за запрос – либо уникальный захват, либо уникальное посещение.
+					// Если выбрано uniqc, отключаем uniqv во всех остальных селектах и наоборот.
+					if (/^uniq(c|v)$/.test(value)) {
+						const selectsToOff = markersSelects.filter(e => e != select);
+						switchMarkersSelectsOff(selectsToOff, value);
+					}
+				}
+
+				function onNotificationsDurationInputInput(event) {
+					const value = event.target.value;
+					event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`);
+				}
+
+				function onNotificationsIntervalInputInput(event) {
+					const value = event.target.value;
+					event.target.setAttribute('label', `${value / 1000} сек.`);
+				}
+
+				function onPointBgImageCheckboxChange(event) {
+					if (event.target.checked) {
+						pointBgImageBlurCheckbox.removeAttribute('disabled');
+					} else {
+						pointBgImageBlurCheckbox.checked = 0;
+						pointBgImageBlurCheckbox.setAttribute('disabled', '');
+					}
+				}
+
+				function onToolbarButtonClick() {
 					settingsMenu.classList.toggle('sbgcui_hidden');
 					isSettingsMenuOpened = !isSettingsMenuOpened;
-				});
-				toolbar.addItem(settingsButton, 1);
+				}
 
-				document.body.addEventListener('click', event => {
-					if (
-						isSettingsMenuOpened &&
-						event.target != settingsButton &&
-						!event.target.closest('.sbgcui_settings')
-					) {
-						closeSettingsMenu();
-						isSettingsMenuOpened = false;
-					}
-				});
+				function setStoredInputsValues() {
+					settingsMenu.querySelectorAll('input:not([type="hidden"]), select').forEach(input => {
+						const path = input.name.split('_');
+						const value = path.reduce((obj, prop) => obj[prop], config);
+
+						switch (input.type) {
+							case 'color':
+							case 'number':
+							case 'range':
+							case 'select-one':
+								input.value = value;
+								break;
+							case 'checkbox':
+								input.checked = value;
+								break;
+							case 'radio':
+								input.checked = input.value == value;
+								break;
+						}
+					});
+				}
+
+				function setFilterCSSVar(filter, value) {
+					const units = (filter == 'blur') ? 'px' : (filter == 'hueRotate') ? 'deg' : '';
+					html.style.setProperty(`--sbgcui-${filter}`, `${value}${units}`);
+				}
+
+				function switchMarkersSelectsOff(selects, option) {
+					selects.forEach(select => {
+						switch (option) {
+							case 'uniqc':
+								if (select.value == 'uniqv') { select.value = 'off'; }
+								break;
+							case 'uniqv':
+								if (select.value == 'uniqc') { select.value = 'off'; }
+								break;
+							default:
+								select.value = 'off';
+						}
+					});
+				}
+
+				let isSettingsMenuOpened = false;
+
+				try {
+					var settingsMenu = await fetchHTMLasset('settings');
+
+					var brandingSelect = settingsMenu.querySelector('select[name="mapFilters_branding"]');
+					var brandingInput = settingsMenu.querySelector('input[name="mapFilters_brandingColor"]');
+					const closeButton = settingsMenu.querySelector('#sbgcui_settings-close');
+					const colorFiltersInputs = settingsMenu.querySelectorAll('input[data-role="colorfilter"]');
+					const forceClearButton = settingsMenu.querySelector('#sbgcui_forceclear');
+					const highlevelMarkersOptions = settingsMenu.querySelectorAll('option[value="highlevel"]');
+					var innerMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_inner"]');
+					const mapTintingInput = settingsMenu.querySelector('#tinting_map');
+					const minFreeSpaceSpan = settingsMenu.querySelector('#sbgcui_min_free_space');
+					const notificationsDurationInput = settingsMenu.querySelector('input[name="notifications_duration"]');
+					const notificationsIntervalInput = settingsMenu.querySelector('input[name="notifications_interval"]');
+					var outerBottomMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outerBottom"]');
+					var outerMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outer"]');
+					var outerTopMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outerTop"]');
+					const pointBgImageCheckbox = settingsMenu.querySelector('#ui_pointBgImage');
+					var pointBgImageBlurCheckbox = settingsMenu.querySelector('#ui_pointBgImageBlur');
+					const versionSpan = settingsMenu.querySelector('.sbgcui_settings-version');
+					const vibrationSection = settingsMenu.querySelector('details:has(#vibration_notifications)');
+
+					var markersSelects = [innerMarkerSelect, outerMarkerSelect, outerBottomMarkerSelect, outerTopMarkerSelect];
+
+					minFreeSpaceSpan.innerText = MIN_FREE_SPACE;
+					versionSpan.innerText = `v${USERSCRIPT_VERSION}`;
+					highlevelMarkersOptions.forEach(option => { option.innerText += ` ${HIGHLEVEL_MARKER}+`; });
+
+					if (!('vibrate' in window.navigator)) { vibrationSection.classList.add('sbgcui_hidden'); }
+
+					brandingInput.addEventListener('change', onBrandingInputChange);
+					brandingInput.addEventListener('input', onBrandingInputInput);
+					brandingSelect.addEventListener('change', onBrandingSelectChange);
+					closeButton.addEventListener('click', onCloseButtonClick);
+					forceClearButton.addEventListener('click', onForceClearButtonClick);
+					mapTintingInput.addEventListener('change', onMapTintingInputChange);
+					notificationsDurationInput.addEventListener('input', onNotificationsDurationInputInput);
+					notificationsIntervalInput.addEventListener('input', onNotificationsIntervalInputInput);
+					pointBgImageCheckbox.addEventListener('change', onPointBgImageCheckboxChange);
+					settingsMenu.addEventListener('click', closeDetails);
+					settingsMenu.addEventListener('submit', onFormSubmit);
+					colorFiltersInputs.forEach(input => { input.addEventListener('input', onColorFilterInput); });
+					markersSelects.forEach(select => { select.addEventListener('change', onMarkerSelectChange); });
+
+					setStoredInputsValues();
+					tlContainer.appendChild(settingsMenu);
+				}
+				catch (error) {
+					console.log('SBG CUI: Ошибка при создании меню настроек.', error);
+				}
+
+				const toolbarButton = document.createElement('button');
+				toolbarButton.classList.add('fa', 'fa-solid-gears');
+				toolbarButton.addEventListener('click', onToolbarButtonClick);
+				toolbar.addItem(toolbarButton, 1);
 			}
 
 
@@ -4606,9 +4164,7 @@
 			/* Время до разрядки точки */
 			{
 				function updateTimeout() {
-					if (config.ui.pointDischargeTimeout) {
-						timeoutSpan.innerText = `(~${lastOpenedPoint.dischargeTimeout})`;
-					}
+					timeoutSpan.innerText = config.ui.pointDischargeTimeout ? `(~${lastOpenedPoint.dischargeTimeout})` : '';
 				}
 
 				const timeoutSpan = document.createElement('span');
@@ -5052,10 +4608,11 @@
 					function clearStorage() {
 						const date = datePicker.getAttribute('min');
 						const totalEntries = datePicker.dataset.totalentries;
+						const days = Math.floor((Date.now() - new Date(date)) / 1000 / 60 / 60 / 24);
 
 						if (totalEntries == 0) { alert('Записей не обнаружено.'); return; }
 
-						if (confirm(`Очистить всю историю действий? \nВы удалите ${totalEntries} записей с ${date}.`)) {
+						if (confirm(`Очистить всю историю действий? \nВы удалите ${totalEntries} записей за последние ${days} дней (с ${date}).`)) {
 							if (confirm('Подтвердите удаление истории действий за всё время.')) {
 								const logsStore = database.transaction('logs', 'readwrite').objectStore('logs');
 								const request = logsStore.clear();
@@ -5370,7 +4927,7 @@
 						latestNotifId = notifs[0].id;
 
 						notifs.slice(0, notifsCount).reverse().forEach(notif => {
-							const { g: guid, na: attackerName, ta: attackerTeam, c: coords, t: pointTitle } = notif;
+							const { g: guid, na: attackerName, ta: attackerTeam, c: coords, t: pointTitle, id } = notif;
 
 							if (status == 'fav' && !(guid in favorites)) { return; }
 
@@ -5379,6 +4936,10 @@
 								<span>${pointTitle}</span>
 							`;
 							const toast = createToast(message, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
+							toast.options.callback = () => {
+								localStorage.setItem('latest-notif', id);
+								if (id == notifs[0].id) { notifsButton.removeAttribute('data-count'); }
+							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
 								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
