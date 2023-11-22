@@ -775,9 +775,7 @@
 					if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
 						let notification = new Notification(message, { icon: '/icons/icon_512.png' });
 					} else {
-						let toast = createToast(message, 'top left', -1);
-
-						toast.options.className = 'sbgcui_toast-selection';
+						let toast = createToast(message, 'top left', -1, 'sbgcui_toast-selection');
 						toast.showToast();
 
 						if ('vibrate' in window.navigator && config.vibration.notifications) {
@@ -834,8 +832,8 @@
 			}
 
 
-			let originalFetch = window.fetch;
-			window.fetch = proxiedFetch;
+			window.fetch = fetchDecorator(window.fetch);
+			window.Toastify = toastifyDecorator(window.Toastify);
 
 			let html = document.documentElement;
 			let attackButton = document.querySelector('#attack-menu');
@@ -900,310 +898,6 @@
 
 			isStarMode = isStarMode && starModeTarget != null;
 
-
-			async function proxiedFetch(pathNquery, options) {
-				return new Promise((resolve, reject) => {
-					const url = new URL(window.location.origin + pathNquery);
-					let isBroom;
-
-					switch (url.pathname) {
-						case '/api/attack2':
-							const guid = JSON.parse(options.body).guid;
-							const invCache = JSON.parse(localStorage.getItem('inventory-cache'));
-							const message = `Использовать "${i18next.t('items.brooms_one')}"?`;
-
-							isBroom = invCache.find(e => e.t == 4 && e.g == guid) !== undefined;
-
-							if (isBroom && !confirm(message)) {
-								resolve();
-								attackSlider.dispatchEvent(new Event('attackSliderOpened'));
-								return;
-							}
-
-							break;
-						case '/api/inview':
-							if (isRefsViewerOpened) { resolve(); return; }
-
-							let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
-
-							if (uniqsHighlighting) {
-								const hParam = uniqsHighlighting == 'uniqc' ? 4 : 2;
-								url.searchParams.set('h', hParam);
-							}
-
-							const mapConfig = JSON.parse(localStorage.getItem('map-config'));
-							const layers = Bitfield.from(mapConfig.l);
-
-							layers.change(1, 1);
-							layers.change(2, 1);
-							url.searchParams.set('l', layers.toString());
-
-							break;
-					}
-
-					originalFetch(url.pathname + url.search, options)
-						.then(async response => {
-							if (!url.pathname.match(/^\/api\//)) {
-								resolve(response);
-								return;
-							}
-
-							let clonedResponse = response.clone();
-
-							clonedResponse.json().then(async parsedResponse => {
-								switch (url.pathname) {
-									case '/api/point':
-										if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
-											lastOpenedPoint = new Point(parsedResponse.data);
-										}
-										break;
-									case '/api/deploy':
-										if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-											const actionType = parsedResponse.data.co.length == 1 ? 'capture' : 'deploy';
-											lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
-											lastOpenedPoint.selectCore(config.autoSelect.deploy);
-											logAction({ type: actionType, coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
-										} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
-											lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
-											lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-											logAction({ type: 'upgrade', coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
-										}
-										break;
-									case '/api/attack2':
-										lastUsedCatalyser = JSON.parse(options.body).guid;
-										database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
-
-										if ('c' in parsedResponse) {
-											const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
-
-											if (points.length > 0) {
-												const lines = parsedResponse.l.length;
-												const regions = parsedResponse.r.length;
-												const xp = parsedResponse.xp.diff;
-												logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions, xp });
-											}
-										}
-
-										break;
-									case '/api/discover':
-										let toDelete = [];
-
-										if ('loot' in parsedResponse) {
-											logAction({ type: 'discover', point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
-
-											if (discoverModifier.isActive) {
-												toDelete = parsedResponse.loot
-													.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
-													.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
-
-												if (toDelete.length != 0) {
-													parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
-													const modifiedResponse = createResponse(parsedResponse, response);
-													resolve(modifiedResponse);
-												}
-											}
-										}
-
-										clearInventory(false, toDelete);
-
-										if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
-											let dateNow = Date.now();
-											let discoveriesLeft;
-
-											// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
-											// После выжигания в burnout приходит таймстамп остывания точки.
-											// 20 хаков – с запасом на случай ивентов.
-											if (parsedResponse.burnout <= 20) {
-												discoveriesLeft = parsedResponse.burnout;
-											} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
-												break;
-											}
-
-											let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
-											try {
-												guid = JSON.parse(options.body).guid;
-											} catch {
-												guid = new URLSearchParams(options.body).get('guid');
-											}
-
-											if (guid in favorites) {
-												if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
-												if (favorites[guid].hasActiveCooldown) { break; }
-
-												let cooldown = parsedResponse.burnout || (dateNow + parsedResponse.cooldown * 1000);
-
-												favorites[guid].cooldown = cooldown;
-												favorites.save();
-											}
-										}
-
-										break;
-									case '/api/inview':
-										const inviewPoints = parsedResponse.p;
-										const inviewRegions = parsedResponse.r;
-										const zoom = +url.searchParams.get('z');
-
-										const mapConfig = JSON.parse(localStorage.getItem('map-config'));
-										const lParam = url.searchParams.get('l');
-
-										inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
-
-										if (mapConfig.l == lParam) {
-											resolve(response);
-										} else {
-											const layers = Bitfield.from(mapConfig.l);
-											if (layers.get(1) == 0) { parsedResponse.l = []; }
-											if (layers.get(2) == 0) { parsedResponse.r = []; }
-
-											const modifiedResponse = createResponse(parsedResponse, response);
-											resolve(modifiedResponse);
-										}
-
-										const hParam = url.searchParams.get('h');
-										const isUniqueInRequest = hParam != null;
-										const isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
-
-										if (!inviewPoints) { break; }
-
-										if (isHighlightCoresOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
-											let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
-
-											if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
-												let guids = capturedPoints.map(e => e.g) || [];
-
-												guids.forEach(guid => {
-													if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
-
-													getPointData(guid)
-														.then(data => {
-															inview[guid] = {
-																cores: data.co,
-																lines: {
-																	in: data.li.i,
-																	out: data.li.o,
-																	get sum() { return this.in + this.out; },
-																},
-																energy: data.e,
-																level: data.l,
-																timestamp: Date.now()
-															};
-														})
-														.catch(() => { inview[guid] = { timestamp: Date.now() }; });
-												});
-											}
-										}
-
-										if (isUniqueInRequest) {
-											inviewPoints?.forEach(point => {
-												const type = hParam == 4 ? 'c' : 'v';
-												if (point.h) {
-													uniques[type].add(point.g);
-												} else {
-													uniques[type].delete(point.g);
-												}
-											});
-										}
-
-										break;
-									case '/api/draw':
-										if ('line' in parsedResponse) {
-											const { from, to } = JSON.parse(options.body);
-											const regions = parsedResponse.reg.map(region => region.a);
-											const fromTitle = from == lastOpenedPoint.guid ? lastOpenedPoint.title : undefined;
-											const toTitle = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.title;
-											const distance = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.distance;
-
-											logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
-										} else if ('data' in parsedResponse) {
-
-											let { minDistance, maxDistance } = config.drawing;
-											minDistance = minDistance == -1 ? -Infinity : +minDistance;
-											maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
-
-											if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
-												const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
-												const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
-
-												parsedResponse.data = targetPoint ? [targetPoint] : [];
-
-												if (hiddenPoints > 0) {
-													const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
-																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
-													const toast = createToast(message, 'top left');
-
-													toast.options.className = 'sbgcui_toast-selection';
-													toast.showToast();
-												}
-
-												const modifiedResponse = createResponse(parsedResponse, response);
-												lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
-												resolve(modifiedResponse);
-
-												break;
-											}
-
-											if (isFinite(minDistance) || isFinite(maxDistance)) {
-												const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
-												const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
-
-												if (hiddenPoints > 0) {
-													const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
-																			из списка согласно настройкам ограничения дальности рисования
-																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
-													const toast = createToast(message, 'top left');
-
-													toast.options.className = 'sbgcui_toast-selection';
-													toast.showToast();
-
-													parsedResponse.data = suitablePoints;
-												}
-
-												const modifiedResponse = createResponse(parsedResponse, response);
-												resolve(modifiedResponse);
-											}
-
-											lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
-										}
-										break;
-									case '/api/profile':
-										if ('name' in parsedResponse) {
-											regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.created_at));
-										}
-										break;
-									case '/api/repair':
-										if ('data' in parsedResponse && isPointPopupOpened) {
-											lastOpenedPoint.update(parsedResponse.data);
-										}
-										break;
-									case '/api/score':
-										if ('score' in parsedResponse) {
-											const [points, regions] = parsedResponse.score;
-											const pointsStatTds = document.querySelectorAll('.score__table > tbody td:first-of-type');
-											const regionsStatTds = document.querySelectorAll('.score__table > tbody td:last-of-type');
-
-											delete points.check;
-											delete regions.check;
-
-											const [pointsPlaces, regionsPlaces] = [points, regions].map(scores => Object.fromEntries(Object.entries(scores).sort((a, b) => b[1] - a[1]).map((e, i) => [e[0], i])));
-
-											pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
-											regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
-										}
-
-										break;
-									default:
-										resolve(response);
-										return;
-								}
-							}).catch(error => {
-								console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
-							}).finally(() => {
-								resolve(response);
-							});
-						})
-						.catch(error => { reject(error); });
-				});
-			}
 
 			async function getSelfData() {
 				return fetch('/api/self', {
@@ -1369,9 +1063,7 @@
 					.catch(error => {
 						if (error.silent) { return; }
 
-						let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`);
-
-						toast.options.className = 'error-toast';
+						let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`, undefined, undefined, 'error-toast');
 						toast.showToast();
 
 						console.log('SBG CUI: Ошибка при удалении предметов.', error);
@@ -2125,9 +1817,7 @@
 						let toast = createToast('Настройки сохранены');
 						toast.showToast();
 					} catch (error) {
-						let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`);
-
-						toast.options.className = 'error-toast';
+						let toast = createToast(`Ошибка при сохранении настроек. <br>${error.message}`, undefined, undefined, 'error-toast');
 						toast.showToast();
 
 						console.log('SBG CUI: Ошибка при сохранении настроек.', error);
@@ -2352,6 +2042,319 @@
 				view.adjustCenter([0, VIEW_PADDING / -2]);
 			}
 
+			function fetchDecorator(fetch) {
+				return async function (pathNquery, options) {
+					return new Promise((resolve, reject) => {
+						const url = new URL(window.location.origin + pathNquery);
+						let isBroom;
+
+						switch (url.pathname) {
+							case '/api/attack2':
+								const guid = JSON.parse(options.body).guid;
+								const invCache = JSON.parse(localStorage.getItem('inventory-cache'));
+								const message = `Использовать "${i18next.t('items.brooms_one')}"?`;
+
+								isBroom = invCache.find(e => e.t == 4 && e.g == guid) !== undefined;
+
+								if (isBroom && !confirm(message)) {
+									resolve();
+									attackSlider.dispatchEvent(new Event('attackSliderOpened'));
+									return;
+								}
+
+								break;
+							case '/api/inview':
+								if (isRefsViewerOpened) { resolve(); return; }
+
+								let uniqsHighlighting = Object.values(config.pointHighlighting).find(e => e.match(/uniqc|uniqv/));
+
+								if (uniqsHighlighting) {
+									const hParam = uniqsHighlighting == 'uniqc' ? 4 : 2;
+									url.searchParams.set('h', hParam);
+								}
+
+								const mapConfig = JSON.parse(localStorage.getItem('map-config'));
+								const layers = Bitfield.from(mapConfig.l);
+
+								layers.change(1, 1);
+								layers.change(2, 1);
+								url.searchParams.set('l', layers.toString());
+
+								break;
+						}
+
+						fetch(url.pathname + url.search, options)
+							.then(async response => {
+								if (!url.pathname.match(/^\/api\//)) {
+									resolve(response);
+									return;
+								}
+
+								let clonedResponse = response.clone();
+
+								clonedResponse.json().then(async parsedResponse => {
+									switch (url.pathname) {
+										case '/api/point':
+											if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
+												lastOpenedPoint = new Point(parsedResponse.data);
+											}
+											break;
+										case '/api/deploy':
+											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
+												const actionType = parsedResponse.data.co.length == 1 ? 'capture' : 'deploy';
+												lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
+												lastOpenedPoint.selectCore(config.autoSelect.deploy);
+												logAction({ type: actionType, coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
+												lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
+												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
+												logAction({ type: 'upgrade', coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+											}
+											break;
+										case '/api/attack2':
+											lastUsedCatalyser = JSON.parse(options.body).guid;
+											database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
+
+											if ('c' in parsedResponse) {
+												const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
+
+												if (points.length > 0) {
+													const lines = parsedResponse.l.length;
+													const regions = parsedResponse.r.length;
+													const xp = parsedResponse.xp.diff;
+													logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions, xp });
+												}
+											}
+
+											break;
+										case '/api/discover':
+											let toDelete = [];
+
+											if ('loot' in parsedResponse) {
+												logAction({ type: 'discover', point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+
+												if (discoverModifier.isActive) {
+													toDelete = parsedResponse.loot
+														.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
+														.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+
+													if (toDelete.length != 0) {
+														parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
+														const modifiedResponse = createResponse(parsedResponse, response);
+														resolve(modifiedResponse);
+													}
+												}
+											}
+
+											clearInventory(false, toDelete);
+
+											if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
+												let dateNow = Date.now();
+												let discoveriesLeft;
+
+												// Пока точка не выжжена, в burnout приходит оставшее количество хаков.
+												// После выжигания в burnout приходит таймстамп остывания точки.
+												// 20 хаков – с запасом на случай ивентов.
+												if (parsedResponse.burnout <= 20) {
+													discoveriesLeft = parsedResponse.burnout;
+												} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
+													break;
+												}
+
+												let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
+												try {
+													guid = JSON.parse(options.body).guid;
+												} catch {
+													guid = new URLSearchParams(options.body).get('guid');
+												}
+
+												if (guid in favorites) {
+													if (discoveriesLeft) { favorites[guid].discoveriesLeft = discoveriesLeft; break; }
+													if (favorites[guid].hasActiveCooldown) { break; }
+
+													let cooldown = parsedResponse.burnout || (dateNow + parsedResponse.cooldown * 1000);
+
+													favorites[guid].cooldown = cooldown;
+													favorites.save();
+												}
+											}
+
+											break;
+										case '/api/inview':
+											const inviewPoints = parsedResponse.p;
+											const inviewRegions = parsedResponse.r;
+											const zoom = +url.searchParams.get('z');
+
+											const mapConfig = JSON.parse(localStorage.getItem('map-config'));
+											const lParam = url.searchParams.get('l');
+
+											inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
+
+											if (mapConfig.l == lParam) {
+												resolve(response);
+											} else {
+												const layers = Bitfield.from(mapConfig.l);
+												if (layers.get(1) == 0) { parsedResponse.l = []; }
+												if (layers.get(2) == 0) { parsedResponse.r = []; }
+
+												const modifiedResponse = createResponse(parsedResponse, response);
+												resolve(modifiedResponse);
+											}
+
+											const hParam = url.searchParams.get('h');
+											const isUniqueInRequest = hParam != null;
+											const isHighlightCoresOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|highlevel|level/)) != undefined;
+
+											if (!inviewPoints) { break; }
+
+											if (isHighlightCoresOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
+												let capturedPoints = inviewPoints.filter(e => { !e.t && delete inview[e.g]; return e.t != 0; }); // Временная заплатка что бы на снесённых точках исчезали маркеры.
+
+												if (capturedPoints.length <= INVIEW_POINTS_LIMIT) {
+													let guids = capturedPoints.map(e => e.g) || [];
+
+													guids.forEach(guid => {
+														if (Date.now() - inview[guid]?.timestamp < INVIEW_POINTS_DATA_TTL) { return; }
+
+														getPointData(guid)
+															.then(data => {
+																inview[guid] = {
+																	cores: data.co,
+																	lines: {
+																		in: data.li.i,
+																		out: data.li.o,
+																		get sum() { return this.in + this.out; },
+																	},
+																	energy: data.e,
+																	level: data.l,
+																	timestamp: Date.now()
+																};
+															})
+															.catch(() => { inview[guid] = { timestamp: Date.now() }; });
+													});
+												}
+											}
+
+											if (isUniqueInRequest) {
+												inviewPoints?.forEach(point => {
+													const type = hParam == 4 ? 'c' : 'v';
+													if (point.h) {
+														uniques[type].add(point.g);
+													} else {
+														uniques[type].delete(point.g);
+													}
+												});
+											}
+
+											break;
+										case '/api/draw':
+											if ('line' in parsedResponse) {
+												const { from, to } = JSON.parse(options.body);
+												const regions = parsedResponse.reg.map(region => region.a);
+												const fromTitle = from == lastOpenedPoint.guid ? lastOpenedPoint.title : undefined;
+												const toTitle = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.title;
+												const distance = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.distance;
+
+												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
+											} else if ('data' in parsedResponse) {
+
+												let { minDistance, maxDistance } = config.drawing;
+												minDistance = minDistance == -1 ? -Infinity : +minDistance;
+												maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+
+												if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
+													const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+													const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+
+													parsedResponse.data = targetPoint ? [targetPoint] : [];
+
+													if (hiddenPoints > 0) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
+													}
+
+													const modifiedResponse = createResponse(parsedResponse, response);
+													lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
+													resolve(modifiedResponse);
+
+													break;
+												}
+
+												if (isFinite(minDistance) || isFinite(maxDistance)) {
+													const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
+													const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
+
+													if (hiddenPoints > 0) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																			из списка согласно настройкам ограничения дальности рисования
+																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
+
+														parsedResponse.data = suitablePoints;
+													}
+
+													const modifiedResponse = createResponse(parsedResponse, response);
+													resolve(modifiedResponse);
+												}
+
+												lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
+											}
+											break;
+										case '/api/profile':
+											if ('name' in parsedResponse) {
+												regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.created_at));
+											}
+											break;
+										case '/api/repair':
+											if ('data' in parsedResponse && isPointPopupOpened) {
+												lastOpenedPoint.update(parsedResponse.data);
+											}
+											break;
+										case '/api/score':
+											if ('score' in parsedResponse) {
+												const [points, regions] = parsedResponse.score;
+												const pointsStatTds = document.querySelectorAll('.score__table > tbody td:first-of-type');
+												const regionsStatTds = document.querySelectorAll('.score__table > tbody td:last-of-type');
+
+												delete points.check;
+												delete regions.check;
+
+												const [pointsPlaces, regionsPlaces] = [points, regions].map(scores => Object.fromEntries(Object.entries(scores).sort((a, b) => b[1] - a[1]).map((e, i) => [e[0], i])));
+
+												pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
+												regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
+											}
+
+											break;
+										default:
+											resolve(response);
+											return;
+									}
+								}).catch(error => {
+									console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
+								}).finally(() => {
+									resolve(response);
+								});
+							})
+							.catch(error => { reject(error); });
+					});
+				}
+			}
+
+			function toastifyDecorator(toastify) {
+				return function (options) {
+					options.selector = null;
+					options.style = {
+						fontSize: '0.8em',
+					};
+
+					return toastify(options);
+				}
+			}
+
 
 			/* Данные о себе и версии игры */
 			{
@@ -2360,8 +2363,8 @@
 
 				if (LATEST_KNOWN_VERSION != selfData.version) {
 					if (versionWarns < 2) {
-						const toast = createToast(`Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`);
-						toast.options.className = 'error-toast';
+						const message = `Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`;
+						const toast = createToast(message, undefined, undefined, 'error-toast');
 						toast.showToast();
 
 						stateStore.put(versionWarns + 1, 'versionWarns');
@@ -2959,9 +2962,7 @@
 							}
 						})
 						.catch(error => {
-							const toast = createToast(`Ошибка при зарядке. <br>${error.message}`);
-
-							toast.options.className = 'error-toast';
+							const toast = createToast(`Ошибка при зарядке. <br>${error.message}`, undefined, undefined, 'error-toast');
 							toast.showToast();
 
 							console.log('SBG CUI: Ошибка при зарядке.', error);
@@ -3116,9 +3117,8 @@
 						const previousStats = event.target.result;
 
 						if (previousStats == undefined) {
-							const toast = createToast(`Вы ещё не сохраняли ${isSelf ? 'свою ' : ''}статистику${isSelf ? '' : ' этого игрока'}.`);
-
-							toast.options.className = 'error-toast';
+							const message = `Вы ещё не сохраняли ${isSelf ? 'свою ' : ''}статистику${isSelf ? '' : ' этого игрока'}.`;
+							const toast = createToast(message, undefined, undefined, 'error-toast');
 							toast.showToast();
 
 							return;
@@ -3602,8 +3602,8 @@
 						let uniqueRefsAmount = inventoryContent.childNodes.length;
 						let toast;
 
-						toast = createToast(`Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`, 'top left', -1);
-						toast.options.className = 'sbgcui_toast-selection';
+						const message = `Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`;
+						toast = createToast(message, undefined, -1, 'sbgcui_toast-selection');
 						toast.showToast();
 
 						clearMeasurements();
@@ -3734,8 +3734,7 @@
 						Кэш рефов будет очищен. <br><br>
 						Для отмены операции закройте инвентарь.`;
 
-						toast = createToast(message, 'bottom center', -1);
-						toast.options.className = 'sbgcui_toast-selection';
+						toast = createToast(message, 'bottom center', -1, 'sbgcui_toast-selection');
 						toast.showToast();
 
 						isInMeasurementMode = true;
@@ -4219,9 +4218,7 @@
 						toastMessage = 'Режим рисования "Звезда" отключён.';
 					}
 
-					const toast = createToast(toastMessage, 'top left', isStarMode ? 6000 : undefined);
-
-					toast.options.className = 'sbgcui_toast-selection';
+					const toast = createToast(toastMessage, undefined, isStarMode ? 6000 : undefined, 'sbgcui_toast-selection');
 					toast.showToast();
 				}
 
@@ -4235,9 +4232,7 @@
 					starModeButton.classList.remove('fa-fade');
 
 					const message = `Точка "<span style="color: var(--selection)">${pointTitleSpan.innerText}</span>" выбрана центром для рисования звезды.`;
-					const toast = createToast(message, 'top left');
-
-					toast.options.className = 'sbgcui_toast-selection';
+					const toast = createToast(message, undefined, undefined, 'sbgcui_toast-selection');
 					toast.showToast();
 				}
 
@@ -4575,9 +4570,7 @@
 			/* Количество регионов под кликом */
 			{
 				function buttonClickHandler() {
-					const toast = createToast('Нажмите на регион чтобы узнать, сколько их в этом месте.');
-
-					toast.options.className = 'sbgcui_toast-selection';
+					const toast = createToast('Нажмите на регион чтобы узнать, сколько их в этом месте.', undefined, undefined, 'sbgcui_toast-selection');
 					toast.showToast();
 
 					map.un('click', mapClickHandler);
@@ -4894,9 +4887,8 @@
 							trashCanButton.style.setProperty('--sbgcui-unique-refs-to-del', `"0"`);
 						})
 						.catch(error => {
-							const toast = createToast(`Ошибка при удалении ссылок. <br>${error?.message || error}`);
-
-							toast.options.className = 'error-toast';
+							const message = `Ошибка при удалении ссылок. <br>${error?.message || error}`;
+							const toast = createToast(message, undefined, undefined, 'error-toast');
 							toast.showToast();
 
 							console.log('SBG CUI: Ошибка при удалении ссылок.', error);

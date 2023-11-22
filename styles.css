@@ -42,6 +42,12 @@ body {
 	margin-bottom: 7px;
 }
 
+.interaction-toast,
+.error-toast {
+	border-color: var(--border-transp);
+	border-radius: 5px;
+}
+
 .item-icon {
 	margin-right: 5px;
 }
@@ -140,7 +146,6 @@ body {
 	position: absolute;
 	top: 0;
 	left: 0;
-	z-index: 1;
 }
 
 #notifs-menu {
@@ -300,7 +305,6 @@ body {
 
 .bottom-container {
 	pointer-events: none;
-	z-index: 2;
 	position: relative;
 	bottom: initial;
 	left: initial;
@@ -489,11 +493,6 @@ html[lang="ru"] .i-buttons {
 #inventory-delete {
 	order: 1;
 }
-
-.info {
-	z-index: 4;
-}
-
 .info>.popup-close {
 	position: sticky;
 }
@@ -890,7 +889,6 @@ html[lang="ru"] .i-buttons {
 	position: initial;
 	top: initial;
 	left: initial;
-	z-index: 2;
 	margin-bottom: auto;
 	backdrop-filter: blur(1px);
 	-webkit-backdrop-filter: blur(1px);
@@ -930,7 +928,7 @@ html[lang="ru"] .i-buttons {
 	border-radius: 5px;
 	display: flex;
 	flex-direction: column;
-	font-size: 0.7em;
+	font-size: 0.7em !important;
 	max-width: 30%;
 	padding: 4px;
 	text-align: center;
@@ -1793,7 +1791,7 @@ li[sbgcui-excluded-core]>span {
 	position: absolute;
 	top: 0;
 	width: 100%;
-	z-index: 3;
+	z-index: 2;
 }
 
 .sbgcui_log-header {
