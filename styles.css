@@ -949,6 +949,12 @@ html[lang="ru"] .i-buttons {
 	white-space: nowrap;
 }
 
+.sbgcui_destroy_notif_toast > .toast-close {
+	position: absolute;
+	right: 0;
+	top: 0;
+}
+
 .sbgcui_button_reset {
 	background: none;
 	border: none;

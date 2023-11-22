@@ -5379,7 +5379,10 @@
 								<span>${pointTitle}</span>
 							`;
 							const toast = createToast(message, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
-							if (onClick == 'jumpto') { toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); }; }
+							if (onClick == 'jumpto') {
+								toast.options.close = true;
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
+							}
 
 							toast.showToast();
 						});
