@@ -904,11 +904,13 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_toast-selection {
+	background: var(--background);
 	border: 1px var(--selection) solid;
 	border-color: var(--selection);
+	border-radius: 5px;
 	box-shadow: 0 0 15px var(--selection);
-	background: var(--background);
 	color: var(--text);
+	padding: 5px;
 }
 
 .sbgcui_toast-team {
