@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.16
+// @version      1.14.17
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -26,9 +26,9 @@
 	}
 
 
-	const consoleLogsAndErrors = [];
+	const logsNerrors = [];
 	const pushMessage = messages => {
-		consoleLogsAndErrors.push({ timestamp: Date.now(), messages });
+		logsNerrors.push({ timestamp: Date.now(), messages });
 	};
 	const logDecorator = genuineFunction => {
 		return function (...args) {
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.16';
+	const USERSCRIPT_VERSION = '1.14.17';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -215,7 +215,7 @@
 				status: 'all', // all || fav || off
 				onClick: 'jumpto', // close || jumpto
 				interval: 30000,
-				duration: 7000,
+				duration: -1,
 			},
 		};
 
@@ -426,7 +426,7 @@
 							if (response.ok) {
 								return response.blob()
 							} else {
-								throw new Error(`[${response.status}] Не удалось загрузить тайл ${coords}.`);
+								throw new Error(`[HTTP ${response.status}] Не удалось загрузить тайл ${coords}.`);
 							}
 						})
 						.then(blob => {
@@ -796,7 +796,7 @@
 				#notify() {
 					if (!this.isActive) { return; }
 
-					let message = `"${this.name}": точка остыла.`;
+					let message = `"${this.name}": <br>точка остыла.`;
 
 					if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
 						let notification = new Notification(message, { icon: '/icons/icon_512.png' });
@@ -1218,10 +1218,11 @@
 				element?.dispatchEvent(clickEvent);
 			}
 
-			function createToast(text = '', position = 'top left', duration = 3000, className = 'interaction-toast') {
+			function createToast(content = '', position = 'top left', duration = 3000, className = 'interaction-toast') {
 				let parts = position.split(/\s+/);
 				let toast = Toastify({
-					text,
+					node: content instanceof Element ? content : undefined,
+					text: content instanceof Element ? undefined : content,
 					duration,
 					gravity: parts[0],
 					position: parts[1],
@@ -1668,7 +1669,7 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					options.selector = null;
+					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
 					options.style = {
 						fontSize: '0.8em',
 					};
@@ -2546,7 +2547,7 @@
 					const pointBgImageCheckbox = settingsMenu.querySelector('#ui_pointBgImage');
 					var pointBgImageBlurCheckbox = settingsMenu.querySelector('#ui_pointBgImageBlur');
 					const versionSpan = settingsMenu.querySelector('.sbgcui_settings-version');
-					const vibrationSection = settingsMenu.querySelector('details:has(#vibration_notifications)');
+					const vibrationDetails = settingsMenu.querySelector('#vibration_notifications').closest('details');
 
 					var markersSelects = [innerMarkerSelect, outerMarkerSelect, outerBottomMarkerSelect, outerTopMarkerSelect];
 
@@ -2554,7 +2555,7 @@
 					versionSpan.innerText = `v${USERSCRIPT_VERSION}`;
 					highlevelMarkersOptions.forEach(option => { option.innerText += ` ${HIGHLEVEL_MARKER}+`; });
 
-					if (!('vibrate' in window.navigator)) { vibrationSection.classList.add('sbgcui_hidden'); }
+					if (!('vibrate' in window.navigator)) { vibrationDetails.classList.add('sbgcui_hidden'); }
 
 					brandingInput.addEventListener('change', onBrandingInputChange);
 					brandingInput.addEventListener('input', onBrandingInputInput);
@@ -4272,7 +4273,7 @@
 				pointPopup.appendChild(jumpToButton);
 
 				try {
-					if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error(); }
+					if (window.navigator.userAgent.toLowerCase().includes('wv')) { throw new Error('Навигационные ссылки не поддерживаются в APK.'); }
 
 					function createURL(app, routeType) {
 						const [lonA, latA] = ol.proj.toLonLat(playerFeature.getGeometry().getCoordinates());
@@ -4625,7 +4626,7 @@
 					}
 
 					function showConsole() {
-						consoleLogsAndErrors.forEach(data => {
+						logsNerrors.forEach(data => {
 							const entry = document.createElement('p');
 							const entryTime = document.createElement('span');
 							const entryDescr = document.createElement('div');
@@ -4634,27 +4635,27 @@
 							entryTime.classList.add('sbgcui_log-content-entry-time');
 							entryDescr.classList.add('sbgcui_log-content-entry-description');
 
-							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
-							entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format);
+							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23' };
+							entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format).replace(',', ':');
 
 							entryDescr.innerHTML = data.messages.join('<br>');
 
 							entry.append(entryTime, entryDescr);
-							consoleContent.prepend(entry);
+							cnslContent.prepend(entry);
 						});
 
 						[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
-						consoleContent.classList.remove('sbgcui_hidden');
+						cnslContent.classList.remove('sbgcui_hidden');
 					}
 
 					function hideConsole() {
-						consoleContent.innerHTML = '';
+						cnslContent.innerHTML = '';
 						[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
-						consoleContent.classList.add('sbgcui_hidden');
+						cnslContent.classList.add('sbgcui_hidden');
 					}
 
 					function toggleConsole() {
-						const isConsoleHidden = consoleContent.classList.contains('sbgcui_hidden');
+						const isConsoleHidden = cnslContent.classList.contains('sbgcui_hidden');
 						isConsoleHidden ? showConsole() : hideConsole();
 					}
 
@@ -4864,13 +4865,13 @@
 					const popup = await fetchHTMLasset('log');
 					const closeButton = popup.querySelector('.sbgcui_log-close');
 					const clearButton = popup.querySelector('.sbgcui_log-buttons-trash');
-					const consoleButton = popup.querySelector('.sbgcui_log-buttons-console');
+					const cnslButton = popup.querySelector('.sbgcui_log-buttons-console');
+					const cnslContent = popup.querySelector('.sbgcui_log-console');
 					const datePicker = popup.querySelector('input[type="date"]');
-					const logContent = popup.querySelector('.sbgcui_log-content');
-					const consoleContent = popup.querySelector('.sbgcui_log-console');
-					const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
 					const header = popup.querySelector('.sbgcui_log-header');
 					const jumpToButton = document.querySelector('.info > .sbgcui_jumpToButton');
+					const logContent = popup.querySelector('.sbgcui_log-content');
+					const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
 					const toolbarButton = document.createElement('button');
 					let log;
 
@@ -4886,7 +4887,7 @@
 					toolbarButton.addEventListener('click', showPopup);
 					closeButton.addEventListener('click', hidePopup);
 					clearButton.addEventListener('click', clearStorage);
-					consoleButton.addEventListener('click', toggleConsole);
+					cnslButton.addEventListener('click', toggleConsole);
 					jumpToButton.addEventListener('click', hidePopup);
 					tagsWrapper.addEventListener('click', toggleTag);
 					logContent.addEventListener('click', showPointInfo);
@@ -4926,16 +4927,16 @@
 
 						latestNotifId = notifs[0].id;
 
-						notifs.slice(0, notifsCount).reverse().forEach(notif => {
-							const { g: guid, na: attackerName, ta: attackerTeam, c: coords, t: pointTitle, id } = notif;
+						notifs.slice(0, notifsCount).forEach(notif => {
+							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle, id } = notif;
+							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
+							const attackTime = new Date(attackDate).toLocaleString(i18next.language, format);
 
 							if (status == 'fav' && !(guid in favorites)) { return; }
 
-							const message = `
-								<span style="color: var(--team-${attackerTeam})">${attackerName}</span>
-								<span>${pointTitle}</span>
-							`;
-							const toast = createToast(message, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
+							const toastNode = createToastNode(attackerName, attackerTeam, attackTime, pointTitle);
+							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
+							toast.options.selector = destroyNotifsContainer;
 							toast.options.callback = () => {
 								localStorage.setItem('latest-notif', id);
 								if (id == notifs[0].id) { notifsButton.removeAttribute('data-count'); }
@@ -4949,6 +4950,28 @@
 						});
 					}
 				}
+				function createToastNode(attackerName, attackerTeam, attackTime, pointTitle) {
+					const toastNode = document.createElement('div');
+					const attackDetailsWrapper = document.createElement('span');
+					const attackerNameSpan = document.createElement('span');
+					const attackTimeSpan = document.createElement('span');
+					const pointTitleSpan = document.createElement('span');
+
+					toastNode.classList.add('sbgcui_destroy_notif_toast-content');
+					attackerNameSpan.style.color = `var(--team-${attackerTeam})`;
+					attackerNameSpan.innerText = attackerName;
+					attackTimeSpan.innerText = `@ ${attackTime}`;
+					pointTitleSpan.innerText = pointTitle;
+
+					attackDetailsWrapper.append(attackerNameSpan, attackTimeSpan);
+					toastNode.append(attackDetailsWrapper, pointTitleSpan);
+
+					return toastNode;
+				}
+
+				const destroyNotifsContainer = document.createElement('div');
+				destroyNotifsContainer.classList.add('sbgcui_destroy_notifs');
+				document.body.appendChild(destroyNotifsContainer);
 
 				let notifsCount = 0;
 				const notifs = await getNotifs();

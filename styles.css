@@ -28,7 +28,6 @@ body {
 	overflow: hidden;
 }
 
-.toastify span:has(+br+span>.item-icon)~span:nth-of-type(2),
 .toastify span:has(.item-icon):first-of-type,
 .toastify span:has(.type-1)+span:has(.type-2),
 .toastify span:has(.type-2)+span:has(.type-3),
@@ -498,6 +497,7 @@ html[lang="ru"] .i-buttons {
 #inventory-delete {
 	order: 1;
 }
+
 .info>.popup-close {
 	position: sticky;
 }
@@ -927,37 +927,60 @@ html[lang="ru"] .i-buttons {
 	color: var(--text);
 }
 
+.sbgcui_destroy_notifs {
+	bottom: 0;
+	height: 0;
+	/* Чтобы не перекрывало тулбар. Высота не важна, тосты абсолютно позиционированы. */
+	left: 0;
+	position: absolute;
+	width: calc(50% - 3em - 15px);
+	/* Половина ширины body - половина ширины кнопки атаки - отступ тоста от края */
+	z-index: 10;
+}
+
+.sbgcui_destroy_notifs>.toastify:nth-child(2) {
+	translate: 0 10px;
+}
+
+.sbgcui_destroy_notifs>.toastify:nth-child(3) {
+	translate: 0 20px;
+}
+
 .sbgcui_destroy_notif_toast {
 	background: var(--background-transp);
 	border: 1px solid var(--border-transp);
 	border-radius: 5px;
-	display: flex;
-	flex-direction: column;
+	box-sizing: border-box;
 	font-size: 0.7em !important;
-	max-width: 30%;
 	padding: 4px;
-	text-align: center;
-	width: 30%;
+	width: inherit;
 }
 
-.sbgcui_destroy_notif_toast:nth-child(2) {
-	translate: 0 10px;
-}
-
-.sbgcui_destroy_notif_toast:nth-child(3) {
-	translate: 0 20px;
-}
-
-.sbgcui_destroy_notif_toast>span:last-child {
-	overflow-x: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.sbgcui_destroy_notif_toast > .toast-close {
+.sbgcui_destroy_notif_toast>.toast-close {
+	color: var(--text);
+	opacity: 0.7;
 	position: absolute;
 	right: 0;
 	top: 0;
+}
+
+.sbgcui_destroy_notif_toast-content {
+	color: var(--text);
+	display: flex;
+	flex-direction: column;
+}
+
+.sbgcui_destroy_notif_toast-content>span:first-child {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	width: calc(100% - 12px);
+}
+
+.sbgcui_destroy_notif_toast-content>span:last-child {
+	overflow-x: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .sbgcui_button_reset {
@@ -1191,11 +1214,11 @@ input[type="range"][name="notifications_duration"]::after {
 	display: flex;
 }
 
-.sbgcui_settings-amount_input_wrp > label {
+.sbgcui_settings-amount_input_wrp>label {
 	flex-basis: 20%;
 }
 
-.sbgcui_settings-amount_input_wrp > input {
+.sbgcui_settings-amount_input_wrp>input {
 	margin-left: 10px;
 	width: 4em;
 }
@@ -1899,6 +1922,10 @@ li[sbgcui-excluded-core]>span {
 	flex-direction: column;
 }
 
+.sbgcui_log-console .sbgcui_log-content-entry-time {
+	flex-basis: 25%;
+}
+
 .sbgcui_log-content-entry-time::after {
 	content: var(--action-type);
 	display: block;
@@ -1910,6 +1937,11 @@ li[sbgcui-excluded-core]>span {
 	flex-basis: calc(80% - 10px);
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.sbgcui_log-console .sbgcui_log-content-entry-description {
+	flex-basis: calc(75% - 10px);
+	overflow-wrap: break-word;
 }
 
 .sbgcui_log-content-entry-description-fromto {
