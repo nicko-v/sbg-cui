@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.17
+// @version      1.14.18
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.17';
+	const USERSCRIPT_VERSION = '1.14.18';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -2459,6 +2459,10 @@
 					}
 				}
 
+				function onMaxAmountInBagInputInput(event) {
+					event.target.setAttribute('data-amount', event.target.value);
+				}
+
 				function onNotificationsDurationInputInput(event) {
 					const value = event.target.value;
 					event.target.setAttribute('label', `${value == -1 ? '∞' : Math.round(value / 1000)} сек.`);
@@ -2503,6 +2507,13 @@
 								break;
 						}
 					});
+
+					// Диспатчим эвенты на инпутах, у которых есть текстовые/цветовые маркеры, меняющиеся при вводе.
+					[
+						...maxAmountInBagInputs,
+						notificationsDurationInput,
+						notificationsIntervalInput
+					].forEach(input => { input.dispatchEvent(new Event('input')); });
 				}
 
 				function setFilterCSSVar(filter, value) {
@@ -2538,9 +2549,10 @@
 					const highlevelMarkersOptions = settingsMenu.querySelectorAll('option[value="highlevel"]');
 					var innerMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_inner"]');
 					const mapTintingInput = settingsMenu.querySelector('#tinting_map');
+					var maxAmountInBagInputs = settingsMenu.querySelectorAll('.sbgcui_settings-maxamounts input[name^="maxAmountInBag"]');
 					const minFreeSpaceSpan = settingsMenu.querySelector('#sbgcui_min_free_space');
-					const notificationsDurationInput = settingsMenu.querySelector('input[name="notifications_duration"]');
-					const notificationsIntervalInput = settingsMenu.querySelector('input[name="notifications_interval"]');
+					var notificationsDurationInput = settingsMenu.querySelector('input[name="notifications_duration"]');
+					var notificationsIntervalInput = settingsMenu.querySelector('input[name="notifications_interval"]');
 					var outerBottomMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outerBottom"]');
 					var outerMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outer"]');
 					var outerTopMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_outerTop"]');
@@ -2570,6 +2582,7 @@
 					settingsMenu.addEventListener('submit', onFormSubmit);
 					colorFiltersInputs.forEach(input => { input.addEventListener('input', onColorFilterInput); });
 					markersSelects.forEach(select => { select.addEventListener('change', onMarkerSelectChange); });
+					maxAmountInBagInputs.forEach(input => { input.addEventListener('input', onMaxAmountInBagInputInput); });
 
 					setStoredInputsValues();
 					tlContainer.appendChild(settingsMenu);

@@ -1223,6 +1223,17 @@ input[type="range"][name="notifications_duration"]::after {
 .sbgcui_settings-amount_input_wrp>input {
 	margin-left: 10px;
 	width: 4em;
+	transition: all 0.4s ease-out;
+}
+
+.sbgcui_settings-amount_input_wrp>input[data-amount="-1"] {
+	background-color: darkgreen;
+	border: 2px solid green;
+}
+
+.sbgcui_settings-amount_input_wrp>input[data-amount="0"] {
+	background-color: darkred;
+	border: 2px solid red;
 }
 
 .sbgcui_settings-input_wrp,
