@@ -1455,6 +1455,8 @@
 
 											if ('loot' in parsedResponse) {
 												logAction({ type: 'discover', point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
+												parsedResponse.loot.sort((a, b) => (a.t == b.t) ? ((a.t < 3 && b.t < 3) ? (b.l - a.l) : (a.t < 3 ? a.t : b.t)) : (a.t - b.t));
 
 												if (discoverModifier.isActive) {
 													toDelete = parsedResponse.loot
@@ -1463,10 +1465,11 @@
 
 													if (toDelete.length != 0) {
 														parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
-														const modifiedResponse = createResponse(parsedResponse, response);
-														resolve(modifiedResponse);
 													}
 												}
+
+												const modifiedResponse = createResponse(parsedResponse, response);
+												resolve(modifiedResponse);
 											}
 
 											clearInventory(false, toDelete);
