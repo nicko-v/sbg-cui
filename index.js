@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.18
+// @version      1.14.19
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.18';
+	const USERSCRIPT_VERSION = '1.14.19';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -777,6 +777,7 @@
 
 			class Favorite {
 				#cooldown;
+				#cooldownNotifToast
 
 				constructor(guid, cooldown, name) {
 					this.guid = guid;
@@ -785,26 +786,28 @@
 					this.discoveriesLeft = undefined;
 					this.timeoutID = undefined;
 					this.isActive = 1;
+					this.#cooldownNotifToast = createToast(`"${this.name}": <br>точка остыла.`, 'top left', -1, 'sbgcui_toast-selection');
 
 					if (!name) { this.#getName(); }
 				}
 
 				#getName() {
 					getPointData(this.guid)
-						.then(data => { this.name = data.t; })
+						.then(data => {
+							this.name = data.t;
+							this.#cooldownNotifToast.options.text = `"${this.name}": <br>точка остыла.`;
+						})
 						.catch(error => { console.log('SBG CUI: Ошибка при получении данных точки.', error); });
 				}
 
 				#notify() {
 					if (!this.isActive) { return; }
 
-					let message = `"${this.name}": <br>точка остыла.`;
 
 					if (!isMobile() && 'Notification' in window && Notification.permission == 'granted') {
 						let notification = new Notification(message, { icon: '/icons/icon_512.png' });
 					} else {
-						let toast = createToast(message, 'top left', -1, 'sbgcui_toast-selection');
-						toast.showToast();
+						this.showCooldownNotifToast();
 
 						if ('vibrate' in window.navigator && config.vibration.notifications) {
 							window.navigator.vibrate(0);
@@ -823,6 +826,16 @@
 
 					clearTimeout(this.timeoutID);
 					this.timeoutID = setTimeout(this.#onTimeout.bind(this), delay);
+				}
+
+				hideCooldownNotifToast() {
+					if (this.#cooldownNotifToast.toastElement != null) {
+						this.#cooldownNotifToast.hideToast();
+					}
+				}
+
+				showCooldownNotifToast() {
+					this.#cooldownNotifToast.showToast();
 				}
 
 				toJSON() {
@@ -1460,10 +1473,15 @@
 
 											break;
 										case '/api/discover':
+											//const guid = JSON.parse(options.body).guid;
+											const guid = lastOpenedPoint.guid;
 											let toDelete = [];
 
+											// Закрываем тост о том, что избранная точка остыла.
+											if (guid in favorites) { favorites[guid].hideCooldownNotifToast(); }
+
 											if ('loot' in parsedResponse) {
-												logAction({ type: 'discover', point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+												logAction({ type: 'discover', point: guid, title: lastOpenedPoint.title });
 												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
 												parsedResponse.loot.sort((a, b) => (a.t == b.t) ? ((a.t < 3 && b.t < 3) ? (b.l - a.l) : (a.t < 3 ? a.t : b.t)) : (a.t - b.t));
 
@@ -1494,13 +1512,6 @@
 													discoveriesLeft = parsedResponse.burnout;
 												} else if (parsedResponse.cooldown <= DISCOVERY_COOLDOWN || parsedResponse.burnout < dateNow) {
 													break;
-												}
-
-												let guid; // Тело запроса дискавера передаётся в виде объекта, а не JSON. Возможно исправят.
-												try {
-													guid = JSON.parse(options.body).guid;
-												} catch {
-													guid = new URLSearchParams(options.body).get('guid');
 												}
 
 												if (guid in favorites) {
@@ -5030,7 +5041,6 @@
 				let intervalId = setInterval(checkAndShow, interval);
 				window.addEventListener('configUpdated', updateInterval);
 			}
-
 
 			window.cuiStatus = 'loaded';
 		} catch (error) {
