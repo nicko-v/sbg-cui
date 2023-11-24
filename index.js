@@ -591,6 +591,8 @@
 					this.regionsAmount = pointData.r;
 					this.cores = {};
 					this.image = `https://lh3.googleusercontent.com/${pointData.i}`;
+					this.isVisited = pointData.u.v;
+					this.isCaptured = pointData.u.c;
 
 					this.update(pointData.co);
 				}
@@ -1424,14 +1426,21 @@
 											break;
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-												const actionType = parsedResponse.data.co.length == 1 ? 'capture' : 'deploy';
+												const { coords, guid: point, title, isCaptured } = lastOpenedPoint;
+												const isFirstCore = parsedResponse.data.co.length == 1;
+												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
+												
 												lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
-												logAction({ type: actionType, coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+
+												logAction({ type: actionType, coords, point, title });
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
+												const { coords, guid: point, title } = lastOpenedPoint;
+
 												lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-												logAction({ type: 'upgrade', coords: lastOpenedPoint.coords, point: lastOpenedPoint.guid, title: lastOpenedPoint.title });
+
+												logAction({ type: 'upgrade', coords, point, title });
 											}
 											break;
 										case '/api/attack2':
@@ -2427,6 +2436,7 @@
 						}
 
 						showToast('Настройки сохранены');
+						window.dispatchEvent(new Event('configUpdated'));
 					} catch (error) {
 						showToast(`Ошибка при сохранении настроек. <br>${error.message}`, undefined, undefined, 'error-toast');
 						console.log('SBG CUI: Ошибка при сохранении настроек.', error);
@@ -3583,10 +3593,10 @@
 			{
 				const closeButton = document.createElement('button');
 				const cooldownGradient = `conic-gradient(
-			#0000 var(--sbgcui-cluster-cooldown, 100%),
-			var(--sbgcui-cluster-team, #000) var(--sbgcui-cluster-cooldown, 100%) calc(var(--sbgcui-cluster-cooldown, 100%) + 1%),
-			#0007 var(--sbgcui-cluster-cooldown, 100%) 100%
-			)`;
+					#0000 var(--sbgcui-cluster-cooldown, 100%),
+					var(--sbgcui-cluster-team, #000) var(--sbgcui-cluster-cooldown, 100%) calc(var(--sbgcui-cluster-cooldown, 100%) + 1%),
+					#0007 var(--sbgcui-cluster-cooldown, 100%) 100%
+					)`;
 				const origin = document.createElement('div');
 				const overlay = document.createElement('div');
 				const originalOnClick = map.getListeners('click')[0];
@@ -4738,6 +4748,7 @@
 							logs.map(action => {
 								switch (action.type) {
 									case 'capture':
+									case 'uniqcap':
 									case 'deploy':
 									case 'upgrade':
 									case 'discover':
@@ -4779,6 +4790,7 @@
 
 										switch (action.type) {
 											case 'capture':
+											case 'uniqcap':
 											case 'deploy':
 											case 'upgrade':
 											case 'discover': {
@@ -4978,6 +4990,7 @@
 						});
 					}
 				}
+
 				function createToastNode(attackerName, attackerTeam, attackTime, pointTitle) {
 					const toastNode = document.createElement('div');
 					const attackDetailsWrapper = document.createElement('span');
@@ -4997,15 +5010,25 @@
 					return toastNode;
 				}
 
+				function updateInterval() {
+					if (interval != config.notifications.interval) {
+						clearInterval(intervalId);
+						interval = config.notifications.interval;
+						intervalId = setInterval(checkAndShow, interval);
+					}
+				}
+
 				const destroyNotifsContainer = document.createElement('div');
 				destroyNotifsContainer.classList.add('sbgcui_destroy_notifs');
 				document.body.appendChild(destroyNotifsContainer);
 
+				let interval = config.notifications.interval;
 				let notifsCount = 0;
 				const notifs = await getNotifs();
 				latestNotifId = notifs[0].id;
 
-				setInterval(checkAndShow, config.notifications.interval);
+				let intervalId = setInterval(checkAndShow, interval);
+				window.addEventListener('configUpdated', updateInterval);
 			}
 
 

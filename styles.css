@@ -1812,6 +1812,7 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_log {
 	--capture: darkgreen;
+	--uniqcap: darkolivegreen;
 	--deploy: darkgoldenrod;
 	--upgrade: darkslategrey;
 	--discover: darkcyan;
@@ -1866,6 +1867,10 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_log-tags>span[data-action="capture"] {
 	background-color: var(--capture);
+}
+
+.sbgcui_log-tags>span[data-action="uniqcap"] {
+	background-color: var(--uniqcap);
 }
 
 .sbgcui_log-tags>span[data-action="deploy"] {
@@ -2005,6 +2010,7 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_log:has(span[data-action="capture"][data-hidden]) .sbgcui_log-content-entry[data-action="capture"],
+.sbgcui_log:has(span[data-action="uniqcap"][data-hidden]) .sbgcui_log-content-entry[data-action="uniqcap"],
 .sbgcui_log:has(span[data-action="deploy"][data-hidden]) .sbgcui_log-content-entry[data-action="deploy"],
 .sbgcui_log:has(span[data-action="upgrade"][data-hidden]) .sbgcui_log-content-entry[data-action="upgrade"],
 .sbgcui_log:has(span[data-action="discover"][data-hidden]) .sbgcui_log-content-entry[data-action="discover"],
