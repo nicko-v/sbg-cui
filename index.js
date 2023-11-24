@@ -2411,7 +2411,7 @@
 
 							if (section == 'maxAmountInBag') {
 								const item = path[1], level = path[2];
-								const amount = Number.isInteger(+formEntries[entry]) ? +formEntries[entry] : -1;
+								const amount = isValidAmount(formEntries[entry]) ? +formEntries[entry] : -1;
 
 								config.maxAmountInBag[item][level] = amount;
 							} else {
@@ -2462,8 +2462,18 @@
 					}
 				}
 
+				function onMaxAmountInBagInputChange(event) {
+					const input = event.target;
+
+					if (!isValidAmount(input.value)) {
+						input.value = -1;
+						input.setAttribute('data-amount', input.value);
+					}
+				}
+
 				function onMaxAmountInBagInputInput(event) {
-					event.target.setAttribute('data-amount', event.target.value);
+					const input = event.target;
+					input.setAttribute('data-amount', input.value);
 				}
 
 				function onNotificationsDurationInputInput(event) {
@@ -2539,6 +2549,7 @@
 					});
 				}
 
+				const isValidAmount = value => !(value == '' || value == '-0' || Number.isInteger(+value) == false || +value < -1);
 				let isSettingsMenuOpened = false;
 
 				try {
@@ -2585,6 +2596,7 @@
 					settingsMenu.addEventListener('submit', onFormSubmit);
 					colorFiltersInputs.forEach(input => { input.addEventListener('input', onColorFilterInput); });
 					markersSelects.forEach(select => { select.addEventListener('change', onMarkerSelectChange); });
+					maxAmountInBagInputs.forEach(input => { input.addEventListener('change', onMaxAmountInBagInputChange); });
 					maxAmountInBagInputs.forEach(input => { input.addEventListener('input', onMaxAmountInBagInputInput); });
 
 					setStoredInputsValues();
