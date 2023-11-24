@@ -1692,6 +1692,7 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
+					if (/(вне радиуса)|(out of range)/.test(options.text)) { options.gravity = 'top'; options.position = 'right'; }
 					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
 					options.style = {
 						fontSize: '0.8em',
