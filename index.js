@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.19
+// @version      1.14.20
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -36,6 +36,7 @@
 			return genuineFunction(...args);
 		};
 	};
+	window.cl = console.log;
 	console.log = logDecorator(console.log);
 	console.warn = logDecorator(console.warn);
 	console.error = logDecorator(console.error);
@@ -60,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.19';
+	const USERSCRIPT_VERSION = '1.14.20';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -4712,7 +4713,6 @@
 					function hidePopup() {
 						popup.classList.add('sbgcui_hidden');
 						logContent.innerHTML = '';
-						log = undefined;
 						hideConsole();
 					}
 
@@ -4748,6 +4748,7 @@
 						const request = logsStore.getAll(keyRange);
 
 						logContent.innerHTML = '';
+						tagsWrapper.dataset.totalentries = 0;
 
 						request.addEventListener('success', event => {
 							const logs = event.target.result;
@@ -4883,6 +4884,12 @@
 											}
 										}
 
+										if (state.hiddenLogs.has(action.type)) {
+											entry.setAttribute('data-hidden', '');
+										} else {
+											tagsWrapper.dataset.totalentries = +tagsWrapper.dataset.totalentries + 1;
+										}
+
 										entry.append(entryTime, entryDescr);
 										logContent.appendChild(entry);
 									});
@@ -4900,14 +4907,19 @@
 						if (!event.target.dataset.hasOwnProperty('action')) { return; }
 						const tag = event.target;
 						const action = tag.dataset.action;
+						const entries = document.querySelectorAll(`.sbgcui_log-content-entry[data-action="${action}"]`);
+
+						tag.toggleAttribute('data-hidden');
+						entries.forEach(entry => { entry.toggleAttribute('data-hidden'); });
+
 						const isHidden = tag.hasAttribute('data-hidden');
 
 						if (isHidden) {
-							state.hiddenLogs.delete(action);
-							tag.removeAttribute('data-hidden');
-						} else {
 							state.hiddenLogs.add(action);
-							tag.setAttribute('data-hidden', '');
+							tagsWrapper.dataset.totalentries = +tagsWrapper.dataset.totalentries - entries.length;
+						} else {
+							state.hiddenLogs.delete(action);
+							tagsWrapper.dataset.totalentries = +tagsWrapper.dataset.totalentries + entries.length;
 						}
 
 						const stateStore = database.transaction('state', 'readwrite').objectStore('state');
@@ -4925,12 +4937,10 @@
 					const logContent = popup.querySelector('.sbgcui_log-content');
 					const tagsWrapper = popup.querySelector('.sbgcui_log-tags');
 					const toolbarButton = document.createElement('button');
-					let log;
 
 					state.hiddenLogs = state.hiddenLogs || new Set();
 
 					toolbarButton.classList.add('fa', 'fa-solid-table-list');
-
 					[...tagsWrapper.children].forEach(tag => {
 						const action = tag.dataset.action;
 						if (state.hiddenLogs.has(action)) { tag.setAttribute('data-hidden', ''); }
@@ -4975,7 +4985,7 @@
 					notifsCount = await getNotifs(latestNotifId);
 
 					if (notifsCount > 0) {
-						const notifs = await getNotifs();
+						notifs = await getNotifs();
 
 						latestNotifId = notifs[0].id;
 
@@ -5036,7 +5046,7 @@
 
 				let interval = config.notifications.interval;
 				let notifsCount = 0;
-				const notifs = await getNotifs();
+				let notifs = await getNotifs();
 				latestNotifId = notifs[0].id;
 
 				let intervalId = setInterval(checkAndShow, interval);

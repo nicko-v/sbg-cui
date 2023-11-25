@@ -1852,6 +1852,13 @@ li[sbgcui-excluded-core]>span {
 	padding: 10px 0;
 }
 
+.sbgcui_log-tags::after {
+	content: attr(data-totalentries) " записей найдено";
+	font-size: 0.8em;
+	text-align: center;
+	width: 100%;
+}
+
 .sbgcui_log-tags>span {
 	border-radius: 50px;
 	color: #D1D1D1;
@@ -1932,6 +1939,10 @@ li[sbgcui-excluded-core]>span {
 	padding: 1px 5px;
 }
 
+.sbgcui_log-content-entry[data-hidden] {
+	display: none;
+}
+
 .sbgcui_log-content-entry-time {
 	align-items: center;
 	color: var(--action-color);
@@ -2007,17 +2018,6 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_log-console:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-console {
 	color: var(--selection);
-}
-
-.sbgcui_log:has(span[data-action="capture"][data-hidden]) .sbgcui_log-content-entry[data-action="capture"],
-.sbgcui_log:has(span[data-action="uniqcap"][data-hidden]) .sbgcui_log-content-entry[data-action="uniqcap"],
-.sbgcui_log:has(span[data-action="deploy"][data-hidden]) .sbgcui_log-content-entry[data-action="deploy"],
-.sbgcui_log:has(span[data-action="upgrade"][data-hidden]) .sbgcui_log-content-entry[data-action="upgrade"],
-.sbgcui_log:has(span[data-action="discover"][data-hidden]) .sbgcui_log-content-entry[data-action="discover"],
-.sbgcui_log:has(span[data-action="draw"][data-hidden]) .sbgcui_log-content-entry[data-action="draw"],
-.sbgcui_log:has(span[data-action="destroy"][data-hidden]) .sbgcui_log-content-entry[data-action="destroy"],
-.sbgcui_log:has(span[data-action="broom"][data-hidden]) .sbgcui_log-content-entry[data-action="broom"] {
-	display: none;
 }
 
 
