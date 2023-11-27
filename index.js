@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.20
+// @version      1.14.21
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.20';
+	const USERSCRIPT_VERSION = '1.14.21';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -686,6 +686,10 @@
 						ACTIONS_REWARDS.destroy.line * this.linesAmount +
 						ACTIONS_REWARDS.destroy.region * this.regionsAmount
 					);
+				}
+
+				get selectedCoreGuid() {
+					return pointCores.querySelector('.selected')?.dataset.guid;
 				}
 
 				update(cores) {
@@ -2250,11 +2254,11 @@
 
 						toast.showToast();
 						database.transaction('state', 'readwrite').objectStore('state').put(excludedCores, 'excludedCores');
-					}, 1000);
+					}, 2000);
 
 					coreSlide.addEventListener('touchend', () => {
 						let touchDuration = Date.now() - touchStartDate;
-						if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
+						if (touchDuration < 2000) { clearTimeout(timeoutID); } else { return; }
 					}, { once: true });
 				});
 
@@ -2264,7 +2268,13 @@
 							coreSlide.setAttribute('sbgcui-excluded-core', '');
 						}
 					});
-					lastOpenedPoint.selectCore(config.autoSelect.deploy);
+					const selectedCoreGuid = lastOpenedPoint.selectedCoreGuid;
+					if (selectedCoreGuid != undefined) {
+						const selectedCoreLvl = lastOpenedPoint.cores[selectedCoreGuid].level;
+						lastOpenedPoint.selectCore(config.autoSelect.upgrade, selectedCoreLvl);
+					} else {
+						lastOpenedPoint.selectCore(config.autoSelect.deploy);
+					}
 				});
 			}
 
@@ -5000,17 +5010,24 @@
 							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
 							toast.options.selector = destroyNotifsContainer;
 							toast.options.callback = () => {
-								localStorage.setItem('latest-notif', id);
+								const latestNotif = +localStorage.getItem('latest-notif');
+								if (id > latestNotif) { localStorage.setItem('latest-notif', id); }
 								if (id == notifs[0].id) { notifsButton.removeAttribute('data-count'); }
+								destroyNotifsToasts.delete(toast);
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
 								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); };
 							}
+							destroyNotifsToasts.add(toast);
 
 							toast.showToast();
 						});
 					}
+				}
+
+				function closeToasts() {
+					destroyNotifsToasts.forEach(toast => { toast.hideToast(); });
 				}
 
 				function createToastNode(attackerName, attackerTeam, attackTime, pointTitle) {
@@ -5041,6 +5058,7 @@
 				}
 
 				const destroyNotifsContainer = document.createElement('div');
+				const destroyNotifsToasts = new Set();
 				destroyNotifsContainer.classList.add('sbgcui_destroy_notifs');
 				document.body.appendChild(destroyNotifsContainer);
 
@@ -5051,6 +5069,7 @@
 
 				let intervalId = setInterval(checkAndShow, interval);
 				window.addEventListener('configUpdated', updateInterval);
+				notifsButton.addEventListener('click', closeToasts);
 			}
 
 			window.cuiStatus = 'loaded';
