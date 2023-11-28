@@ -25,7 +25,7 @@
 			},
 			"mangle": true,
 			"compress": {
-				"drop_console": true,
+				"drop_console": false,
 				"dead_code": false,
 				"keep_fnames": false,
 				"keep_classnames": false
@@ -33,6 +33,7 @@
 		},
 		"MinifyAll.PrefixOfNewMinifiedFiles": ".min",
 		"MinifyAll.minifyOnSaveToNewFile": true,
-		"MinifyAll.openMinifiedDocument": false
+		"MinifyAll.openMinifiedDocument": false,
+		"MinifyAll.disableHtml": true
 	}
 }

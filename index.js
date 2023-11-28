@@ -258,7 +258,7 @@
 			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
 
 			navigator.storage.estimate().then(({ quota, usage }) => {
-				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}. \nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`, `\nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
 			});
 		}
 
