@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.21
+// @version      1.14.22
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.21';
+	const USERSCRIPT_VERSION = '1.14.22';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -251,6 +251,17 @@
 			}
 		}
 
+		function checkStorageSize(event) {
+			const tiles = event.target.result;
+			const tilesAmount = tiles.length;
+			const tilesSize = tiles.reduce((acc, tile) => acc + tile.size, 0);
+			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
+
+			navigator.storage.estimate().then(({ quota, usage }) => {
+				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}. \nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+			});
+		}
+
 		if (database == undefined) { database = event.target.result; }
 
 		database.addEventListener('versionchange', () => {
@@ -261,13 +272,15 @@
 			console.log('SBG CUI: Ошибка при работе с БД.', event.target.error);
 		});
 
-		const transaction = database.transaction(['config', 'state', 'favorites'], 'readonly');
+		const transaction = database.transaction(['config', 'favorites', 'state', 'tiles'], 'readonly');
 		transaction.addEventListener('complete', () => { window.dispatchEvent(new Event('dbReady')); });
 
 		const configRequest = transaction.objectStore('config').openCursor();
-		const stateRequest = transaction.objectStore('state').openCursor();
 		const favoritesRequest = transaction.objectStore('favorites').openCursor();
-		[configRequest, stateRequest, favoritesRequest].forEach(request => { request.addEventListener('success', getData); });
+		const stateRequest = transaction.objectStore('state').openCursor();
+		const tilesRequest = transaction.objectStore('tiles').getAll();
+		[configRequest, favoritesRequest, stateRequest].forEach(request => { request.addEventListener('success', getData); });
+		tilesRequest.addEventListener('success', checkStorageSize);
 	});
 	openRequest.addEventListener('error', event => {
 		console.log('SBG CUI: Ошибка открытия базы данных', event.target.error);
@@ -1447,7 +1460,7 @@
 												const { coords, guid: point, title, isCaptured } = lastOpenedPoint;
 												const isFirstCore = parsedResponse.data.co.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
-												
+
 												lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
@@ -1704,6 +1717,22 @@
 					};
 
 					return toastify(options);
+				}
+			}
+
+			function resetBaselayerIfChanged() {
+				const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
+				const baselayer = `${base}_${theme}`;
+
+				if (state.baselayer != baselayer) {
+					const transaction = database.transaction(['state', 'tiles'], 'readwrite');
+					const stateStore = transaction.objectStore('state');
+					const tilesStore = transaction.objectStore('tiles');
+
+					stateStore.put(baselayer, 'baselayer');
+					tilesStore.clear();
+
+					state.baselayer = baselayer;
 				}
 			}
 
@@ -2013,21 +2042,7 @@
 					view.setCenter(playerFeature.getGeometry().getCoordinates());
 				});
 
-				map.getAllLayers()[0].on('change', () => {
-					const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
-					const baselayer = `${base}_${theme}`;
-
-					if (state.baselayer != baselayer) {
-						const transaction = database.transaction(['state', 'tiles'], 'readwrite');
-						const stateStore = transaction.objectStore('state');
-						const tilesStore = transaction.objectStore('tiles');
-
-						stateStore.put(baselayer, 'baselayer');
-						tilesStore.clear();
-
-						state.baselayer = baselayer;
-					}
-				});
+				map.getAllLayers()[0].on('change', resetBaselayerIfChanged);
 			}
 
 
@@ -2195,6 +2210,8 @@
 				});
 
 				document.querySelector('input[value="osm"]').parentElement.after(stadiaWatercolorLabel, stadiaTonerLabel);
+
+				resetBaselayerIfChanged();
 			}
 
 
