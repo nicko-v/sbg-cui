@@ -4999,7 +4999,7 @@
 
 						latestNotifId = notifs[0].id;
 
-						notifs.slice(0, notifsCount).forEach(notif => {
+						notifs.slice(0, notifsCount).reverse().forEach(notif => {
 							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle, id } = notif;
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
 							const attackTime = new Date(attackDate).toLocaleString(i18next.language, format);
