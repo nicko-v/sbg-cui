@@ -1710,8 +1710,15 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					if (/(вне радиуса)|(out of range)/.test(options.text)) { options.gravity = 'top'; options.position = 'right'; }
+					if (i18next.t('popups.point.range').includes(options.text)) {
+						options.gravity = 'top';
+						options.position = 'right';
+					} else if (i18next.t('popups.lines-none').includes(options.text)) {
+						options.className = 'error-toast';
+					}
+
 					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
+
 					options.style = {
 						fontSize: '0.8em',
 					};
@@ -4714,7 +4721,7 @@
 							entryDescr.classList.add('sbgcui_log-content-entry-description');
 
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23' };
-							entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format).replace(',', ':');
+							entryTime.innerText = new Date(data.timestamp).toLocaleString(i18next.language, format).replace(/,|\./, ':');
 
 							entryDescr.innerHTML = data.messages.join('<br>');
 
