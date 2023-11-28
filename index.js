@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.22
+// @version      1.14.23
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.22';
+	const USERSCRIPT_VERSION = '1.14.23';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -257,9 +257,13 @@
 			const tilesSize = tiles.reduce((acc, tile) => acc + tile.size, 0);
 			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
 
-			navigator.storage.estimate().then(({ quota, usage }) => {
-				console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`, `\nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
-			});
+			if (typeof navigator.storage?.estimate == 'function') {
+				navigator.storage.estimate().then(({ quota, usage }) => {
+					console.log(`Storage quota: ${formatter(quota)}, usage: ${formatter(usage)}.`, `\nMap cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+				});
+			} else {
+				console.log(`Map cache: ${formatter(tilesSize)} (${tilesAmount} tiles).`);
+			}
 		}
 
 		if (database == undefined) { database = event.target.result; }
