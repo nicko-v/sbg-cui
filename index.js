@@ -1267,7 +1267,7 @@
 					className,
 				});
 				toast.options.id = Math.round(Math.random() * 1e5);;
-				toast.options.onClick = () => toast.hideToast();
+				toast.options.onClick = toast.hideToast;
 				return toast;
 			}
 
@@ -1722,6 +1722,9 @@
 					}
 
 					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
+					
+					// Тосты о сносе требуется показывать в обратном порядке.
+					toastify.defaults.oldestFirst = options.className == 'sbgcui_destroy_notif_toast' ? false : true;
 
 					options.style = {
 						fontSize: '0.8em',
@@ -5027,7 +5030,7 @@
 
 						latestNotifId = notifs[0].id;
 
-						notifs.slice(0, notifsCount).reverse().forEach(notif => {
+						notifs.slice(0, notifsCount).forEach(notif => {
 							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle, id } = notif;
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
 							const attackTime = new Date(attackDate).toLocaleString(i18next.language, format);
@@ -5037,6 +5040,7 @@
 							const toastNode = createToastNode(attackerName, attackerTeam, attackTime, pointTitle);
 							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
 							toast.options.selector = destroyNotifsContainer;
+							toast.options.oldestFirst = false;
 							toast.options.callback = () => {
 								const latestNotif = +localStorage.getItem('latest-notif');
 								if (id > latestNotif) { localStorage.setItem('latest-notif', id); }
@@ -5093,7 +5097,7 @@
 				let interval = config.notifications.interval;
 				let notifsCount = 0;
 				let notifs = await getNotifs();
-				latestNotifId = notifs[0].id;
+				latestNotifId = notifs[0]?.id ?? 0;
 
 				let intervalId = setInterval(checkAndShow, interval);
 				window.addEventListener('configUpdated', updateInterval);
