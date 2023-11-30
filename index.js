@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.23
+// @version      1.14.24
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.23';
+	const USERSCRIPT_VERSION = '1.14.24';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -5030,7 +5030,7 @@
 
 						latestNotifId = notifs[0].id;
 
-						notifs.slice(0, notifsCount).forEach(notif => {
+						notifs.slice(0, notifsCount).reverse().forEach(notif => {
 							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle, id } = notif;
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
 							const attackTime = new Date(attackDate).toLocaleString(i18next.language, format);
@@ -5040,7 +5040,6 @@
 							const toastNode = createToastNode(attackerName, attackerTeam, attackTime, pointTitle);
 							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
 							toast.options.selector = destroyNotifsContainer;
-							toast.options.oldestFirst = false;
 							toast.options.callback = () => {
 								const latestNotif = +localStorage.getItem('latest-notif');
 								if (id > latestNotif) { localStorage.setItem('latest-notif', id); }
@@ -5089,9 +5088,14 @@
 					}
 				}
 
+				const closeAllButton = document.createElement('button');
 				const destroyNotifsContainer = document.createElement('div');
 				const destroyNotifsToasts = new Set();
+
 				destroyNotifsContainer.classList.add('sbgcui_destroy_notifs');
+				closeAllButton.classList.add('sbgcui_button_reset', 'sbgcui_destroy_notifs-closeall');
+				closeAllButton.innerText = 'Закрыть всё';
+				destroyNotifsContainer.appendChild(closeAllButton);
 				document.body.appendChild(destroyNotifsContainer);
 
 				let interval = config.notifications.interval;
@@ -5102,6 +5106,7 @@
 				let intervalId = setInterval(checkAndShow, interval);
 				window.addEventListener('configUpdated', updateInterval);
 				notifsButton.addEventListener('click', closeToasts);
+				closeAllButton.addEventListener('click', closeToasts);
 			}
 
 			window.cuiStatus = 'loaded';

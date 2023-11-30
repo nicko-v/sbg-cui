@@ -28,6 +28,12 @@ body {
 	overflow: hidden;
 }
 
+.sbgcui_button_reset {
+	background: none;
+	border: none;
+	color: unset;
+}
+
 .toastify span:has(.item-icon):first-of-type,
 .toastify span:has(.type-1)+span:has(.type-2),
 .toastify span:has(.type-2)+span:has(.type-3),
@@ -931,21 +937,37 @@ html[lang="ru"] .i-buttons {
 
 .sbgcui_destroy_notifs {
 	bottom: 0;
-	height: 0;
-	/* Чтобы не перекрывало тулбар. Высота не важна, тосты абсолютно позиционированы. */
-	left: 0;
+	left: 15px;
 	position: absolute;
 	width: calc(50% - 3em - 15px);
 	/* Половина ширины body - половина ширины кнопки атаки - отступ тоста от края */
 	z-index: 10;
 }
 
+.sbgcui_destroy_notifs-closeall {
+	background-color: var(--background-transp);
+	border: 1px solid var(--border-transp);
+	border-radius: 5px;
+	display: none;
+	font-size: 0.7em;
+	height: 2em;
+	width: 100%;
+}
+
+.sbgcui_destroy_notifs-closeall:nth-child(n+3) {
+	display: block;
+}
+
+.sbgcui_destroy_notifs>.toastify:nth-child(1) {
+	translate: 0 calc(-2em + 5px);
+}
+
 .sbgcui_destroy_notifs>.toastify:nth-child(2) {
-	translate: 0 10px;
+	translate: 0 calc(-2em + 10px);
 }
 
 .sbgcui_destroy_notifs>.toastify:nth-child(3) {
-	translate: 0 20px;
+	translate: 0 calc(-2em + 15px);
 }
 
 .sbgcui_destroy_notif_toast {
@@ -961,6 +983,7 @@ html[lang="ru"] .i-buttons {
 .sbgcui_destroy_notif_toast>.toast-close {
 	color: var(--text);
 	opacity: 0.7;
+	padding: 0 3px;
 	position: absolute;
 	right: 0;
 	top: 0;
@@ -976,19 +999,13 @@ html[lang="ru"] .i-buttons {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: space-between;
-	width: calc(100% - 12px);
+	width: calc(100% - 14px);
 }
 
 .sbgcui_destroy_notif_toast-content>span:last-child {
 	overflow-x: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-.sbgcui_button_reset {
-	background: none;
-	border: none;
-	color: unset;
 }
 
 .sbgcui_no_bg_image {
