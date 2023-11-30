@@ -1267,7 +1267,7 @@
 					className,
 				});
 				toast.options.id = Math.round(Math.random() * 1e5);;
-				toast.options.onClick = toast.hideToast;
+				toast.options.onClick = () => toast.hideToast();
 				return toast;
 			}
 
@@ -1722,7 +1722,7 @@
 					}
 
 					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
-					
+
 					// Тосты о сносе требуется показывать в обратном порядке.
 					toastify.defaults.oldestFirst = options.className == 'sbgcui_destroy_notif_toast' ? false : true;
 
