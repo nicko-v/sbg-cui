@@ -936,7 +936,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_destroy_notifs {
-	bottom: 0;
+	bottom: 5px;
 	left: 15px;
 	position: absolute;
 	width: calc(50% - 3em - 15px);
