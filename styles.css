@@ -479,7 +479,7 @@ html[lang="ru"] .i-buttons {
 #inventory__close {
 	backdrop-filter: blur(5px);
 	-webkit-backdrop-filter: blur(5px);
-	border: 2px solid var(--text);
+	border: 2px solid var(--border-transp);
 	border-radius: 0.5em;
 	bottom: 5px;
 	box-shadow: 0 0 10px var(--shadow);
