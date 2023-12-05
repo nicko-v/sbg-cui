@@ -1675,7 +1675,7 @@
 												if (hideLastFavRef) {
 													let hiddenPoints = 0;
 													parsedResponse.data = parsedResponse.data.filter(point => {
-														const isLastFavRef = point.p in favorites && point.a == 1;
+														const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
 														if (isLastFavRef) {
 															hiddenPoints += 1;
 															return false;
