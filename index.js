@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.24
+// @version      1.14.25
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.24';
+	const USERSCRIPT_VERSION = '1.14.25';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -808,7 +808,6 @@
 					this.discoveriesLeft = undefined;
 					this.timeoutID = undefined;
 					this.isActive = 1;
-					this.#cooldownNotifToast = createToast(`"${this.name}": <br>точка остыла.`, 'top left', -1, 'sbgcui_toast-selection');
 
 					if (!name) { this.#getName(); }
 				}
@@ -817,7 +816,6 @@
 					getPointData(this.guid)
 						.then(data => {
 							this.name = data.t;
-							this.#cooldownNotifToast.options.text = `"${this.name}": <br>точка остыла.`;
 						})
 						.catch(error => { console.log('SBG CUI: Ошибка при получении данных точки.', error); });
 				}
@@ -851,12 +849,13 @@
 				}
 
 				hideCooldownNotifToast() {
-					if (this.#cooldownNotifToast.toastElement != null) {
-						this.#cooldownNotifToast.hideToast();
-					}
+					if (this.#cooldownNotifToast == undefined) { return; }
+					this.#cooldownNotifToast.hideToast();
+					this.#cooldownNotifToast = undefined;
 				}
 
 				showCooldownNotifToast() {
+					this.#cooldownNotifToast = createToast(`"${this.name}": <br>точка остыла.`, 'top left', -1, 'sbgcui_toast-selection');
 					this.#cooldownNotifToast.showToast();
 				}
 
@@ -1255,7 +1254,7 @@
 				element?.dispatchEvent(clickEvent);
 			}
 
-			function createToast(content = '', position = 'top left', duration = 3000, className = 'interaction-toast') {
+			function createToast(content = '', position = 'top left', duration = 3000, className = 'interaction-toast', oldestFirst = true) {
 				let parts = position.split(/\s+/);
 				let toast = Toastify({
 					node: content instanceof Element ? content : undefined,
@@ -1265,6 +1264,7 @@
 					position: parts[1],
 					escapeMarkup: false,
 					className,
+					oldestFirst,
 				});
 				toast.options.id = Math.round(Math.random() * 1e5);;
 				toast.options.onClick = () => toast.hideToast();
@@ -1517,11 +1517,12 @@
 													}
 												}
 
+												await clearInventory(false, toDelete);
+
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
 											}
 
-											clearInventory(false, toDelete);
 
 											if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
 												let dateNow = Date.now();
@@ -1721,10 +1722,12 @@
 						options.className = 'error-toast';
 					}
 
-					if (!options.className.startsWith('sbgcui_')) { options.selector = null; }
+					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
 
-					// Тосты о сносе требуется показывать в обратном порядке.
-					toastify.defaults.oldestFirst = options.className == 'sbgcui_destroy_notif_toast' ? false : true;
+					// Есть баг в Toastify - значение oldestFirst всегда берётся
+					// из дефолтного конфига тоста, даже если оно передано в options.
+					// Поэтому здесь каждый раз изменяется дефолтное значение.
+					toastify.defaults.oldestFirst = options.oldestFirst ?? true;
 
 					options.style = {
 						fontSize: '0.8em',
@@ -5038,7 +5041,7 @@
 							if (status == 'fav' && !(guid in favorites)) { return; }
 
 							const toastNode = createToastNode(attackerName, attackerTeam, attackTime, pointTitle);
-							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast');
+							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast', false);
 							toast.options.selector = destroyNotifsContainer;
 							toast.options.callback = () => {
 								const latestNotif = +localStorage.getItem('latest-notif');
