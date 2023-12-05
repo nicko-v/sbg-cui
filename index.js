@@ -79,7 +79,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 6);
+	const openRequest = indexedDB.open('CUI', 7);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -152,6 +152,18 @@
 						configStore.put(maxAmountInBag, 'maxAmountInBag');
 					});
 				},
+				7: () => {
+					const configStore = event.target.transaction.objectStore('config');
+					const request = configStore.get('drawing');
+
+					request.addEventListener('success', event => {
+						const drawing = event.target.result;
+						
+						drawing.hideLastFavRef = 0;
+
+						configStore.put(drawing, 'drawing');
+					});
+				},
 			};
 
 			for (let v in updateToVersion) {
@@ -211,6 +223,7 @@
 			drawing: {
 				minDistance: -1,
 				maxDistance: -1,
+				hideLastFavRef: 0,
 			},
 			notifications: {
 				status: 'all', // all || fav || off
