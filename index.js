@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.25
+// @version      1.14.26
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.25';
+	const USERSCRIPT_VERSION = '1.14.26';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1639,8 +1639,7 @@
 
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
 											} else if ('data' in parsedResponse) {
-
-												let { minDistance, maxDistance } = config.drawing;
+												let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
 												minDistance = minDistance == -1 ? -Infinity : +minDistance;
 												maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
 
@@ -1656,12 +1655,6 @@
 														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
 														toast.showToast();
 													}
-
-													const modifiedResponse = createResponse(parsedResponse, response);
-													lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t }));
-													resolve(modifiedResponse);
-
-													break;
 												}
 
 												if (isFinite(minDistance) || isFinite(maxDistance)) {
@@ -1677,12 +1670,31 @@
 
 														parsedResponse.data = suitablePoints;
 													}
+												}
 
-													const modifiedResponse = createResponse(parsedResponse, response);
-													resolve(modifiedResponse);
+												if (hideLastFavRef) {
+													let hiddenPoints = 0;
+													parsedResponse.data = parsedResponse.data.filter(point => {
+														const isLastFavRef = point.p in favorites && point.a == 1;
+														if (isLastFavRef) {
+															hiddenPoints += 1;
+															return false;
+														} else {
+															return true;
+														}
+													});
+													if (hiddenPoints > 0) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																			из списка согласно настройке сохранения последних сносок от избранных точек.`;
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
+													}
 												}
 
 												lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
+
+												const modifiedResponse = createResponse(parsedResponse, response);
+												resolve(modifiedResponse);
 											}
 											break;
 										case '/api/profile':
