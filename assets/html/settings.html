@@ -358,12 +358,17 @@
     </h6>
     <section class="sbgcui_settings-subsection">
       <div class="sbgcui_settings-textfield_wrapper">
-        <h5 class="sbgcui_settings-textfield-title">Скрывать рефы ближе, чем (м):</h5>
+        <h5 class="sbgcui_settings-textfield-title">Скрывать сноски ближе, чем (м):</h5>
         <input name="drawing_minDistance" type="number" min="-1">
       </div>
       <div class="sbgcui_settings-textfield_wrapper">
-        <h5 class="sbgcui_settings-textfield-title">Скрывать рефы дальше, чем (м):</h5>
+        <h5 class="sbgcui_settings-textfield-title">Скрывать сноски дальше, чем (м):</h5>
         <input name="drawing_maxDistance" type="number" min="-1">
+      </div>
+      <div class="sbgcui_settings-input_wrp">
+        <input name="drawing_hideLastFavRef" type="hidden" value="0">
+        <input id="drawing_hideLastFavRef" name="drawing_hideLastFavRef" type="checkbox" value="1">
+        <label for="drawing_hideLastFavRef">Скрывать последнюю сноску от избранных точек</label>
       </div>
     </section>
   </details>
