@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.26
+// @version      1.14.27
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.26';
+	const USERSCRIPT_VERSION = '1.14.27';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -158,7 +158,7 @@
 
 					request.addEventListener('success', event => {
 						const drawing = event.target.result;
-						
+
 						drawing.hideLastFavRef = 0;
 
 						configStore.put(drawing, 'drawing');
@@ -954,6 +954,7 @@
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 			let isRefsViewerOpened = false;
+			let isInvClearInProgress = false;
 
 			let lastOpenedPoint = {};
 			let discoverModifier;
@@ -965,224 +966,212 @@
 
 			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
+			const headers = { authorization: `Bearer ${localStorage.getItem('auth')}`, 'accept-language': i18next.language };
+			let gameVersion;
+
 
 			isStarMode = isStarMode && starModeTarget != null;
 
 
 			async function getSelfData() {
-				return fetch('/api/self', {
-					headers: {
-						authorization: `Bearer ${localStorage.getItem('auth')}`,
-						'accept-language': i18next.language
-					},
-					method: "GET",
-				})
-					.then(response => response.json().then(parsedResponse => ({
-						version: response.headers.get('SBG-Version'),
-						name: parsedResponse.n,
-						team: parsedResponse.t,
-						exp: parsedResponse.x,
-						lvl: parsedResponse.l,
-						guid: parsedResponse.g,
-					})))
-					.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
+				const url = '/api/self';
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+				const version = response.headers.get('SBG-Version');
+
+				gameVersion = version;
+
+				return parsedResponse;
 			}
 
 			async function getPlayerData(guid, name) {
-				return fetch(`/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`, {
-					headers: {
-						authorization: `Bearer ${localStorage.getItem('auth')}`,
-						'accept-language': i18next.language
-					},
-					method: "GET",
-				})
-					.then(r => r.json())
-					.catch(error => { console.log('SBG CUI: Ошибка при получении данных игрока.', error); });
+				const url = `/api/profile?${guid ? ('guid=' + guid) : ('name=' + name)}`;
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse;
 			}
 
 			async function getPointData(guid, isCompact = true) {
-				return fetch(`/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`, {
-					headers: {
-						authorization: `Bearer ${player.auth}`,
-						'accept-language': i18next.language
-					},
-					method: 'GET'
-				}).then(r => r.json()).then(r => r.data);
+				const url = `/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`;
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse.data;
 			}
 
 			async function getInventory() {
-				return fetch('/api/inventory', {
-					headers: {
-						authorization: `Bearer ${player.auth}`,
-						'accept-language': i18next.language
-					},
-					method: 'GET',
-					'accept-language': i18next.language
-				}).then(r => r.json()).then(r => r.i);
-			}
+				const url = '/api/inventory';
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
 
-			async function clearInventory(forceClear = false, filteredLoot = []) {
-				let maxAmount = config.maxAmountInBag;
-
-				getInventory()
-					.then(inventory => {
-						const itemsAmount = inventory.reduce((total, e) => total + e.a, 0);
-						const isEnoughSpace = INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE;
-						const { allied, hostile } = maxAmount.references;
-
-						if (isEnoughSpace && !forceClear && filteredLoot.length == 0) { throw { silent: true }; }
-
-						if (!isEnoughSpace || forceClear) {
-							// Если надо удалить все ключи или вообще никакие не надо удалять - не запрашиваем данные точек.
-							if ((allied == -1 && hostile == -1) || (allied == 0 && hostile == 0)) { return [inventory, filteredLoot, []]; }
-
-							// У обычных предметов в ключе l хранится уровень, у рефов - гуид точки. Логично.
-							const pointsData = inventory.map(i => (i.t == 3) ? getPointData(i.l) : undefined).filter(e => e);
-
-							return Promise.all([inventory, filteredLoot, ...pointsData]);
-						} else {
-							return [[], filteredLoot, []];
-						}
-					})
-					.then(([inventory, filteredLoot, ...pointsDataArr]) => {
-						let pointsData = {};
-
-						pointsDataArr.forEach(e => {
-							pointsData[e.g] = { team: e.te };
-						});
-
-						let toDelete = inventory.map(({ t: itemType, l: itemLevel, a: itemAmount, g: itemGuid }) => {
-							if (itemType > ITEMS_TYPES.length - 1) { return; };
-
-							let itemMaxAmount = -1;
-							let amountToDelete = 0;
-							let itemName = ITEMS_TYPES[itemType];
-
-							if (itemName == 'references') {
-								if (isStarMode && (itemLevel == starModeTarget?.guid)) {
-									itemMaxAmount = -1;
-								} else if (favorites[itemLevel]?.isActive) {
-									itemMaxAmount = -1;
-								} else if (maxAmount.references.allied == -1 && maxAmount.references.hostile == -1) {
-									itemMaxAmount = -1;
-								} else if (maxAmount.references.allied == 0 && maxAmount.references.hostile == 0) {
-									itemMaxAmount = 0;
-								} else if (Object.keys(pointsData).length) {
-									let pointSide = pointsData[itemLevel].team == player.team ? 'allied' : 'hostile';
-									itemMaxAmount = maxAmount[itemName][pointSide];
-								}
-							} else {
-								itemMaxAmount = maxAmount[itemName]?.[itemLevel];
-							}
-
-							if (itemMaxAmount != -1 && itemAmount > itemMaxAmount) {
-								amountToDelete = itemAmount - itemMaxAmount;
-							}
-
-							return { guid: itemGuid, type: itemType, amount: amountToDelete };
-						}).filter(i => i?.amount > 0);
-
-						filteredLoot.forEach(filteredLootItem => {
-							const toDeleteItem = toDelete.find(item => item.guid == filteredLootItem.guid);
-							if (toDeleteItem) {
-								toDeleteItem.amount += filteredLootItem.amount;
-								toDeleteItem.filtered = filteredLootItem.amount; // Эти предметы не будут добавлены в кэш основным скриптом, т.к. удаляются сразу же.
-							} else {
-								toDelete.push({ ...filteredLootItem, filtered: filteredLootItem.amount });
-							}
-						});
-
-						return Promise.all([toDelete, deleteItems(toDelete)]);
-					})
-					.then(([deleted, responses]) => {
-						if (!deleted.length) { return; }
-
-						let invTotal = responses.reduce((total, e) => e.count.total < total ? e.count.total : total, Infinity);
-						if (isFinite(invTotal)) {
-							invTotalSpan.innerText = invTotal;
-							if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) { inventoryButton.style.color = ''; }
-						}
-
-						/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
-						deleteFromCacheAndSliders(deleted);
-
-
-						deleted = deleted.reduce((total, e) => {
-							const amount = (e.amount - (e.filtered ?? 0));
-
-							if (amount != 0) {
-								if (!total.hasOwnProperty(e.type)) { total[e.type] = 0; }
-								total[e.type] += amount;
-							}
-
-							return total;
-						}, {});
-
-						if (Object.entries(deleted).every(type => type[1] == 0)) { return; }
-
-						let message = '';
-
-						for (let key in deleted) {
-							const itemName = i18next.t(`items.types.${ITEMS_TYPES[key].slice(0, -1)}`);
-							message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${key}"></span>x${deleted[key]} ${itemName}`;
-						}
-
-						let toast = createToast(`Удалено: ${message}`);
-						toast.showToast();
-					})
-					.catch(error => {
-						if (error.silent) { return; }
-
-						let toast = createToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`, undefined, undefined, 'error-toast');
-						toast.showToast();
-
-						console.log('SBG CUI: Ошибка при удалении предметов.', error);
-					});
-			}
-
-			async function deleteItems(items) {
-				let groupedItems = items.reduce((groups, e) => {
-					if (!groups.hasOwnProperty(e.type)) { groups[e.type] = {}; }
-					groups[e.type][e.guid] = e.amount;
-					return groups;
-				}, {});
-
-				return Promise.all(Object.keys(groupedItems).map(async e => {
-					return fetch('/api/inventory', {
-						headers: {
-							authorization: `Bearer ${player.auth}`,
-							'accept-language': i18next.language,
-							'content-type': 'application/json',
-						},
-						body: JSON.stringify({ selection: groupedItems[e], tab: e }),
-						method: 'DELETE'
-					}).then(r => r.json());
-				}));
+				return parsedResponse.i;
 			}
 
 			async function repairPoint(guid) {
-				return fetch('/api/repair', {
-					headers: {
-						authorization: `Bearer ${player.auth}`,
-						'accept-language': i18next.language,
-						'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-					},
-					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`,
+				const url = '/api/repair';
+				const options = {
+					headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 					method: 'POST',
-				}).then(r => r.json());
+					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`
+				};
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse;
 			}
 
-			async function fetchHTMLasset(filename) {
-				return fetch(`${HOME_DIR}/assets/html/${filename}.html`)
-					.then(r => {
-						if (r.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${r.status})`); }
-						return r.text();
-					})
-					.then(html => {
-						const parser = new DOMParser();
-						const node = parser.parseFromString(html, 'text/html').body.firstChild;
-						return node;
+			async function deleteItems(items, type) { // items: { guid: amount, }
+				const url = '/api/inventory';
+				const options = {
+					headers: { ...headers, 'content-type': 'application/json' },
+					method: 'DELETE',
+					body: JSON.stringify({ selection: items, tab: type })
+				};
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse;
+			}
+
+			async function getHTMLasset(filename) {
+				const url = `${HOME_DIR}/assets/html/${filename}.html`;
+				const response = await fetch(url);
+
+				if (response.status != 200) { throw new Error(`Ошибка при загрузке ресурса "${filename}.html" (${response.status})`); }
+
+				const text = await response.text();
+				const parser = new DOMParser();
+				const node = parser.parseFromString(text, 'text/html').body.firstChild;
+
+
+				return node;
+			}
+
+			async function clearInventory(isForceClear = false, filteredLoot = []) {
+				if (isInvClearInProgress) { return; } else { isInvClearInProgress = true; }
+
+				const maxAmountInBag = config.maxAmountInBag;
+
+				try {
+					const inventory = await getInventory();
+					const itemsAmount = inventory.reduce((total, item) => total + item.a, 0);
+					const isEnoughSpace = INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE;
+					const { allied, hostile } = maxAmountInBag.references;
+					const toDelete = {};
+					let pointsData = [], pointsTeams = {};
+
+					if (isEnoughSpace && !isForceClear && filteredLoot.length == 0) { return; }
+
+					if (!isEnoughSpace || isForceClear) {
+						if (allied > 0 || hostile > 0) {
+							const refs = inventory.filter(e => e.t == 3);
+
+							pointsData = await Promise.all(refs.map(ref => getPointData(ref.l)));
+							pointsTeams = Object.fromEntries(pointsData.map(point => [point.g, point.te]));
+						}
+
+						inventory.forEach(item => {
+							const { t: type, l: level, l: pointGuid, a: amount, g: guid } = item;
+							if (type > ITEMS_TYPES.length - 1) { return; };
+
+							const itemName = ITEMS_TYPES[type];
+							let itemMaxAmount = -1;
+							let amountToDelete = 0;
+
+							if (itemName == 'references') {
+								if (isStarMode && (pointGuid == starModeTarget?.guid)) {
+									itemMaxAmount = -1;
+								} else if (favorites[pointGuid]?.isActive) {
+									itemMaxAmount = -1;
+								} else if (maxAmountInBag.references.allied == -1 && maxAmountInBag.references.hostile == -1) {
+									itemMaxAmount = -1;
+								} else if (maxAmountInBag.references.allied == 0 && maxAmountInBag.references.hostile == 0) {
+									itemMaxAmount = 0;
+								} else if (Object.keys(pointsTeams).length) {
+									const pointTeam = pointsTeams[pointGuid];
+									const pointSide = pointTeam == player.team ? 'allied' : 'hostile';
+									itemMaxAmount = pointTeam === undefined ? -1 : maxAmountInBag[itemName][pointSide];
+								}
+							} else {
+								itemMaxAmount = maxAmountInBag[itemName]?.[level] ?? -1;
+							}
+
+							if (itemMaxAmount != -1 && amount > itemMaxAmount) {
+								amountToDelete = amount - itemMaxAmount;
+							}
+
+							if (amountToDelete > 0) {
+								toDelete[type] = toDelete[type] ?? {};
+								toDelete[type][guid] = { amount: amountToDelete };
+							}
+						});
+					}
+
+					filteredLoot.forEach(item => {
+						const { amount, guid, type } = item;
+
+						if (toDelete[type]?.[guid] != undefined) {
+							toDelete[type][guid].amount += amount;
+							toDelete[type][guid].filtered = amount; // Эти предметы не будут добавлены в кэш основным скриптом, т.к. удаляются сразу же.
+						} else {
+							toDelete[type] = toDelete[type] ?? {};
+							toDelete[type][guid] = { amount, filtered: amount };
+						}
 					});
+
+					if (Object.keys(toDelete).length == 0) { return; }
+
+
+					// Обновляем количество на кнопке, показываем тост с удалёнными.
+					let invTotal = Infinity;
+					let message = '';
+					const deletedAmounts = {};
+
+					for (let type in toDelete) {
+						const entries = Object.entries(toDelete[type]);
+						const items = Object.fromEntries(entries.map(item => [item[0], item[1].amount]));
+						const response = await deleteItems(items, type);
+
+						if (response.count.total < invTotal) { invTotal = response.count.total; }
+
+						deletedAmounts[type] = deletedAmounts[type] ?? 0;
+						deletedAmounts[type] += entries.reduce((total, entry) => {
+							const amount = (entry[1].amount - (entry[1].filtered ?? 0));
+							return total + amount;
+						}, 0);
+					}
+
+					for (let type in deletedAmounts) {
+						const amount = deletedAmounts[type];
+						if (amount > 0) {
+							const itemName = i18next.t(`items.types.${ITEMS_TYPES[type].slice(0, -1)}`);
+							message += `<br><span style="background: var(--sbgcui-branding-color); margin-right: 5px;" class="item-icon type-${type}"></span>x${deletedAmounts[type]} ${itemName}`;
+						}
+					}
+
+					if (message.length) { showToast(`Удалено: ${message}`); }
+
+					if (isFinite(invTotal)) {
+						invTotalSpan.innerText = invTotal;
+						if (inventoryButton.style.color.match('accent') && invTotal < INVENTORY_LIMIT) {
+							inventoryButton.style.color = '';
+						}
+					}
+
+
+					/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
+					deleteFromCacheAndSliders(toDelete);
+				} catch (error) {
+					showToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`, undefined, undefined, 'error-toast');
+					console.log('SBG CUI: Ошибка при удалении предметов.', error);
+				} finally {
+					isInvClearInProgress = false;
+				}
 			}
 
 			function createResponse(obj, originalResponse) {
@@ -1214,29 +1203,33 @@
 			function deleteFromCacheAndSliders(items) {
 				let cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 
-				items.forEach(e => {
-					const cachedItem = cache.find(f => f.g == e.guid);
-					const deletedAmount = e.amount - (e.filtered ?? 0);
-					const slider = e.type == 1 ? deploySlider : e.type == 2 ? attackSlider : undefined;
+				for (let type in items) {
+					for (let guid in items[type]) {
+						const item = items[type][guid];
+						const cachedItem = cache.find(f => f.g == guid);
+						const deletedAmount = item.amount - (item.filtered ?? 0);
+						const slider = type == 1 ? deploySlider : type == 2 ? attackSlider : undefined;
 
-					if (cachedItem) { cachedItem.a -= deletedAmount; }
+						if (cachedItem) { cachedItem.a -= deletedAmount; }
 
-					if (slider != undefined && deletedAmount > 0) {
-						const slide = slider.querySelector(`li[data-guid="${e.guid}"]`);
-						if (slide == null) { return; }
+						if (slider != undefined && deletedAmount > 0) {
+							const slide = slider.querySelector(`li[data-guid="${guid}"]`);
+							if (slide == null) { return; }
 
-						const amountSpan = slide.querySelector(`li[data-guid="${e.guid}"] > .${e.type == 1 ? 'cores' : 'catalysers'}-list__amount`);
-						const amountSpanText = +amountSpan.innerText.slice(1);
+							const amountSpan = slide.querySelector(`li[data-guid="${guid}"] > .${type == 1 ? 'cores' : 'catalysers'}-list__amount`);
+							const amountSpanText = +amountSpan.innerText.slice(1);
 
-						if (amountSpanText - deletedAmount > 0) {
-							amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
-						} else {
-							slide.remove();
-							window[`${slider == attackSlider ? 'attack' : 'deploy'}_slider`].refresh();
+							if (amountSpanText - deletedAmount > 0) {
+								amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
+							} else {
+								slide.remove();
+								window[`${slider == attackSlider ? 'attack' : 'deploy'}_slider`].refresh();
+							}
 						}
 					}
-				});
-				cache = cache.filter(e => e.a > 0);
+				}
+
+				cache = cache.filter(item => item.a > 0);
 
 				localStorage.setItem('inventory-cache', JSON.stringify(cache));
 			}
@@ -1781,12 +1774,12 @@
 
 			/* Данные о себе и версии игры */
 			{
-				var selfData = await getSelfData();
+				const selfData = await getSelfData();
 				const stateStore = database.transaction('state', 'readwrite').objectStore('state');
 
-				if (LATEST_KNOWN_VERSION != selfData.version) {
+				if (LATEST_KNOWN_VERSION != gameVersion) {
 					if (versionWarns < 2) {
-						const message = `Текущая версия игры (${selfData.version}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`;
+						const message = `Текущая версия игры (${gameVersion}) не соответствует последней известной версии (${LATEST_KNOWN_VERSION}). Возможна некорректная работа.`;
 						const toast = createToast(message, undefined, undefined, 'error-toast');
 						toast.showToast();
 
@@ -1797,22 +1790,22 @@
 				}
 
 				var player = {
-					name: selfData.name,
-					team: selfData.team,
+					name: selfData.n,
+					team: selfData.t,
 					exp: {
-						total: selfData.exp,
-						current: selfData.exp - LEVEL_TARGETS.slice(0, selfData.lvl - 1).reduce((sum, e) => e + sum, 0),
-						goal: LEVEL_TARGETS[selfData.lvl - 1],
+						total: selfData.x,
+						current: selfData.x - LEVEL_TARGETS.slice(0, selfData.l - 1).reduce((sum, e) => e + sum, 0),
+						goal: LEVEL_TARGETS[selfData.l - 1],
 						get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
 						set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
 					},
 					auth: localStorage.getItem('auth'),
-					guid: selfData.guid,
+					guid: selfData.g,
 					feature: playerFeature,
-					teamColor: getComputedStyle(html).getPropertyValue(`--team-${selfData.team}`),
+					teamColor: getComputedStyle(html).getPropertyValue(`--team-${selfData.t}`),
 					get level() { return this._level; },
 					set level(str) { this._level = +str.split('').filter(e => e.match(/[0-9]/)).join(''); },
-					_level: selfData.lvl,
+					_level: selfData.l,
 				};
 			}
 
@@ -2645,7 +2638,7 @@
 				let isSettingsMenuOpened = false;
 
 				try {
-					var settingsMenu = await fetchHTMLasset('settings');
+					var settingsMenu = await getHTMLasset('settings');
 
 					var brandingSelect = settingsMenu.querySelector('select[name="mapFilters_branding"]');
 					var brandingInput = settingsMenu.querySelector('input[name="mapFilters_brandingColor"]');
@@ -4203,7 +4196,7 @@
 				});
 
 				try {
-					const popup = await fetchHTMLasset('zero-point-info');
+					const popup = await getHTMLasset('zero-point-info');
 					const zeroPointFeature = new ol.Feature({
 						geometry: new ol.geom.Point([0, 0])
 					});
@@ -4444,7 +4437,7 @@
 						navPopup.classList.toggle('sbgcui_hidden');
 					}
 
-					const navPopup = await fetchHTMLasset('navigate');
+					const navPopup = await getHTMLasset('navigate');
 					const coordsSpan = navPopup.querySelector('.sbgcui_navigate-coords');
 					const form = navPopup.querySelector('form');
 					const menus = navPopup.querySelectorAll('menu');
@@ -4541,12 +4534,18 @@
 					if (!confirm(`Удалить ${overallRefsToDelete} ссыл${ortdSuffix} от ${uniqueRefsToDelete} точ${urtdSuffix}?`)) { return; }
 
 					const selectedFeatures = pointsWithRefsSource.getFeatures().filter(feature => feature.get('isSelected') == true);
-					const refsToDelete = selectedFeatures.map(feature => ({ guid: feature.getId(), type: 3, amount: feature.get('amount') }));
+					const refsToDelete = { 3: {} };
 
-					deleteItems(refsToDelete)
-						.then(responses => {
-							const response = responses[0];
+					selectedFeatures.forEach(feature => {
+						const guid = feature.getId(), amount = feature.get('amount');
+						refsToDelete[3][guid] = { amount };
+					});
 
+					const entries = Object.entries(refsToDelete[3]);
+					const items = Object.fromEntries(entries.map(item => [item[0], item[1].amount]));
+
+					deleteItems(items, 3)
+						.then(response => {
 							if ('error' in response) { throw response.error; }
 
 							const invTotal = response.count.total;
@@ -4995,7 +4994,7 @@
 						stateStore.put(state.hiddenLogs, 'hiddenLogs');
 					}
 
-					const popup = await fetchHTMLasset('log');
+					const popup = await getHTMLasset('log');
 					const closeButton = popup.querySelector('.sbgcui_log-close');
 					const clearButton = popup.querySelector('.sbgcui_log-buttons-trash');
 					const cnslButton = popup.querySelector('.sbgcui_log-buttons-console');
