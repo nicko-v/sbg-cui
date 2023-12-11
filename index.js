@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.28
+// @version      1.14.29
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.28';
+	const USERSCRIPT_VERSION = '1.14.29';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1056,14 +1056,16 @@
 				if (isInvClearInProgress) { return; } else { isInvClearInProgress = true; }
 
 				const maxAmountInBag = config.maxAmountInBag;
+				const toDelete = {};
 
 				try {
 					const inventory = await getInventory();
 					const itemsAmount = inventory.reduce((total, item) => total + item.a, 0);
 					const isEnoughSpace = INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE;
 					const { allied, hostile } = maxAmountInBag.references;
-					const toDelete = {};
 					let pointsData = [], pointsTeams = {};
+
+					if (inventory instanceof Array) { localStorage.setItem('inventory-cache', JSON.stringify(inventory)); }
 
 					if (isEnoughSpace && !isForceClear && filteredLoot.length == 0) { return; }
 
@@ -1137,6 +1139,10 @@
 						const items = Object.fromEntries(entries.map(item => [item[0], item[1].amount]));
 						const response = await deleteItems(items, type);
 
+						if (!('count' in response)) {
+							delete toDelete[type];
+							continue;
+						}
 						if (response.count.total < invTotal) { invTotal = response.count.total; }
 
 						deletedAmounts[type] = deletedAmounts[type] ?? 0;
@@ -1164,13 +1170,16 @@
 					}
 
 
-					/* Надо удалить предметы из кэша, т.к. при следующем хаке общее количество предметов возьмётся из кэша и счётчик будет некорректным */
+					// Надо удалить предметы из кэша, т.к. при следующем хаке общее количество
+					// предметов возьмётся из кэша, и счётчик будет некорректным.
 					deleteFromCacheAndSliders(toDelete);
 				} catch (error) {
 					showToast(`Ошибка при проверке или очистке инвентаря. <br>${error.message}`, undefined, undefined, 'error-toast');
 					console.log('SBG CUI: Ошибка при удалении предметов.', error);
 				} finally {
 					isInvClearInProgress = false;
+
+					return toDelete;
 				}
 			}
 
@@ -1210,11 +1219,7 @@
 						const deletedAmount = item.amount - (item.filtered ?? 0);
 						const slider = type == 1 ? deploySlider : type == 2 ? attackSlider : undefined;
 
-						if (cachedItem) {
-							cachedItem.a -= deletedAmount;
-							cache = cache.filter(item => item.a > 0);
-							localStorage.setItem('inventory-cache', JSON.stringify(cache));
-						}
+						if (cachedItem) { cachedItem.a -= deletedAmount; }
 
 						if (slider != undefined && deletedAmount > 0) {
 							const slide = slider.querySelector(`li[data-guid="${guid}"]`);
@@ -1233,7 +1238,8 @@
 					}
 				}
 
-				
+				cache = cache.filter(item => item.a > 0);
+				localStorage.setItem('inventory-cache', JSON.stringify(cache));
 			}
 
 			function chooseCatalyser(type) {
@@ -1525,7 +1531,11 @@
 													}
 												}
 
-												await clearInventory(false, toDelete);
+												const deletedItems = await clearInventory(false, toDelete);
+
+												// Чистим лут от удалённых предметов, иначе основной скрипт добавит их в кэш и слайдеры.
+												parsedResponse.loot.forEach(item => { item.a -= deletedItems[item.t]?.[item.g]?.amount ?? 0; });
+												parsedResponse.loot = parsedResponse.loot.filter(item => item.a > 0);
 
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
@@ -1821,24 +1831,24 @@
 				let faSvg = document.createElement('link');
 
 				cssVars.innerHTML = (`
-      :root {
-        --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
-        --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
-        --sbgcui-invert: ${mapFilters.invert};
-        --sbgcui-hueRotate: ${mapFilters.hueRotate}deg;
-        --sbgcui-brightness: ${mapFilters.brightness};
-        --sbgcui-grayscale: ${mapFilters.grayscale};
-        --sbgcui-sepia: ${mapFilters.sepia};
-        --sbgcui-blur: ${mapFilters.blur}px;
-        --sbgcui-point-bg: #ccc;
-        --sbgcui-point-image: '';
-        --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
-        --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
-				--sbgcui-show-speedometer: ${ui.speedometer};
-				--sbgcui-branding-color: ${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor};
-				--team-${player.team}: var(--sbgcui-branding-color);
-      }
-  	`);
+      		:root {
+      		  --sbgcui-player-exp-percentage: ${player.exp.percentage}%;
+      		  --sbgcui-inventory-limit: " / ${INVENTORY_LIMIT}";
+      		  --sbgcui-invert: ${mapFilters.invert};
+      		  --sbgcui-hueRotate: ${mapFilters.hueRotate}deg;
+      		  --sbgcui-brightness: ${mapFilters.brightness};
+      		  --sbgcui-grayscale: ${mapFilters.grayscale};
+      		  --sbgcui-sepia: ${mapFilters.sepia};
+      		  --sbgcui-blur: ${mapFilters.blur}px;
+      		  --sbgcui-point-bg: #ccc;
+      		  --sbgcui-point-image: '';
+      		  --sbgcui-point-image-blur: ${ui.pointBgImageBlur ? 2 : 0}px;
+      		  --sbgcui-point-btns-rtl: ${ui.pointBtnsRtl ? 'rtl' : 'ltr'};
+						--sbgcui-show-speedometer: ${ui.speedometer};
+						--sbgcui-branding-color: ${mapFilters.branding == 'custom' ? mapFilters.brandingColor : player.teamColor};
+						--team-${player.team}: var(--sbgcui-branding-color);
+      		}
+  			`);
 
 				if (mapFilters.branding == 'custom') {
 					window.TeamColors[player.team].fill = mapFilters.brandingColor + '80';
