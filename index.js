@@ -371,6 +371,8 @@
 			}
 		}
 
+		class PointFeature extends ol.Feature {}
+
 		class View extends ol.View {
 			constructor(options) {
 				if (portrait.matches) { options.padding = [VIEW_PADDING, 0, 0, 0]; }
@@ -485,8 +487,9 @@
 		};
 
 		ol.Map = Map;
-		ol.Feature = Feature;
 		ol.View = View;
+		ol.Feature = Feature;
+		ol.PointFeature = PointFeature;
 		ol.layer.Tile = Tile;
 		ol.source.XYZ = XYZ;
 		ol.source.OSM = OSM;
@@ -531,6 +534,8 @@
 					return `${match}; manageControls();`;
 				case `makeEntry(e, data)`:
 					return `window.makeEntryDec(e, data, makeEntry)`;
+				case `new ol.Feature({`:
+					return 'new ol.PointFeature({';
 				case `makeItemTitle(item)`:
 					return `makeShortItemTitle(item)`;
 				case `view.calculateExtent(map.getSize()`:
@@ -565,6 +570,7 @@
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
+			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
@@ -573,7 +579,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 22;
+		const replacesShouldBe = 23;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -3443,7 +3449,7 @@
 
 			/* Подсветка точек */
 			{
-				class OlFeature extends ol.Feature {
+				class PointFeature extends ol.Feature {
 					constructor(arg) {
 						super(arg);
 
@@ -3570,7 +3576,7 @@
 					}
 				}
 
-				ol.Feature = OlFeature;
+				ol.PointFeature = PointFeature ;
 			}
 
 
