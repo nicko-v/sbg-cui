@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.30
+// @version      1.14.31
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.30';
+	const USERSCRIPT_VERSION = '1.14.31';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1221,20 +1221,21 @@
 					for (let guid in items[type]) {
 						const item = items[type][guid];
 						const cachedItem = cache.find(f => f.g == guid);
-						const deletedAmount = item.amount - (item.filtered ?? 0);
+						const deleteFromSlider = item.amount - (item.filtered ?? 0);
+						const deleteFromCache = item.amount;
 						const slider = type == 1 ? deploySlider : type == 2 ? attackSlider : undefined;
 
-						if (cachedItem) { cachedItem.a -= deletedAmount; }
+						if (cachedItem) { cachedItem.a -= deleteFromCache; }
 
-						if (slider != undefined && deletedAmount > 0) {
+						if (slider != undefined && deleteFromSlider > 0) {
 							const slide = slider.querySelector(`li[data-guid="${guid}"]`);
 							if (slide == null) { continue; }
 
 							const amountSpan = slide.querySelector(`li[data-guid="${guid}"] > .${type == 1 ? 'cores' : 'catalysers'}-list__amount`);
 							const amountSpanText = +amountSpan.innerText.slice(1);
 
-							if (amountSpanText - deletedAmount > 0) {
-								amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
+							if (amountSpanText - deleteFromSlider > 0) {
+								amountSpan.innerText = `x${amountSpanText - deleteFromSlider}`;
 							} else {
 								slide.remove();
 								window[`${slider == attackSlider ? 'attack' : 'deploy'}_slider`].refresh();
