@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.29
+// @version      1.14.30
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.29';
+	const USERSCRIPT_VERSION = '1.14.30';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1071,8 +1071,6 @@
 					const { allied, hostile } = maxAmountInBag.references;
 					let pointsData = [], pointsTeams = {};
 
-					if (inventory instanceof Array) { localStorage.setItem('inventory-cache', JSON.stringify(inventory)); }
-
 					if (isEnoughSpace && !isForceClear && filteredLoot.length == 0) { return; }
 
 					if (!isEnoughSpace || isForceClear) {
@@ -1158,6 +1156,8 @@
 						}, 0);
 					}
 
+					if (Object.keys(toDelete).length > 0) { localStorage.setItem('inventory-cache', JSON.stringify(inventory)); }
+
 					for (let type in deletedAmounts) {
 						const amount = deletedAmounts[type];
 						if (amount > 0) {
@@ -1184,7 +1184,6 @@
 					console.log('SBG CUI: Ошибка при удалении предметов.', error);
 				} finally {
 					isInvClearInProgress = false;
-
 					return toDelete;
 				}
 			}
@@ -1546,7 +1545,6 @@
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
 											}
-
 
 											if ('burnout' in parsedResponse || 'cooldown' in parsedResponse) {
 												let dateNow = Date.now();
