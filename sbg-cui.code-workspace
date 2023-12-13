@@ -34,6 +34,7 @@
 		"MinifyAll.PrefixOfNewMinifiedFiles": ".min",
 		"MinifyAll.minifyOnSaveToNewFile": true,
 		"MinifyAll.openMinifiedDocument": false,
-		"MinifyAll.disableHtml": true
+		"MinifyAll.disableHtml": true,
+		"workbench.editor.tabActionLocation": "left"
 	}
 }
