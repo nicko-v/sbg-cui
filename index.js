@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.31
+// @version      1.14.32
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.31';
+	const USERSCRIPT_VERSION = '1.14.32';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -371,7 +371,7 @@
 			}
 		}
 
-		class PointFeature extends ol.Feature {}
+		class PointFeature extends ol.Feature { }
 
 		class View extends ol.View {
 			constructor(options) {
@@ -1058,7 +1058,7 @@
 				return node;
 			}
 
-			async function clearInventory(isForceClear = false, filteredLoot = []) {
+			async function clearInventory(isForceClear = false, loot = []) {
 				if (isInvClearInProgress) { return; } else { isInvClearInProgress = true; }
 
 				const maxAmountInBag = config.maxAmountInBag;
@@ -1068,10 +1068,12 @@
 					const inventory = await getInventory();
 					const itemsAmount = inventory.reduce((total, item) => total + item.a, 0);
 					const isEnoughSpace = INVENTORY_LIMIT - itemsAmount >= MIN_FREE_SPACE;
+					const isFilteredLoot = loot.some(item => item.isFiltered);
 					const { allied, hostile } = maxAmountInBag.references;
-					let pointsData = [], pointsTeams = {};
+					const deletedAmounts = {};
+					let pointsData = [], pointsTeams = {}, invTotal = Infinity, message = '';
 
-					if (isEnoughSpace && !isForceClear && filteredLoot.length == 0) { return; }
+					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return; }
 
 					if (!isEnoughSpace || isForceClear) {
 						if (allied > 0 || hostile > 0) {
@@ -1118,25 +1120,24 @@
 						});
 					}
 
-					filteredLoot.forEach(item => {
-						const { amount, guid, type } = item;
+					loot.forEach(item => {
+						const { amount, isFiltered, guid, type } = item;
 
-						if (toDelete[type]?.[guid] != undefined) {
-							toDelete[type][guid].amount += amount;
-							toDelete[type][guid].filtered = amount; // Эти предметы не будут добавлены в кэш основным скриптом, т.к. удаляются сразу же.
-						} else {
+						if (isFiltered) {
+							const inventoryAmount = inventory.find(item => item.g == guid)?.a;
+
 							toDelete[type] = toDelete[type] ?? {};
-							toDelete[type][guid] = { amount, filtered: amount };
+							toDelete[type][guid] = toDelete[type][guid] ?? { amount: 0 };
+
+							toDelete[type][guid].amount = Math.min(toDelete[type][guid].amount + amount, inventoryAmount ?? Infinity);
+							toDelete[type][guid].uncached = amount;
+							toDelete[type][guid].filtered = amount;
+						} else if (toDelete[type]?.[guid] != undefined) {
+							toDelete[type][guid].uncached = amount;
 						}
 					});
 
 					if (Object.keys(toDelete).length == 0) { return; }
-
-
-					// Обновляем количество на кнопке, показываем тост с удалёнными.
-					let invTotal = Infinity;
-					let message = '';
-					const deletedAmounts = {};
 
 					for (let type in toDelete) {
 						const entries = Object.entries(toDelete[type]);
@@ -1156,8 +1157,6 @@
 						}, 0);
 					}
 
-					if (Object.keys(toDelete).length > 0) { localStorage.setItem('inventory-cache', JSON.stringify(inventory)); }
-
 					for (let type in deletedAmounts) {
 						const amount = deletedAmounts[type];
 						if (amount > 0) {
@@ -1174,7 +1173,6 @@
 							inventoryButton.style.color = '';
 						}
 					}
-
 
 					// Надо удалить предметы из кэша, т.к. при следующем хаке общее количество
 					// предметов возьмётся из кэша, и счётчик будет некорректным.
@@ -1221,21 +1219,20 @@
 					for (let guid in items[type]) {
 						const item = items[type][guid];
 						const cachedItem = cache.find(f => f.g == guid);
-						const deleteFromSlider = item.amount - (item.filtered ?? 0);
-						const deleteFromCache = item.amount;
+						const deletedAmount = item.amount - (item.uncached ?? 0);
 						const slider = type == 1 ? deploySlider : type == 2 ? attackSlider : undefined;
 
-						if (cachedItem) { cachedItem.a -= deleteFromCache; }
+						if (cachedItem) { cachedItem.a -= deletedAmount; }
 
-						if (slider != undefined && deleteFromSlider > 0) {
+						if (slider != undefined && deletedAmount > 0) {
 							const slide = slider.querySelector(`li[data-guid="${guid}"]`);
 							if (slide == null) { continue; }
 
 							const amountSpan = slide.querySelector(`li[data-guid="${guid}"] > .${type == 1 ? 'cores' : 'catalysers'}-list__amount`);
 							const amountSpanText = +amountSpan.innerText.slice(1);
 
-							if (amountSpanText - deleteFromSlider > 0) {
-								amountSpan.innerText = `x${amountSpanText - deleteFromSlider}`;
+							if (amountSpanText - deletedAmount > 0) {
+								amountSpan.innerText = `x${amountSpanText - deletedAmount}`;
 							} else {
 								slide.remove();
 								window[`${slider == attackSlider ? 'attack' : 'deploy'}_slider`].refresh();
@@ -1517,27 +1514,35 @@
 										case '/api/discover':
 											//const guid = JSON.parse(options.body).guid;
 											const guid = lastOpenedPoint.guid;
-											let toDelete = [];
 
 											// Закрываем тост о том, что избранная точка остыла.
 											if (guid in favorites) { favorites[guid].hideCooldownNotifToast(); }
 
 											if ('loot' in parsedResponse) {
+												let loot = parsedResponse.loot;
+
 												logAction({ type: 'discover', point: guid, title: lastOpenedPoint.title });
 												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
 												parsedResponse.loot.sort((a, b) => (a.t == b.t) ? ((a.t < 3 && b.t < 3) ? (b.l - a.l) : (a.t < 3 ? a.t : b.t)) : (a.t - b.t));
 
-												if (discoverModifier.isActive) {
-													toDelete = parsedResponse.loot
-														.filter(e => !discoverModifier.refs ? e.t == 3 : e.t != 3 && e.t != 4)
-														.map(e => ({ guid: e.g, type: e.t, amount: e.a }));
+												loot = loot.map(i => {
+													const item = { guid: i.g, type: i.t, amount: i.a };
 
-													if (toDelete.length != 0) {
-														parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3));
+													if (
+														(discoverModifier.refs == false && (i.t == 3)) ||
+														(discoverModifier.loot == false && (i.t == 1 || i.t == 2))
+													) {
+														item.isFiltered = true;
 													}
+
+													return item;
+												});
+
+												if (loot.some(item => item.isFiltered)) {
+													parsedResponse.loot = parsedResponse.loot.filter(e => !discoverModifier.refs ? (e.t != 3) : (e.t == 3 || e.t == 4));
 												}
 
-												const deletedItems = await clearInventory(false, toDelete);
+												const deletedItems = await clearInventory(false, loot);
 
 												// Чистим лут от удалённых предметов, иначе основной скрипт добавит их в кэш и слайдеры.
 												parsedResponse.loot.forEach(item => { item.a -= deletedItems[item.t]?.[item.g]?.amount ?? 0; });
@@ -3575,7 +3580,7 @@
 					}
 				}
 
-				ol.PointFeature = PointFeature ;
+				ol.PointFeature = PointFeature;
 			}
 
 
