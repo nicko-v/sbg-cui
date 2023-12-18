@@ -982,6 +982,7 @@ html[lang="ru"] .i-buttons {
 
 .sbgcui_destroy_notif_toast>.toast-close {
 	color: var(--text);
+	font-size: 1.3em;
 	opacity: 0.7;
 	padding: 0 3px;
 	position: absolute;
@@ -1000,6 +1001,11 @@ html[lang="ru"] .i-buttons {
 	flex-wrap: wrap;
 	justify-content: space-between;
 	width: calc(100% - 14px);
+}
+
+.sbgcui_destroy_notif_toast-content>span:first-child>span:first-child {
+	text-overflow: ellipsis;
+	overflow-x: hidden;
 }
 
 .sbgcui_destroy_notif_toast-content>span:last-child {
