@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.32
+// @version      1.14.33
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.32';
+	const USERSCRIPT_VERSION = '1.14.33';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -4424,7 +4424,8 @@
 								url = `dgis://2gis.ru/routeSearch/rsType/${routeType}/from/${lonA},${latA}/to/${lonB},${latB}`;
 								break;
 							case 'gmaps':
-								url = `comgooglemaps://?saddr=${latA},${lonA}&daddr=${latB},${lonB}&directionsmode=${routeType}`;
+								//url = `comgooglemaps://?saddr=${latA},${lonA}&daddr=${latB},${lonB}&directionsmode=${routeType}`;
+								url = `https://www.google.com/maps/dir/?api=1&origin=${latA},${lonA}&destination=${latB},${lonB}&travelmode=${routeType}`;
 								break;
 						}
 
