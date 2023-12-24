@@ -859,6 +859,10 @@ html[lang="ru"] .i-buttons {
 	pointer-events: none;
 }
 
+.self-info__entry:has(#self-info__inv-lim) {
+	display: none;
+}
+
 .self-info__entry {
 	display: flex;
 	align-items: flex-end;
