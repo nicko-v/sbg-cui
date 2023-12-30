@@ -405,13 +405,13 @@ html[lang="ru"] .i-buttons {
 .i-stat {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	grid-template-rows: 1fr repeat(6, auto);
+	grid-template-rows: repeat(3, auto) 1fr repeat(3, auto);
 	gap: 0px 10px;
 	grid-template-areas:
-		"_ _"
 		"distance lines"
 		"owner regions"
 		"energy reward"
+		"_ _"
 		"buttons buttons"
 		"cores cores"
 		"slider slider";
