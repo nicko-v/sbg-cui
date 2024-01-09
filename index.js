@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.34
+// @version      1.14.35
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,18 +43,14 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	//const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
-	const ACTIONS_REWARDS = { destroy: { region: 125 * 2, line: 45 * 2, core: 10 * 2 } };
+	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
-	//const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
-	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 2, 2];
-	//const DISCOVERY_COOLDOWN = 90;
-	const DISCOVERY_COOLDOWN = 20;
+	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
+	const DISCOVERY_COOLDOWN = 90;
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	//const INVENTORY_LIMIT = 3000;
-	const INVENTORY_LIMIT = 4000;
+	const INVENTORY_LIMIT = 3000;
 	const INVIEW_MARKERS_MAX_ZOOM = 16;
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
@@ -65,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.34';
+	const USERSCRIPT_VERSION = '1.14.35';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
