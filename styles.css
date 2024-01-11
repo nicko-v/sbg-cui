@@ -28,6 +28,11 @@ body {
 	overflow: hidden;
 }
 
+.layers-config__subheader[data-i18n="layers.lights.header"],
+#map-lights {
+	display: none;
+}
+
 .sbgcui_button_reset {
 	background: none;
 	border: none;

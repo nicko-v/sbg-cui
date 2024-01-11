@@ -2200,6 +2200,10 @@
 				};
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
+
+				const mapConfig = JSON.parse(localStorage.getItem('map-config'));
+				mapConfig.h = 0;
+				localStorage.setItem('map-config', JSON.stringify(mapConfig));
 			}
 
 
