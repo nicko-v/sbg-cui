@@ -965,7 +965,6 @@
 			let lastOpenedPoint = {};
 			let discoverModifier;
 			let latestNotifId;
-			let inviewRegionsVertexes = [];
 			let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
 			const uniques = { c: new Set(), v: new Set() };
 			const inview = {};
@@ -1579,13 +1578,10 @@
 											break;
 										case '/api/inview':
 											const inviewPoints = parsedResponse.p;
-											const inviewRegions = parsedResponse.r;
 											const zoom = +url.searchParams.get('z');
 
 											const mapConfig = JSON.parse(localStorage.getItem('map-config'));
 											const lParam = url.searchParams.get('l');
-
-											inviewRegionsVertexes = inviewRegions.map(e => e.c[0].slice(0, 3));
 
 											if (mapConfig.l == lParam) {
 												resolve(response);
