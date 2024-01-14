@@ -2172,7 +2172,7 @@
 					'sbgcui.distance': 'Расстояние',
 				});
 				i18next.addResources('en', 'main', {
-					'notifs.text': 'нейтрализована $1$',
+					'notifs.text': 'neutralized by $1$',
 					'sbgcui.point': 'Point',
 					'sbgcui.points': 'Points',
 					'sbgcui.line': 'Line',
