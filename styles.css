@@ -460,6 +460,10 @@ html[lang="ru"] .i-buttons {
 	grid-area: slider;
 }
 
+.i-stat__core.selected {
+	border-width: 5px;
+}
+
 .i-stat__entry {
 	text-overflow: ellipsis;
 	overflow-x: hidden;
