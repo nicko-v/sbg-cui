@@ -548,6 +548,21 @@ html[lang="ru"] .i-buttons {
 	transform: translateX(-50%);
 }
 
+.sbgcui_inventory__ma-shortcuts {
+	display: none;
+	justify-content: space-around;
+	margin-bottom: 15px;
+}
+
+.sbgcui_inventory__ma-shortcuts>span {
+	border: 1px solid var(--text);
+	padding: 0 5px;
+}
+
+.inventory .sbgcui_inventory__ma-shortcuts {
+	display: flex;
+}
+
 .inventory__content {
 	order: 1;
 	margin-bottom: 0;
@@ -607,6 +622,9 @@ html[lang="ru"] .i-buttons {
 }
 
 .inventory__manage-amount {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 	z-index: 1;
 }
 

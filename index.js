@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.35
+// @version      1.14.36
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.35';
+	const USERSCRIPT_VERSION = '1.14.36';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -5155,6 +5155,29 @@
 				window.addEventListener('configUpdated', updateInterval);
 				notifsButton.addEventListener('click', closeToasts);
 				closeAllButton.addEventListener('click', closeToasts);
+			}
+
+
+			/* Шорткаты для удаления */
+			{
+				const input = document.querySelector('.inventory__manage-amount input');
+				const manageAmountButtons = document.querySelector('.inventory .inventory__ma-buttons');
+				const shortcuts = [10, 50, 100];
+				const wrapper = document.createElement('div');
+
+				shortcuts.forEach(amount => {
+					const span = document.createElement('span');
+					span.innerText = amount;
+					span.dataset.amount = amount;
+					wrapper.appendChild(span);
+				});
+				wrapper.addEventListener('click', event => {
+					const amount = event.target.dataset.amount;
+					input.value = amount || input.value;
+				});
+				wrapper.classList.add('sbgcui_inventory__ma-shortcuts');
+
+				manageAmountButtons.before(wrapper);
 			}
 
 			window.cuiStatus = 'loaded';
