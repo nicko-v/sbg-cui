@@ -5173,7 +5173,11 @@
 				});
 				wrapper.addEventListener('click', event => {
 					const amount = event.target.dataset.amount;
-					input.value = amount || input.value;
+					const max = +input.max;
+
+					if (amount == undefined) { return; }
+
+					input.value = amount > max ? max : amount;
 				});
 				wrapper.classList.add('sbgcui_inventory__ma-shortcuts');
 
