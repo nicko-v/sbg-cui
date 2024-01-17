@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.36
+// @version      1.14.37
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.36';
+	const USERSCRIPT_VERSION = '1.14.37';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -518,6 +518,8 @@
 					return `window.deploy_slider`;
 				case `const draw_slider`:
 					return `window.draw_slider`;
+				case `if (new_val < 1) new_val = 1`:
+					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
 					return `${match}return;`;
 				case `$('[name="baselayer"]').on('change', e`:
@@ -562,6 +564,7 @@
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
+			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
@@ -579,7 +582,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 23;
+		const replacesShouldBe = 25;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
