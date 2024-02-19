@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.38
+// @version      1.14.39
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.38';
+	const USERSCRIPT_VERSION = '1.14.39';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -500,55 +500,55 @@
 		function replacer(match) {
 			replacesMade += 1;
 			switch (match) {
-				case `const Catalysers`:
+				case `const Catalysers`: // Line ~95
 					return `window.Catalysers`;
-				case `const TeamColors`:
+				case `const TeamColors`: // Line ~101
 					return `window.TeamColors`;
-				case `if (zoom % 1 != 0)`:
-					return `//${match}`;
-				case `if (getSettings('plrhid') == true) $('.ol-layer__player').addClass('hidden')`:
-					return `${match};}
+				case `new ol.Feature({`: // Line ~161, 1891
+					return 'new ol.PointFeature({';
+				case `constrainResolution: true`: // Line ~261
+					return `constrainResolution: false`;
+				case `movePlayer([coords.longitude, coords.latitude])`: // Line ~353
+					return `${match};
 									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
-									}{`;
-				case `const attack_slider`:
+									}`;
+				case `const attack_slider`: // Line ~409
 					return `window.attack_slider`;
-				case `const deploy_slider`:
+				case `const deploy_slider`: // Line ~427
 					return `window.deploy_slider`;
-				case `const draw_slider`:
+				case `const draw_slider`: // Line ~442
 					return `window.draw_slider`;
-				case `if (new_val < 1) new_val = 1`:
+				case `if (new_val < 1) new_val = 1`: // Line ~795
 					return `if (new_val < 1) new_val = max`;
-				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`:
+				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
 					return `${match}return;`;
-				case `$('[name="baselayer"]').on('change', e`:
+				case `$('[name="baselayer"]').on('change', e`: // Line ~1108
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
-				case `hour: '2-digit'`:
+				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
-				case `function initCompass() {`:
+				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
-				case `testuser`:
+				case `testuser`: // Line ~1314
 					return `NickolayV`;
-				case `timers.info_controls = setInterval(() => {`:
+				case `timers.info_controls = setInterval(() => {`: // Line ~1443
 					return `timers.info_controls = setTimeout(() => {`;
-				case `delete cooldowns[guid]`:
+				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
-				case `makeEntry(e, data)`:
+				case `makeEntry(e, data)`: // Line ~1658
 					return `window.makeEntryDec(e, data, makeEntry)`;
-				case `new ol.Feature({`:
-					return 'new ol.PointFeature({';
-				case `makeItemTitle(item)`:
-					return `makeShortItemTitle(item)`;
-				case `view.calculateExtent(map.getSize()`:
+				case `view.calculateExtent(map.getSize()`: // Line ~1872, 1873
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
-				case `z: view.getZoom()`:
+				case `z: view.getZoom()`: // Line ~1874
 					return `z: Math.floor(view.getZoom())`;
-				case `if (area < 1)`:
+				case `if (area < 1)`: // Line ~1972
 					return `if (area < 0)`;
-				case `if (type == 'osm') {`:
+				case `makeItemTitle(item)`: // Line ~2018
+					return `makeShortItemTitle(item)`;
+				case `if (type == 'osm') {`: // Line ~2166
 					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
-				case `class Bitfield`:
+				case `class Bitfield`: // Line ~2306
 					return `window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
 				default:
 					replacesMade -= 1;
@@ -559,8 +559,9 @@
 		const regexp = new RegExp([
 			`(const Catalysers)`,
 			`(const TeamColors)`,
-			`(if \\(zoom % 1 != 0\\))`,
-			`(if \\(getSettings\\('plrhid'\\) == true\\) \\$\\('\\.ol-layer__player'\\)\\.addClass\\('hidden'\\))`,
+			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
+			`(constrainResolution: true)`,
+			`(movePlayer\\(\\[coords\\.longitude, coords\\.latitude\\]\\))`,
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
@@ -573,11 +574,10 @@
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
-			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
-			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
+			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
