@@ -55,7 +55,7 @@
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
-	const LATEST_KNOWN_VERSION = '0.4.2-3';
+	const LATEST_KNOWN_VERSION = '0.4.2-4';
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
