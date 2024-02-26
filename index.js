@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.39
+// @version      1.14.40
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.39';
+	const USERSCRIPT_VERSION = '1.14.40';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1078,7 +1078,10 @@
 					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return; }
 
 					if (!isEnoughSpace || isForceClear) {
-						if (allied > 0 || hostile > 0) {
+						const isDeleteAll = allied == 0 && hostile == 0;
+						const isDeleteNone = allied == -1 && hostile == -1;
+
+						if (!(isDeleteAll || isDeleteNone)) {
 							const refs = inventory.filter(e => e.t == 3);
 
 							pointsData = await Promise.all(refs.map(ref => getPointData(ref.l)));
@@ -1098,9 +1101,9 @@
 									itemMaxAmount = -1;
 								} else if (favorites[pointGuid]?.isActive) {
 									itemMaxAmount = -1;
-								} else if (maxAmountInBag.references.allied == -1 && maxAmountInBag.references.hostile == -1) {
+								} else if (isDeleteNone) {
 									itemMaxAmount = -1;
-								} else if (maxAmountInBag.references.allied == 0 && maxAmountInBag.references.hostile == 0) {
+								} else if (isDeleteAll) {
 									itemMaxAmount = 0;
 								} else if (Object.keys(pointsTeams).length) {
 									const pointTeam = pointsTeams[pointGuid];
