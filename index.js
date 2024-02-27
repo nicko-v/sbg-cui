@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.40
+// @version      1.14.41
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.40';
+	const USERSCRIPT_VERSION = '1.14.41';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -79,7 +79,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 7);
+	const openRequest = indexedDB.open('CUI', 8);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -99,10 +99,6 @@
 
 			logsStore.createIndex('action_type', 'type');
 
-			const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
-			const baselayer = `${base}_${theme}`;
-
-			stateStore.add(baselayer, 'baselayer');
 			stateStore.add(new Set(), 'excludedCores');
 			stateStore.add(true, 'isMainToolbarOpened');
 			stateStore.add(false, 'isRotationLocked');
@@ -163,6 +159,13 @@
 
 						configStore.put(drawing, 'drawing');
 					});
+				},
+				8: () => {
+					const stateStore = event.target.transaction.objectStore('state');
+					const tilesStore = event.target.transaction.objectStore('tiles');
+
+					stateStore.delete('baselayer');
+					tilesStore.clear();
 				},
 			};
 
@@ -447,11 +450,13 @@
 
 		function loadTile(tile, src) {
 			const coords = tile.getTileCoord().join();
+			const urlTemplate = tile.key;
 			const tilesStore = database.transaction('tiles', 'readonly').objectStore('tiles');
 			const request = tilesStore.get(coords);
 
 			request.addEventListener('success', event => {
-				const cachedBlob = event.target.result;
+				const cachedTile = event.target.result || {};
+				const cachedBlob = cachedTile[urlTemplate];
 
 				if (cachedBlob == undefined) {
 					fetch(src)
@@ -464,7 +469,7 @@
 						})
 						.then(blob => {
 							setTileSrc(tile, blob);
-							database.transaction('tiles', 'readwrite').objectStore('tiles').put(blob, coords);
+							database.transaction('tiles', 'readwrite').objectStore('tiles').put({ [urlTemplate]: blob, ...cachedTile }, coords);
 						})
 						.catch(error => { console.log('SBG CUI: Ошибка при получении тайла.', error); });
 				} else {
@@ -1779,20 +1784,21 @@
 				}
 			}
 
-			function resetBaselayerIfChanged() {
-				const { base, theme } = JSON.parse(localStorage.getItem('settings')) || {};
-				const baselayer = `${base}_${theme}`;
+			function clearTilesCache() {
+				const transaction = database.transaction('tiles', 'readwrite');
+				const tilesStore = transaction.objectStore('tiles');
 
-				if (state.baselayer != baselayer) {
-					const transaction = database.transaction(['state', 'tiles'], 'readwrite');
-					const stateStore = transaction.objectStore('state');
-					const tilesStore = transaction.objectStore('tiles');
+				tilesStore.getAll().addEventListener('success', event => {
+					const tiles = event.target.result.reduce((acc, tile) => {
+						acc.total += Object.keys(tile).length;
+						acc.size += Object.values(tile).reduce((acc, blob) => acc += blob.size, 0);
+						return acc;
+					}, { total: 0, size: 0 });
 
-					stateStore.put(baselayer, 'baselayer');
-					tilesStore.clear();
-
-					state.baselayer = baselayer;
-				}
+					const total = tiles.total;
+					const size = +(tiles.size / 1024 / 1024).toFixed(1);
+					confirm(i18next.t('sbgcui.clearTilesCacheConfirm', { total, size })) && tilesStore.clear();
+				});
 			}
 
 
@@ -2100,8 +2106,6 @@
 					portrait.matches ? view.setTopPadding() : view.removePadding();
 					view.setCenter(playerFeature.getGeometry().getCoordinates());
 				});
-
-				map.getAllLayers()[0].on('change', resetBaselayerIfChanged);
 			}
 
 
@@ -2176,6 +2180,8 @@
 					'sbgcui.total': 'Всего',
 					'sbgcui.area': 'Площадь',
 					'sbgcui.distance': 'Расстояние',
+					'sbgcui.clearTilesCache': 'Очистить кэш',
+					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{total}} тайлов / {{size}} МБ.',
 				});
 				i18next.addResources('en', 'main', {
 					'notifs.text': 'neutralized by $1$',
@@ -2189,6 +2195,8 @@
 					'sbgcui.total': 'Total',
 					'sbgcui.area': 'Area',
 					'sbgcui.distance': 'Distance',
+					'sbgcui.clearTilesCache': 'Clear cache',
+					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{total}} tiles / {{size}} MB.',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
@@ -2274,7 +2282,12 @@
 
 				document.querySelector('input[value="osm"]').parentElement.after(stadiaWatercolorLabel, stadiaTonerLabel);
 
-				resetBaselayerIfChanged();
+
+				const clearTilesCacheButton = document.createElement('button');
+				const layersConfigButtons = document.querySelector('.layers-config__buttons');
+				clearTilesCacheButton.innerText = i18next.t('sbgcui.clearTilesCache');
+				clearTilesCacheButton.addEventListener('click', clearTilesCache);
+				layersConfigButtons.appendChild(clearTilesCacheButton);
 			}
 
 

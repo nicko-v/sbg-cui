@@ -28,9 +28,21 @@ body {
 	overflow: hidden;
 }
 
+.layers-config {
+	width: 75vw;
+}
+
+.layers-config__subheader {
+	margin-bottom: 1em;
+}
+
 .layers-config__subheader[data-i18n="layers.lights.header"],
 #map-lights {
 	display: none;
+}
+
+.layers-config__buttons {
+	margin-top: 1em;
 }
 
 .sbgcui_button_reset {
