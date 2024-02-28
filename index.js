@@ -1789,15 +1789,23 @@
 				const tilesStore = transaction.objectStore('tiles');
 
 				tilesStore.getAll().addEventListener('success', event => {
-					const tiles = event.target.result.reduce((acc, tile) => {
-						acc.total += Object.keys(tile).length;
-						acc.size += Object.values(tile).reduce((acc, blob) => acc += blob.size, 0);
-						return acc;
-					}, { total: 0, size: 0 });
+					const baselayers = new Set();
+					const tiles = event.target.result;
+					const storeCapacity = tiles.reduce((acc, tile) => {
+						const layers = Object.keys(tile);
+						const blobs = Object.values(tile);
 
-					const total = tiles.total;
-					const size = +(tiles.size / 1024 / 1024).toFixed(1);
-					confirm(i18next.t('sbgcui.clearTilesCacheConfirm', { total, size })) && tilesStore.clear();
+						layers.forEach(layer => { baselayers.add(layer); });
+						acc.amount += layers.length;
+						acc.size += blobs.reduce((acc, blob) => acc += blob.size, 0);
+
+						return acc;
+					}, { amount: 0, size: 0 });
+
+					const amount = storeCapacity.amount;
+					const size = +(storeCapacity.size / 1024 / 1024).toFixed(1);
+					const message = i18next.t('sbgcui.clearTilesCacheConfirm', { amount, size, baselayers: baselayers.size });
+					confirm(message) && tilesStore.clear();
 				});
 			}
 
@@ -2181,7 +2189,7 @@
 					'sbgcui.area': 'Площадь',
 					'sbgcui.distance': 'Расстояние',
 					'sbgcui.clearTilesCache': 'Очистить кэш',
-					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{total}} тайлов / {{size}} МБ.',
+					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{amount}} тайлов от {{baselayers}} подложек. Всего {{size}} МБ занято.',
 				});
 				i18next.addResources('en', 'main', {
 					'notifs.text': 'neutralized by $1$',
@@ -2196,7 +2204,7 @@
 					'sbgcui.area': 'Area',
 					'sbgcui.distance': 'Distance',
 					'sbgcui.clearTilesCache': 'Clear cache',
-					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{total}} tiles / {{size}} MB.',
+					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{amount}} tiles from {{baselayers}} baselayers. Total {{size}} MB used.',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
