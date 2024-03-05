@@ -282,10 +282,6 @@ body {
 	padding: 7px;
 }
 
-.attack-slider-highlevel {
-	background: none;
-}
-
 .splide__arrow--prev {
 	left: 0;
 }
@@ -306,8 +302,12 @@ body {
 }
 
 .attack-slider-highlevel {
+	background: none;
 	height: unset;
 	padding-bottom: 5px;
+	pointer-events: none;
+	position: absolute;
+	transform: translateY(-100%);
 }
 
 .attack-slider-wrp {
