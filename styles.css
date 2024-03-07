@@ -2037,6 +2037,16 @@ li[sbgcui-excluded-core]>span {
 	overflow-wrap: break-word;
 }
 
+.sbgcui_log-content-entry-description-loot {
+	display: flex;
+	font-size: 0.9em;
+	gap: 10px;
+}
+
+.sbgcui_log-content-entry-description-loot>span {
+text-align: end;
+}
+
 .sbgcui_log-content-entry-description-fromto {
 	display: flex;
 	gap: 5px;

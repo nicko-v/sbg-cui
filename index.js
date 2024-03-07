@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.44
+// @version      1.14.45
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.44';
+	const USERSCRIPT_VERSION = '1.14.45';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1531,7 +1531,12 @@
 											if ('loot' in parsedResponse) {
 												let loot = parsedResponse.loot;
 
-												logAction({ type: 'discover', point: guid, title: lastOpenedPoint.title });
+												logAction({
+													type: 'discover',
+													point: guid,
+													title: lastOpenedPoint.title,
+													loot: loot.map(e => ({ t: e.t, l: e.t == 3 ? undefined : e.l, a: e.a })),
+												});
 												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
 												parsedResponse.loot.sort((a, b) => (a.t == b.t) ? ((a.t < 3 && b.t < 3) ? (b.l - a.l) : (a.t < 3 ? a.t : b.t)) : (a.t - b.t));
 
@@ -4946,6 +4951,41 @@
 												link.setAttribute('data-guid', action.point);
 
 												entryDescr.appendChild(link);
+
+												if (action.loot?.length > 0) {
+													const lootList = document.createElement('div');
+
+													lootList.classList.add('sbgcui_log-content-entry-description-loot');
+
+													action.loot.forEach(item => {
+														const iconSpan = document.createElement('span');
+														const textSpan = document.createElement('span');
+														const wrapperSpan = document.createElement('span');
+
+														switch (item.t) {
+															case 1:
+															case 2:
+																iconSpan.classList.add('item-icon', `type-${item.t}`);
+																iconSpan.style.backgroundColor = `var(--level-${item.l})`;
+																textSpan.innerText = `${item.l}\nx${item.a}`;
+																break;
+															case 3:
+																iconSpan.innerText = `${i18next.t('sbgcui.refsShort')}`;
+																textSpan.innerText = `\nx${item.a}`;
+																break;
+															default:
+																iconSpan.classList.add('item-icon', `type-${item.t}`, `rarity-${item.l}`);
+																iconSpan.style.backgroundColor = 'var(--text)';
+																textSpan.innerText = `\nx${item.a}`;
+																break;
+														}
+
+														wrapperSpan.append(iconSpan, textSpan);
+														lootList.appendChild(wrapperSpan);
+													});
+
+													entryDescr.appendChild(lootList);
+												}
 
 												break;
 											}
