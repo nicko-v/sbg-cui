@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.42
+// @version      1.14.43
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.42';
+	const USERSCRIPT_VERSION = '1.14.43';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -2184,6 +2184,7 @@
 					'sbgcui.lines': 'Линии',
 					'sbgcui.region': 'Регион',
 					'sbgcui.regions': 'Регионы',
+					'sbgcui.refsShort': 'СНК',
 					'sbgcui.max': 'Макс.',
 					'sbgcui.total': 'Всего',
 					'sbgcui.area': 'Площадь',
@@ -2199,6 +2200,7 @@
 					'sbgcui.lines': 'Lines',
 					'sbgcui.region': 'Region',
 					'sbgcui.regions': 'Regions',
+					'sbgcui.refsShort': 'REF',
 					'sbgcui.max': 'Max',
 					'sbgcui.total': 'Total',
 					'sbgcui.area': 'Area',
@@ -3144,9 +3146,16 @@
 								getPointData(guid)
 									.then(data => {
 										if (!data) { return; }
-										pointName.innerText = `[${data.l}] ${pointLink.innerText}`;
-										pointLink.style.color = data.te == player.team ? 'var(--sbgcui-branding-color)' : `var(--team-${data.te})`;
-										pointData.innerHTML = `${Math.round(data.e)}% @ ${data.co}<br>${data.li.i}↓ ${data.li.o}↑`;
+
+										const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
+										const energy = Math.round(data.e);
+										const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
+										const isAllied = team == player.team;
+										const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
+
+										pointName.innerText = `[${level}] ${title}`;
+										pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
+										pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
 									});
 							}
 						}
