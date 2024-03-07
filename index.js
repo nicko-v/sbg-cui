@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.43
+// @version      1.14.44
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.43';
+	const USERSCRIPT_VERSION = '1.14.44';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -3099,14 +3099,14 @@
 						for (let guid in favorites) {
 							if (favorites[guid].isActive) {
 								let li = document.createElement('li');
-								let pointLink = document.createElement('a');
+								let pointLink = document.createElement('span');
 								let pointName = document.createElement('span');
 								let deleteButton = document.createElement('button');
 								let pointData = document.createElement('div');
 
 								pointName.innerText = favorites[guid].name;
 								pointLink.appendChild(pointName);
-								pointLink.setAttribute('href', `/app/?point=${guid}`);
+								pointLink.addEventListener('click', () => { window.showInfo(guid); });
 
 								deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
 								deleteButton.addEventListener('click', _ => {

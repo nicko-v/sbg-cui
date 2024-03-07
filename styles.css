@@ -1373,7 +1373,7 @@ input[type="range"][name="notifications_duration"]::after {
 	transform: translate(-50%, -50%);
 	display: flex;
 	flex-direction: column;
-	width: 70%;
+	width: 85%;
 	max-height: 60%;
 	background-color: var(--background);
 	box-shadow: 0 0 5px var(--shadow);
@@ -1405,7 +1405,7 @@ input[type="range"][name="notifications_duration"]::after {
 .sbgcui_favs-content {
 	display: flex;
 	flex-direction: column;
-	font-size: 0.8em;
+	font-size: 0.9em;
 	gap: 10px;
 	padding: 0;
 	padding-bottom: 10px;
@@ -1452,13 +1452,13 @@ input[type="range"][name="notifications_duration"]::after {
 	white-space: nowrap;
 }
 
-.sbgcui_favs-li>a {
+.sbgcui_favs-li>span {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 }
 
-.sbgcui_favs-li>a[sbgcui_discoveries]::before {
+.sbgcui_favs-li>span[sbgcui_discoveries]::before {
 	content: attr(sbgcui_discoveries) " discoveries left";
 	display: flex;
 	color: var(--text-disabled);
@@ -1466,14 +1466,14 @@ input[type="range"][name="notifications_duration"]::after {
 	order: 2;
 }
 
-.sbgcui_favs-li>a::after {
+.sbgcui_favs-li>span::after {
 	content: attr(sbgcui_cooldown);
 	display: flex;
 	color: var(--text-disabled);
 	font-size: 0.8em;
 }
 
-.sbgcui_favs-li>a>span {
+.sbgcui_favs-li>span>span {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
