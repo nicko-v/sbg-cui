@@ -2598,6 +2598,11 @@
 					}
 				}
 
+				function onMaxAmountInBagInputFocus(event) {
+					const input = event.target;
+					input.select();
+				}
+
 				function onMaxAmountInBagInputChange(event) {
 					const input = event.target;
 
@@ -2732,8 +2737,11 @@
 					settingsMenu.addEventListener('submit', onFormSubmit);
 					colorFiltersInputs.forEach(input => { input.addEventListener('input', onColorFilterInput); });
 					markersSelects.forEach(select => { select.addEventListener('change', onMarkerSelectChange); });
-					maxAmountInBagInputs.forEach(input => { input.addEventListener('change', onMaxAmountInBagInputChange); });
-					maxAmountInBagInputs.forEach(input => { input.addEventListener('input', onMaxAmountInBagInputInput); });
+					maxAmountInBagInputs.forEach(input => {
+						input.addEventListener('focus', onMaxAmountInBagInputFocus);
+						input.addEventListener('change', onMaxAmountInBagInputChange);
+						input.addEventListener('input', onMaxAmountInBagInputInput);
+					});
 
 					setStoredInputsValues();
 					tlContainer.appendChild(settingsMenu);
