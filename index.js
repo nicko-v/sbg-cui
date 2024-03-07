@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.45
+// @version      1.14.46
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.45';
+	const USERSCRIPT_VERSION = '1.14.46';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1535,6 +1535,7 @@
 													type: 'discover',
 													point: guid,
 													title: lastOpenedPoint.title,
+													level: lastOpenedPoint.level,
 													loot: loot.map(e => ({ t: e.t, l: e.t == 3 ? undefined : e.l, a: e.a })),
 												});
 												// Сортируем лут чтобы предметы большего уровня выводились в уведомлении выше.
@@ -4948,6 +4949,7 @@
 												const link = document.createElement('a');
 
 												link.innerText = guidsTitles[action.point] || action.point;
+												link.innerText += action.level != undefined ? ` [${action.level}]` : '';
 												link.setAttribute('data-guid', action.point);
 
 												entryDescr.appendChild(link);
