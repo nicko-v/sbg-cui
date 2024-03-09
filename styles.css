@@ -2040,11 +2040,15 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_log-content-entry-description-loot {
 	display: flex;
 	font-size: 0.9em;
-	gap: 10px;
+	gap: 8px;
 }
 
 .sbgcui_log-content-entry-description-loot>span {
 text-align: end;
+}
+
+.sbgcui_log-content-entry-description-loot .item-icon {
+	margin-right: 3px;
 }
 
 .sbgcui_log-content-entry-description-fromto {
