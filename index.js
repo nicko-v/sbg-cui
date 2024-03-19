@@ -1525,8 +1525,8 @@
 
 											break;
 										case '/api/discover':
-											//const guid = JSON.parse(options.body).guid;
-											const guid = lastOpenedPoint.guid;
+											const guid = JSON.parse(options.body).guid;
+											//const guid = lastOpenedPoint.guid;
 
 											// Закрываем тост о том, что избранная точка остыла.
 											if (guid in favorites) { favorites[guid].hideCooldownNotifToast(); }
