@@ -22,6 +22,10 @@
   --fa-url: url("../svg/solid/arrow-down-wide-short.svg");
 }
 
+.fa-solid-arrows-to-dot {
+  --fa-url: url("../svg/solid/arrows-to-dot.svg");
+}
+
 .fa-solid-asterisk {
   --fa-url: url("../svg/solid/asterisk.svg");
 }

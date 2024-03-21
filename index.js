@@ -73,7 +73,7 @@
 	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
 	const portrait = window.matchMedia('(orientation: portrait)');
 	let isFollow = localStorage.getItem('follow') == 'true';
-	let map, view, playerFeature, tempLinesSource;
+	let map, view, playerFeature, tempLinesSource, geolocation;
 
 
 	window.addEventListener('dbReady', loadPageSource);
@@ -109,6 +109,7 @@
 			stateStore.add(null, 'lastUsedCatalyser');
 			stateStore.add(null, 'starModeTarget');
 			stateStore.add(0, 'versionWarns');
+			stateStore.add(false, 'isAutoShowPoints');
 		}
 
 		function updateDB() {
@@ -771,6 +772,34 @@
 					}
 
 					click(coresList.querySelector(`[data-guid="${core?.g}"]:not(.is-active)`));
+				}
+			}
+
+			class InviewPoint {
+				constructor(pointData) { // Чистый ответ сервера или объект Point.
+					this.cores = pointData.co ?? pointData.coresAmount;
+					this.energy = pointData.e ?? pointData.energy;
+					this.level = pointData.l ?? pointData.level;
+					this.lines = {
+						in: pointData.li?.i ?? pointData.lines.in,
+						out: pointData.li?.o ?? pointData.lines.out,
+					};
+					this.timestamp = Date.now();
+				}
+
+				update(pointData) {
+					this.cores = pointData.co ?? pointData.coresAmount ?? this.cores;
+					this.energy = pointData.e ?? pointData.energy ?? this.energy;
+					this.level = pointData.l ?? pointData.level ?? this.level;
+					this.lines = {
+						in: pointData.li?.i ?? pointData.lines?.in ?? this.lines.in,
+						in: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
+					};
+					this.timestamp = Date.now();
+				}
+
+				get linesAmount() {
+					return this.lines.in + this.lines.out;
 				}
 			}
 
@@ -1486,19 +1515,35 @@
 									switch (url.pathname) {
 										case '/api/point':
 											if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
-												lastOpenedPoint = new Point(parsedResponse.data);
+												const pointData = parsedResponse.data;
+												const guid = pointData.g;
+
+												lastOpenedPoint = new Point(pointData);
+
+												if (inview[guid] == undefined) {
+													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
+												} else {
+													inview[guid].update(lastOpenedPoint);
+												}
 											}
 											break;
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-												const { coords, guid: point, title, isCaptured } = lastOpenedPoint;
-												const isFirstCore = parsedResponse.data.co.length == 1;
+												const { co: cores, e: energy, l: level } = parsedResponse.data;
+												const { coords, guid, title, isCaptured } = lastOpenedPoint;
+												const isFirstCore = cores.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
-												lastOpenedPoint.update(parsedResponse.data.co, parsedResponse.data.l);
+												lastOpenedPoint.update(cores, level);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
-												logAction({ type: actionType, coords, point, title });
+												logAction({ type: actionType, coords, point: guid, title });
+
+												if (inview[guid] == undefined) {
+													inview[guid] = new InviewPoint(lastOpenedPoint);
+												} else {
+													inview[guid].update(lastOpenedPoint);
+												}
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 												const { coords, guid: point, title } = lastOpenedPoint;
 
@@ -1513,13 +1558,18 @@
 											database.transaction('state', 'readwrite').objectStore('state').put(lastUsedCatalyser, 'lastUsedCatalyser');
 
 											if ('c' in parsedResponse) {
-												const points = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
+												const destroyedPoints = parsedResponse.c.filter(point => point.energy == 0).map(point => point.guid);
 
-												if (points.length > 0) {
+												if (destroyedPoints.length > 0) {
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
-													logAction({ type: isBroom ? 'broom' : 'destroy', points, lines, regions, xp });
+
+													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, xp });
+													destroyedPoints.forEach(point => {
+														const guid = point.guid;
+														delete inview[guid];
+													});
 												}
 											}
 
@@ -1631,17 +1681,7 @@
 
 														getPointData(guid)
 															.then(data => {
-																inview[guid] = {
-																	cores: data.co,
-																	lines: {
-																		in: data.li.i,
-																		out: data.li.o,
-																		get sum() { return this.in + this.out; },
-																	},
-																	energy: data.e,
-																	level: data.l,
-																	timestamp: Date.now()
-																};
+																inview[guid] = new InviewPoint(data);
 															})
 															.catch(() => { inview[guid] = { timestamp: Date.now() }; });
 													});
@@ -3545,7 +3585,7 @@
 								let level = inview[this.id_]?.level;
 								return typeof level == 'number' ? String(level) : null;
 							case 'lines':
-								let lines = inview[this.id_]?.lines.sum;
+								let lines = inview[this.id_]?.linesAmount;
 								return lines > 0 ? String(lines) : null;
 							case 'refsAmount':
 								let amount = this.cachedRefsAmounts[this.id_];
@@ -3722,7 +3762,7 @@
 
 			/* Показ скорости */
 			{
-				const geolocation = new ol.Geolocation({
+				geolocation = new ol.Geolocation({
 					projection: view.getProjection(),
 					tracking: true,
 					trackingOptions: { enableHighAccuracy: true },
@@ -3991,11 +4031,24 @@
 			}
 
 
-			/* Переключение между точками */
+			/* Переключение между точками и автооткрытие */
 			{
 				const arrow = document.createElement('i');
 				const shownPoints = new Set();
 				let touchMoveCoords = [];
+
+				function hasFreeSlots(point) {
+					const guid = point.getId();
+					return inview[guid] == undefined || inview[guid].cores < 6;
+				}
+
+				function isDiscoverable(point) {
+					const guid = point.getId();
+					const now = Date.now();
+					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid];
+
+					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
+				}
 
 				function isPointInRange(point) {
 					const playerCoords = playerFeature.getGeometry().getCoordinates();
@@ -4021,6 +4074,10 @@
 					return pointsInRange;
 				}
 
+				function keydownHandler(event) {
+					event.code == 'KeyN' && showNextPointInRange();
+				}
+
 				function pointPopupCloseHandler() {
 					playerFeature.un('change', toggleArrowVisibility);
 				}
@@ -4030,31 +4087,12 @@
 					playerFeature.on('change', toggleArrowVisibility);
 				}
 
-				function toggleArrowVisibility() {
-					if (getPointsInRange().length > 1) {
-						arrow.classList.remove('sbgcui_hidden');
-					} else {
-						arrow.classList.add('sbgcui_hidden');
-					}
+				function positionChangeHandler() {
+					if (state.isAutoShowPoints && !isPointPopupOpened) { showNextPointInRange(); }
 				}
 
-				function touchEndHandler() {
-					if (Object.isSealed(touchMoveCoords) || touchMoveCoords.length == 0) { return; }
-
-					const isRtlSwipe = touchMoveCoords.every((coords, i, arr) => coords.x <= arr[i - 1]?.x || i == 0);
-					if (!isRtlSwipe) { return; }
-
-					const xCoords = touchMoveCoords.map(coords => coords.x);
-					const yCoords = touchMoveCoords.map(coords => coords.y);
-					const minX = Math.min(...xCoords);
-					const maxX = Math.max(...xCoords);
-					const minY = Math.min(...yCoords);
-					const maxY = Math.max(...yCoords);
-					if (maxY - minY > 70) { return; }
-					if (maxX - minX < 50) { return; }
-
-
-					let pointsInRange = getPointsInRange();
+				function showNextPointInRange() {
+					const pointsInRange = getPointsInRange();
 					shownPoints.add(lastOpenedPoint.guid);
 
 					if (
@@ -4063,7 +4101,8 @@
 					) {
 						shownPoints.clear();
 					}
-					const nextPoint = pointsInRange.find(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
+					const suitablePoints = pointsInRange.filter(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
+					const nextPoint = suitablePoints.find(hasFreeSlots) ?? suitablePoints.find(isDiscoverable) ?? suitablePoints[0];
 
 					if (nextPoint == undefined) { return; }
 
@@ -4082,6 +4121,39 @@
 					map.dispatchEvent(fakeEvent);
 				}
 
+				function toggleArrowVisibility() {
+					if (getPointsInRange().length > 1) {
+						arrow.classList.remove('sbgcui_hidden');
+					} else {
+						arrow.classList.add('sbgcui_hidden');
+					}
+				}
+
+				function toggleAutoShowPoints() {
+					state.isAutoShowPoints = !state.isAutoShowPoints;
+					database.transaction('state', 'readwrite').objectStore('state').put(state.isAutoShowPoints, 'isAutoShowPoints');
+					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+				}
+
+				function touchEndHandler() {
+					if (Object.isSealed(touchMoveCoords) || touchMoveCoords.length == 0) { return; }
+
+					const isRtlSwipe = touchMoveCoords.every((coords, i, arr) => coords.x <= arr[i - 1]?.x || i == 0);
+					if (!isRtlSwipe) { return; }
+
+					const xCoords = touchMoveCoords.map(coords => coords.x);
+					const yCoords = touchMoveCoords.map(coords => coords.y);
+					const minX = Math.min(...xCoords);
+					const maxX = Math.max(...xCoords);
+					const minY = Math.min(...yCoords);
+					const maxY = Math.max(...yCoords);
+
+					if (maxY - minY > 70) { return; }
+					if (maxX - minX < 50) { return; }
+
+					showNextPointInRange();
+				}
+
 				function touchMoveHandler(event) {
 					if (Object.isSealed(touchMoveCoords)) { return; }
 
@@ -4097,16 +4169,40 @@
 					}
 				}
 
+				function turnAutoShowPointsOff() {
+					autoShowPointsButton.style.opacity = 0.5;
+					autoShowPointsButton.classList.remove('fa-fade');
+					geolocation.un('change:position', positionChangeHandler);
+				}
+
+				function turnAutoShowPointsOn() {
+					autoShowPointsButton.style.opacity = 1;
+					autoShowPointsButton.classList.add('fa-fade');
+					geolocation.on('change:position', positionChangeHandler);
+				}
+
 				arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa', 'fa-solid-angles-left');
 				document.querySelector('.i-stat').appendChild(arrow);
 
 				pointPopup.addEventListener('pointPopupOpened', pointPopupOpenHandler);
 				pointPopup.addEventListener('pointPopupClosed', pointPopupCloseHandler);
 
-
 				pointPopup.addEventListener('touchstart', touchStartHandler);
 				pointPopup.addEventListener('touchmove', touchMoveHandler);
 				pointPopup.addEventListener('touchend', touchEndHandler);
+
+				document.addEventListener('keydown', keydownHandler);
+
+				if (player.name == 'NickolayV') {
+					//const autoShowPointsButton = document.createElement('button');
+					var autoShowPointsButton = document.createElement('button');
+
+					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
+					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
+					state.isAutoShowPoints && turnAutoShowPointsOn();
+
+					toolbar.addItem(autoShowPointsButton, 7);
+				}
 			}
 
 
