@@ -544,6 +544,8 @@
 					return `NickolayV`;
 				case `timers.info_controls = setInterval(() => {`: // Line ~1443
 					return `timers.info_controls = setTimeout(() => {`;
+				case `function update() {`: // Line ~1521
+					return `${match} if (guid !== $('.info').attr('data-guid')) { return; }`;
 				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
 				case `makeEntry(e, data)`: // Line ~1658
@@ -582,6 +584,7 @@
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
+			`(function update\\(\\) {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
@@ -592,7 +595,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 25;
+		const replacesShouldBe = 26;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -1100,7 +1103,7 @@
 			}
 
 			async function clearInventory(isForceClear = false, loot = []) {
-				if (isInvClearInProgress) { return; } else { isInvClearInProgress = true; }
+				if (isInvClearInProgress) { return []; } else { isInvClearInProgress = true; }
 
 				const maxAmountInBag = config.maxAmountInBag;
 				const toDelete = {};
@@ -1114,7 +1117,7 @@
 					const deletedAmounts = {};
 					let pointsData = [], pointsTeams = {}, invTotal = Infinity, message = '';
 
-					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return; }
+					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return []; }
 
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
@@ -1181,7 +1184,7 @@
 						}
 					});
 
-					if (Object.keys(toDelete).length == 0) { return; }
+					if (Object.keys(toDelete).length == 0) { return []; }
 
 					for (let type in toDelete) {
 						const entries = Object.entries(toDelete[type]);
