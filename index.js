@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.47
+// @version      1.14.48
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -64,7 +64,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.47';
+	const USERSCRIPT_VERSION = '1.14.48';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -73,7 +73,7 @@
 	const isDarkMode = matchMedia('(prefers-color-scheme: dark)').matches;
 	const portrait = window.matchMedia('(orientation: portrait)');
 	let isFollow = localStorage.getItem('follow') == 'true';
-	let map, view, playerFeature, tempLinesSource, geolocation;
+	let map, view, playerFeature, tempLinesSource;
 
 
 	window.addEventListener('dbReady', loadPageSource);
@@ -519,6 +519,7 @@
 					return `constrainResolution: false`;
 				case `movePlayer([coords.longitude, coords.latitude])`: // Line ~353
 					return `${match};
+									window.dispatchEvent(new Event('playerMove'));
 									if (!document.querySelector('.info.popup').classList.contains('hidden')) {
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
@@ -1000,6 +1001,7 @@
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
 			let isRefsViewerOpened = false;
+			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
 
 			let lastOpenedPoint = {};
@@ -1856,6 +1858,18 @@
 					const message = i18next.t('sbgcui.clearTilesCacheConfirm', { amount, size, baselayers: baselayers.size });
 					confirm(message) && tilesStore.clear();
 				});
+			}
+
+			function isAnyPopupOrOverlayOpened() {
+				return (
+					isAttackSliderOpened ||
+					isClusterOverlayOpened ||
+					isDrawSliderOpened ||
+					isInventoryPopupOpened ||
+					isPointPopupOpened ||
+					isProfilePopupOpened ||
+					isRefsViewerOpened
+				);
 			}
 
 
@@ -3762,7 +3776,7 @@
 
 			/* Показ скорости */
 			{
-				geolocation = new ol.Geolocation({
+				const geolocation = new ol.Geolocation({
 					projection: view.getProjection(),
 					tracking: true,
 					trackingOptions: { enableHighAccuracy: true },
@@ -3792,23 +3806,26 @@
 				const originalOnClick = map.getListeners('click')[0];
 				const overlayTransitionsTime = 200;
 				let featuresAtPixel;
-				let isOverlayActive = false;
 				let lastShownCluster = [];
 				let mapClickEvent;
 				let cooldownProgressBarIntervals = [];
 
 				function featureClickHandler(event) {
-					if (!isOverlayActive) { return; }
+					if (!isClusterOverlayOpened) { return; }
 
 					const chosenFeatureGuid = event.target.getAttribute('sbgcui_guid');
 					const chosenFeature = featuresAtPixel.find(feature => feature.getId() == chosenFeatureGuid);
 
-					chosenFeature.set('sbgcui_chosenFeature', true, true);
+					// ЗАМЕНЕНО НА window.showInfo
+					//chosenFeature.set('sbgcui_chosenFeature', true, true);
 
 					hideOverlay();
 					setTimeout(() => {
+						/* ЗАМЕНЕНО НА window.showInfo
 						mapClickEvent.pixel = map.getPixelFromCoordinate(chosenFeature.getGeometry().getCoordinates());
 						originalOnClick(mapClickEvent);
+						*/
+						window.showInfo(chosenFeature.getId());
 					}, overlayTransitionsTime);
 				}
 
@@ -3818,7 +3835,7 @@
 					setTimeout(() => {
 						overlay.classList.add('sbgcui_hidden');
 						cooldownProgressBarIntervals.forEach(intervalID => { clearInterval(intervalID); });
-						isOverlayActive = false;
+						isClusterOverlayOpened = false;
 					}, overlayTransitionsTime);
 				}
 
@@ -3865,7 +3882,7 @@
 					overlay.classList.remove('sbgcui_hidden');
 					setTimeout(() => {
 						overlay.classList.add('sbgcui_cluster-overlay-blur');
-						isOverlayActive = true;
+						isClusterOverlayOpened = true;
 					}, 10);
 					cooldownProgressBarIntervals = [];
 				}
@@ -4079,28 +4096,32 @@
 				}
 
 				function pointPopupCloseHandler() {
-					playerFeature.un('change', toggleArrowVisibility);
+					window.removeEventListener('playerMove', toggleArrowVisibility);
 				}
 
 				function pointPopupOpenHandler() {
 					toggleArrowVisibility();
-					playerFeature.on('change', toggleArrowVisibility);
+					window.addEventListener('playerMove', toggleArrowVisibility);
 				}
 
-				function positionChangeHandler() {
-					if (state.isAutoShowPoints && !isPointPopupOpened) { showNextPointInRange(); }
+				function checkPopupsAndShowPoint() {
+					!isAnyPopupOrOverlayOpened() && showNextPointInRange(true);
 				}
 
-				function showNextPointInRange() {
+				function showNextPointInRange(isAutoShow) {
 					const pointsInRange = getPointsInRange();
-					shownPoints.add(lastOpenedPoint.guid);
+					if (lastOpenedPoint.guid != undefined) { shownPoints.add(lastOpenedPoint.guid); }
 
-					if (
-						pointsInRange.every(point => shownPoints.has(point.getId())) ||
-						pointsInRange.every(point => !shownPoints.has(point.getId()))
-					) {
+					const isEveryPointInRangeShown = pointsInRange.every(point => shownPoints.has(point.getId()));
+					const isNoOnePointInRangeShown = pointsInRange.every(point => !shownPoints.has(point.getId()));
+
+					if (isEveryPointInRangeShown) {
+						if (isAutoShow) { return; }
+						shownPoints.clear();
+					} else if (isNoOnePointInRangeShown) {
 						shownPoints.clear();
 					}
+
 					const suitablePoints = pointsInRange.filter(point => (point.getId() !== lastOpenedPoint.guid) && !shownPoints.has(point.getId()));
 					const nextPoint = suitablePoints.find(hasFreeSlots) ?? suitablePoints.find(isDiscoverable) ?? suitablePoints[0];
 
@@ -4108,7 +4129,7 @@
 
 					shownPoints.add(nextPoint.getId());
 
-
+					/* ЗАМЕНЕНО НА window.showInfo
 					const fakeEvent = {};
 
 					fakeEvent.type = 'click';
@@ -4119,6 +4140,9 @@
 					nextPoint.set('sbgcui_chosenFeature', true, true);
 					pointPopup.classList.add('hidden');
 					map.dispatchEvent(fakeEvent);
+					*/
+					pointPopup.classList.add('hidden');
+					window.showInfo(nextPoint.getId());
 				}
 
 				function toggleArrowVisibility() {
@@ -4133,6 +4157,7 @@
 					state.isAutoShowPoints = !state.isAutoShowPoints;
 					database.transaction('state', 'readwrite').objectStore('state').put(state.isAutoShowPoints, 'isAutoShowPoints');
 					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+					showToast(`${state.isAutoShowPoints ? 'В' : 'От'}ключено открытие точки при приближении к ней.`);
 				}
 
 				function touchEndHandler() {
@@ -4172,13 +4197,13 @@
 				function turnAutoShowPointsOff() {
 					autoShowPointsButton.style.opacity = 0.5;
 					autoShowPointsButton.classList.remove('fa-fade');
-					geolocation.un('change:position', positionChangeHandler);
+					window.removeEventListener('playerMove', checkPopupsAndShowPoint);
 				}
 
 				function turnAutoShowPointsOn() {
 					autoShowPointsButton.style.opacity = 1;
 					autoShowPointsButton.classList.add('fa-fade');
-					geolocation.on('change:position', positionChangeHandler);
+					window.addEventListener('playerMove', checkPopupsAndShowPoint);
 				}
 
 				arrow.classList.add('sbgcui_swipe-cards-arrow', 'fa', 'fa-solid-angles-left');
@@ -4199,7 +4224,7 @@
 
 					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
 					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
-					state.isAutoShowPoints && turnAutoShowPointsOn();
+					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
 
 					toolbar.addItem(autoShowPointsButton, 7);
 				}
