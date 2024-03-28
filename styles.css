@@ -1975,6 +1975,7 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_log-content:empty::before,
+.sbgcui_log-content:empty::after,
 .sbgcui_log-console:empty::before {
 	color: var(--text-disabled);
 	display: block;
@@ -1986,6 +1987,10 @@ li[sbgcui-excluded-core]>span {
 
 .sbgcui_log-content:empty::before {
 	content: "Действий не найдено. \AВыберите другую дату.";
+}
+
+.sbgcui_log-content[data-searchInProgress]:empty::after {
+	content: "Поиск данных...";
 }
 
 .sbgcui_log-console:empty::before {

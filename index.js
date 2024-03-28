@@ -5011,11 +5011,15 @@
 						const request = logsStore.getAll(keyRange);
 
 						logContent.innerHTML = '';
+						logContent.setAttribute('data-searchInProgress', '');
 						tagsWrapper.dataset.totalentries = 0;
 
 						request.addEventListener('success', event => {
 							const logs = event.target.result;
-							if (logs.length == 0) { return; }
+							if (logs.length == 0) {
+								logContent.removeAttribute('data-searchInProgress');
+								return;
+							}
 
 							const guidsTitles = {};
 							const pointsWithoutTitle = [];
@@ -5047,6 +5051,7 @@
 							const promises = pointsWithoutTitle.map(guid => getPointData(guid));
 							Promise.all(promises)
 								.then(results => {
+									logContent.removeAttribute('data-searchInProgress');
 									results.forEach(point => { guidsTitles[point.g] = point.t; });
 									logs.forEach(action => {
 										const entry = document.createElement('p');
@@ -5193,8 +5198,12 @@
 										logContent.appendChild(entry);
 									});
 								})
-								.catch(error => { console.log('SBG CUI: Ошибка при получении данных точек (логи).', error); });
+								.catch(error => {
+									console.log('SBG CUI: Ошибка при получении данных точек (логи).', error);
+									logContent.removeAttribute('data-searchInProgress');
+								});
 						});
+						request.addEventListener('error', () => { logContent.removeAttribute('data-searchInProgress'); });
 					}
 
 					function showPointInfo(event) {
