@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.49
+// @version      1.14.50
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.49';
+	const USERSCRIPT_VERSION = '1.14.50';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -296,7 +296,7 @@
 		const stateRequest = transaction.objectStore('state').openCursor();
 		//const tilesRequest = transaction.objectStore('tiles').getAll();
 		[configRequest, favoritesRequest, stateRequest].forEach(request => { request.addEventListener('success', getData); });
-		
+
 		checkStorageSize();
 	});
 	openRequest.addEventListener('error', event => {
