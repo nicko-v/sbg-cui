@@ -1985,7 +1985,7 @@ li[sbgcui-excluded-core]>span {
 	white-space: pre-wrap;
 }
 
-.sbgcui_log-content:empty::before {
+.sbgcui_log-content:not([data-searchInProgress]):empty::before {
 	content: "Действий не найдено. \AВыберите другую дату.";
 }
 
