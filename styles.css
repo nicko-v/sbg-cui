@@ -213,8 +213,14 @@ body {
 	text-shadow: 3px 3px 2px black;
 }
 
+#self-info__inv {
+	padding: 3px;
+}
+
 #self-info__inv::after {
+	border-top: 1px solid;
 	content: var(--sbgcui-inventory-limit);
+	display: block;
 }
 
 #self-info__name {
