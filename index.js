@@ -1808,25 +1808,27 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
-					// В виду отсутствия единой схемы удаляем точку везде.
-					const text = options.text.replace(/\.$/, '');
-					const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
-					const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
-					const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
+					if (options.text != undefined) {
+						// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
+						// В виду отсутствия единой схемы удаляем точку везде.
+						const text = options.text.replace(/\.$/, '');
+						const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
+						const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
+						const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
 
-					switch (text) {
-						case outOfRange:
-							options.gravity = 'top';
-							options.position = 'right';
-							break;
-						case networkFail:
-							options.gravity = 'top';
-							options.position = 'center';
-							break;
-						case linesNone:
-							options.className = 'error-toast';
-							break;
+						switch (text) {
+							case outOfRange:
+								options.gravity = 'top';
+								options.position = 'right';
+								break;
+							case networkFail:
+								options.gravity = 'top';
+								options.position = 'center';
+								break;
+							case linesNone:
+								options.className = 'error-toast';
+								break;
+						}
 					}
 
 					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
