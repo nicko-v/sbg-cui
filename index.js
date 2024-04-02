@@ -502,8 +502,6 @@
 		function replacer(match) {
 			replacesMade += 1;
 			switch (match) {
-				case `11 - `:
-					return ``;
 				case `const Catalysers`: // Line ~95
 					return `window.Catalysers`;
 				case `const TeamColors`: // Line ~101
@@ -564,7 +562,6 @@
 		}
 
 		const regexp = new RegExp([
-			`(11 - )`,
 			`(const Catalysers)`,
 			`(const TeamColors)`,
 			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
@@ -599,7 +596,7 @@
 			.then(data => {
 				const script = document.createElement('script');
 				script.textContent = data.replace(regexp, replacer);
-				//if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
+				if (replacesMade != replacesShouldBe) { throw new Error(`SBG CUI: Сделано замен: ${replacesMade} вместо ${replacesShouldBe}.`); }
 				document.head.appendChild(script);
 			})
 			.catch(error => {
