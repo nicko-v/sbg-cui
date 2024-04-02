@@ -270,7 +270,7 @@
 
 		function checkStorageSize() {
 			if (typeof navigator.storage?.estimate != 'function') { return; }
-			
+
 			const formatter = bytes => bytes >= 1024 ** 3 ? `${+(bytes / 1024 ** 3).toFixed(2)} GB` : `${+(bytes / 1024 ** 2).toFixed(1)} MB`;
 
 			navigator.storage.estimate().then(({ quota, usage }) => {
@@ -1809,11 +1809,25 @@
 
 			function toastifyDecorator(toastify) {
 				return function (options) {
-					if (i18next.t('popups.point.range').includes(options.text)) {
-						options.gravity = 'top';
-						options.position = 'right';
-					} else if (i18next.t('popups.lines-none').includes(options.text)) {
-						options.className = 'error-toast';
+					// Некоторые ответы сервера и некоторые локальные строки имеют точку в конце.
+					// В виду отсутствия единой схемы удаляем точку везде.
+					const text = options.text.replace(/\.$/, '');
+					const outOfRange = i18next.t('popups.point.range').replace(/\.$/, '');
+					const networkFail = i18next.t('popups.network-fail').replace(/\.$/, '');
+					const linesNone = i18next.t('popups.lines-none').replace(/\.$/, '');
+
+					switch (text) {
+						case outOfRange:
+							options.gravity = 'top';
+							options.position = 'right';
+							break;
+						case networkFail:
+							options.gravity = 'top';
+							options.position = 'center';
+							break;
+						case linesNone:
+							options.className = 'error-toast';
+							break;
 					}
 
 					if (options.className?.startsWith('sbgcui_') == false) { options.selector = null; }
