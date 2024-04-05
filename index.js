@@ -2287,9 +2287,16 @@
 					'items.core-short': '{{level}}',
 				});
 
+				window.attack_slider.options = {
+					speed: 200,
+				};
+				window.deploy_slider.options = {
+					speed: 200,
+				};
 				window.draw_slider.options = {
 					height: '120px',
 					pagination: true,
+					speed: 200,
 					//perPage: 2,
 				};
 
