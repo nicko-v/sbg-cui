@@ -34,6 +34,10 @@
   --fa-url: url("../svg/solid/bicycle.svg");
 }
 
+.fa-solid-broom-ball {
+  --fa-url: url("../svg/solid/broom-ball.svg");
+}
+
 .fa-solid-bus {
   --fa-url: url("../svg/solid/bus.svg");
 }
