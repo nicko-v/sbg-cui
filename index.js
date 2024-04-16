@@ -308,7 +308,7 @@
 			.then(r => r.text())
 			.then(data => {
 				data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
-				data = data.replace(/(<script src="\/packages\/js\/ol\.js")/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
+				data = data.replace(/(<script src="\/packages\/js\/ol\.js")(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
 
 				document.write(data);
 				document.close();
