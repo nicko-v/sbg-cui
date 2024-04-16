@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.50
+// @version      1.14.51
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.50';
+	const USERSCRIPT_VERSION = '1.14.51';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -308,7 +308,7 @@
 			.then(r => r.text())
 			.then(data => {
 				data = data.replace(/<script class="mobile-check">.+?<\/script>/, '');
-				data = data.replace(/(<script src="https:\/\/cdn.jsdelivr.net\/npm\/ol@.+?)(>)/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
+				data = data.replace(/(<script src="\/packages\/js\/ol\.js")/, `$1 onload="window.dispatchEvent(new Event('olReady'))"$2`);
 
 				document.write(data);
 				document.close();
