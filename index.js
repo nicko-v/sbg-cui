@@ -4272,16 +4272,13 @@
 
 				document.addEventListener('keydown', keydownHandler);
 
-				if (player.name == 'NickolayV') {
-					//const autoShowPointsButton = document.createElement('button');
-					var autoShowPointsButton = document.createElement('button');
+				const autoShowPointsButton = document.createElement('button');
 
-					autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
-					autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
-					state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
+				autoShowPointsButton.classList.add('fa', 'fa-solid-arrows-to-dot');
+				autoShowPointsButton.addEventListener('click', toggleAutoShowPoints);
+				state.isAutoShowPoints ? turnAutoShowPointsOn() : turnAutoShowPointsOff();
 
-					toolbar.addItem(autoShowPointsButton, 7);
-				}
+				toolbar.addItem(autoShowPointsButton, 7);
 			}
 
 
