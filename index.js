@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.51
+// @version      1.14.52
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -60,7 +60,7 @@
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
-	const USERSCRIPT_VERSION = '1.14.51';
+	const USERSCRIPT_VERSION = '1.14.52';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -956,6 +956,7 @@
 			const attackButton = document.querySelector('#attack-menu');
 			const attackSlider = document.querySelector('.attack-slider-wrp');
 			const blContainer = document.querySelector('.bottom-container');
+			const drawButton = document.querySelector('#draw');
 			const drawSlider = document.querySelector('.draw-slider-wrp');
 			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const catalysersList = document.querySelector('#catalysers-list');
@@ -1043,6 +1044,16 @@
 				const parsedResponse = await response.json();
 
 				return parsedResponse.data;
+			}
+
+			async function getPossibleLines(pointGuid, pointCoords) {
+				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
+				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}`;
+				const options = { headers, method: 'GET' };
+				const response = await fetch(url, options);
+				const parsedResponse = await response.json();
+
+				return parsedResponse.data ?? [];
 			}
 
 			async function getInventory() {
@@ -1516,6 +1527,13 @@
 												const guid = pointData.g;
 
 												lastOpenedPoint = new Point(pointData);
+
+												drawButton.removeAttribute('sbgcui-possible-lines');
+												if (lastOpenedPoint.team == player.team) {
+													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
+														if (lines.length > 0) { drawButton.setAttribute('sbgcui-possible-lines', lines.length); }
+													});
+												}
 
 												if (inview[guid] == undefined) {
 													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
@@ -2470,6 +2488,7 @@
 						e.style.setProperty('--sbgcui-energy', `${data.e}%`);
 						if (data.e < 100) {
 							e.style.setProperty('--sbgcui-display-r-button', 'flex');
+							e.setAttribute('sbgcui-repairable', '');
 						}
 					}
 
@@ -2517,6 +2536,20 @@
 						});
 				}
 
+				function keyupHandler(event) {
+					if (event.code != 'KeyR') { return; }
+
+					const refEntry = document.querySelector('.inventory__item[sbgcui-repairable]');
+					const pointGuid = refEntry?.dataset.ref;
+
+					if (refEntry == null) { return; }
+
+					recursiveRepair(pointGuid, refEntry);
+					refEntry.scrollIntoView();
+					refEntry.removeAttribute('sbgcui-repairable');
+					refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
+				}
+
 				window.makeEntryDec = makeEntryDec;
 
 				inventoryContent.addEventListener('click', event => {
@@ -2537,6 +2570,9 @@
 
 					recursiveRepair(pointGuid, refEntry);
 				});
+
+				inventoryPopup.addEventListener('inventoryPopupOpened', () => { document.addEventListener('keyup', keyupHandler); });
+				inventoryPopup.addEventListener('inventoryPopupClosed', () => { document.removeEventListener('keyup', keyupHandler); });
 			}
 
 

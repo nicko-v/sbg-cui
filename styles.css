@@ -125,6 +125,12 @@ body {
 	grid-area: Draw;
 }
 
+#draw[sbgcui-possible-lines]::after {
+	content: " [" attr(sbgcui-possible-lines) "]";
+	color: var(--selection);
+	font-weight: bold;
+}
+
 #deploy {
 	grid-area: Deploy;
 	-webkit-text-size-adjust: none;
