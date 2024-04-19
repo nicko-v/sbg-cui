@@ -1381,14 +1381,14 @@
 						break;
 					case 'point_level':
 						color = getComputedStyle(pointLevelSpan).color;
+						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
-						pointPopup.style.background = `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)`;
 						pointTitleSpan.style.color = color;
 						break;
 					case 'point_team':
 						color = getComputedStyle(pointOwnerSpan).color;
+						pointPopup.style.background = config.ui.pointBgImage ? `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)` : '';
 						pointPopup.style.borderColor = color;
-						pointPopup.style.background = `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)`;
 						pointTitleSpan.style.color = color;
 						break;
 					default:
