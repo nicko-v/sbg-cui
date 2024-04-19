@@ -132,6 +132,10 @@ body {
 	font-weight: bold;
 }
 
+#draw[sbgcui-possible-lines="0"]::after {
+	color: var(--text-disabled);
+}
+
 #deploy {
 	grid-area: Deploy;
 	-webkit-text-size-adjust: none;
