@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.53
+// @version      1.14.54
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.53';
+	const USERSCRIPT_VERSION = '1.14.54';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1382,11 +1382,13 @@
 					case 'point_level':
 						color = getComputedStyle(pointLevelSpan).color;
 						pointPopup.style.borderColor = color;
+						pointPopup.style.background = `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)`;
 						pointTitleSpan.style.color = color;
 						break;
 					case 'point_team':
 						color = getComputedStyle(pointOwnerSpan).color;
 						pointPopup.style.borderColor = color;
+						pointPopup.style.background = `radial-gradient(circle, rgba(0,0,0,0.3) 65%, ${color} 100%)`;
 						pointTitleSpan.style.color = color;
 						break;
 					default:
