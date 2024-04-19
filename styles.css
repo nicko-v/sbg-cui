@@ -123,6 +123,7 @@ body {
 
 #draw {
 	grid-area: Draw;
+	white-space: nowrap;
 }
 
 #draw[sbgcui-possible-lines]::after {
@@ -2061,7 +2062,7 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_log-content-entry-description-loot>span {
-text-align: end;
+	text-align: end;
 }
 
 .sbgcui_log-content-entry-description-loot .item-icon {
@@ -2179,6 +2180,136 @@ text-align: end;
 	@media screen and (max-height: 440px) {
 		.sbgcui_cluster-center:has(> :nth-child(8))>.sbgcui_cluster-iconWrapper:nth-child(2n) {
 			height: calc(50vh + 20px);
+		}
+	}
+
+	@media screen and (max-height: 600px) {
+		.info.popup {
+			height: 100%;
+			overflow: visible;
+			width: 100%;
+		}
+
+		.info.popup>.sbgcui_button_reset {
+			font-size: 40px;
+			min-height: 1em;
+			padding: 5px;
+		}
+
+		.i-stat {
+			box-sizing: border-box;
+			grid-template-columns: minmax(20vw, 25vw) minmax(300px, auto) minmax(20vw, 25vw);
+			grid-template-rows: repeat(7, auto);
+			gap: 0px 10px;
+			grid-template-areas:
+				"distance buttons cores"
+				"lines buttons cores"
+				"regions buttons cores"
+				"owner buttons cores"
+				". buttons cores"
+				"energy slider cores"
+				"reward slider cores";
+			padding: 0 5px;
+		}
+
+		.i-buttons {
+			width: 100%;
+		}
+
+		.i-stat__core {
+			align-items: center;
+			box-sizing: border-box;
+			display: flex;
+			height: 100%;
+			justify-content: center;
+		}
+
+		.i-stat__cores {
+			gap: 5px;
+			grid-template-columns: min-content min-content;
+			grid-template-rows: repeat(6, 1fr);
+			grid-template-areas:
+				"core1owner core1"
+				"core2owner core2"
+				"core3owner core3"
+				"core4owner core4"
+				"core5owner core5"
+				"core6owner core6";
+			justify-content: end;
+			overflow: hidden;
+		}
+
+		.i-stat__core-info {
+			max-width: calc(25vw - 2em - 10px);
+		}
+
+		.i-stat__core-info:nth-child(1) {
+			grid-area: core1owner;
+		}
+
+		.i-stat__core:nth-child(2) {
+			grid-area: core1;
+		}
+
+		.i-stat__core:nth-child(3) {
+			grid-area: core2;
+		}
+
+		.i-stat__core-info:nth-child(4) {
+			grid-area: core2owner;
+		}
+
+		.i-stat__core-info:nth-child(5) {
+			grid-area: core3owner;
+		}
+
+		.i-stat__core:nth-child(6) {
+			grid-area: core3;
+		}
+
+		.i-stat__core:nth-child(7) {
+			grid-area: core4;
+		}
+
+		.i-stat__core-info:nth-child(8) {
+			grid-area: core4owner;
+		}
+
+		.i-stat__core-info:nth-child(9) {
+			grid-area: core5owner;
+		}
+
+		.i-stat__core:nth-child(10) {
+			grid-area: core5;
+		}
+
+		.i-stat__core:nth-child(11) {
+			grid-area: core6;
+		}
+
+		.i-stat__core-info:nth-child(12) {
+			grid-area: core6owner;
+		}
+
+		.i-stat__core-info {
+			flex-direction: column-reverse;
+		}
+
+		.i-stat__core-info>span {
+			text-align: left;
+		}
+
+		.i-stat>div:nth-child(2) {
+			max-width: 25vw;
+		}
+
+		.deploy-slider-wrp {
+			width: 90%;
+		}
+
+		.sbgcui_jumpToButton {
+			left: 75px;
+			right: initial;
 		}
 	}
 }
