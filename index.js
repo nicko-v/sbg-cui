@@ -1050,7 +1050,7 @@
 
 			async function getPossibleLines(pointGuid, pointCoords) {
 				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
-				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}`;
+				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}&sbgcuiPossibleLinesCheck`;
 				const options = { headers, method: 'GET' };
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
@@ -1740,55 +1740,59 @@
 
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
 											} else if ('data' in parsedResponse) {
-												let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
-												minDistance = minDistance == -1 ? -Infinity : +minDistance;
-												maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
-												if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
-													const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
-													const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+												if (isPossibleLinesCheck == false) { // Тосты о скрытых линиях выводятся только при реальном запросе draw, а не проверке поссиблов.
+													let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
+													minDistance = minDistance == -1 ? -Infinity : +minDistance;
+													maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
+												
+													if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
+														const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+														const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
 
-													parsedResponse.data = targetPoint ? [targetPoint] : [];
+														parsedResponse.data = targetPoint ? [targetPoint] : [];
 
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
+														}
 													}
-												}
 
-												if (isFinite(minDistance) || isFinite(maxDistance)) {
-													const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
-													const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
+													if (isFinite(minDistance) || isFinite(maxDistance)) {
+														const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
+														const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
 
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройкам ограничения дальности рисования
 																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
 
-														parsedResponse.data = suitablePoints;
-													}
-												}
-
-												if (hideLastFavRef) {
-													let hiddenPoints = 0;
-													parsedResponse.data = parsedResponse.data.filter(point => {
-														const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
-														if (isLastFavRef) {
-															hiddenPoints += 1;
-															return false;
-														} else {
-															return true;
+															parsedResponse.data = suitablePoints;
 														}
-													});
-													if (hiddenPoints > 0) {
-														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+													}
+
+													if (hideLastFavRef) {
+														let hiddenPoints = 0;
+														parsedResponse.data = parsedResponse.data.filter(point => {
+															const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
+															if (isLastFavRef) {
+																hiddenPoints += 1;
+																return false;
+															} else {
+																return true;
+															}
+														});
+														if (hiddenPoints > 0) {
+															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройке сохранения последних сносок от избранных точек.`;
-														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-														toast.showToast();
+															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+															toast.showToast();
+														}
 													}
 												}
 
