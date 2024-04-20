@@ -997,6 +997,7 @@
 			let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
 			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
@@ -1911,6 +1912,7 @@
 					isInventoryPopupOpened ||
 					isPointPopupOpened ||
 					isProfilePopupOpened ||
+					isSettingsMenuOpened ||
 					isRefsViewerOpened
 				);
 			}
@@ -2822,7 +2824,6 @@
 				}
 
 				const isValidAmount = value => !(value == '' || value == '-0' || Number.isInteger(+value) == false || +value < -1);
-				let isSettingsMenuOpened = false;
 
 				try {
 					var settingsMenu = await getHTMLasset('settings');
