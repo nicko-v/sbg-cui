@@ -4135,7 +4135,7 @@
 				function isDiscoverable(point) {
 					const guid = point.getId();
 					const now = Date.now();
-					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid];
+					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))?.[guid];
 
 					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
 				}
