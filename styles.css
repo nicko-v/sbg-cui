@@ -128,18 +128,26 @@ body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container {
 }
 
 #draw {
+	display: flex;
 	grid-area: Draw;
+	justify-content: center;
 	white-space: nowrap;
 }
 
 #draw[sbgcui-possible-lines]::after {
 	content: " [" attr(sbgcui-possible-lines) "]";
 	color: var(--selection);
+	display: block;
 	font-weight: bold;
 }
 
 #draw[sbgcui-possible-lines="0"]::after {
 	color: var(--text-disabled);
+}
+
+#draw>span {
+	text-overflow: ellipsis;
+	overflow-x: hidden;
 }
 
 #deploy {
@@ -151,6 +159,7 @@ body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container {
 
 #discover {
 	grid-area: Discover;
+	overflow-x: initial;
 }
 
 #i-image {
@@ -435,8 +444,10 @@ html[lang="ru"] .i-buttons {
 }
 
 .i-buttons>button {
-	padding: 5px 0;
 	box-shadow: 0 0 2px var(--shadow);
+	overflow-x: hidden;
+	padding: 5px 0;
+	text-overflow: ellipsis;
 }
 
 .i-stat {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.55
+// @version      1.14.56
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.55';
+	const USERSCRIPT_VERSION = '1.14.56';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1697,7 +1697,7 @@
 											const hParam = url.searchParams.get('h');
 											const isUniqueInRequest = hParam != null;
 											const isHighlightCoresEnergyOrLevel = Object.values(config.pointHighlighting).find(e => e.match(/cores|energy|highlevel|level/)) != undefined;
-											
+
 											if (!inviewPoints) { break; }
 
 											if (isHighlightCoresEnergyOrLevel && zoom >= INVIEW_MARKERS_MAX_ZOOM) {
@@ -1742,57 +1742,57 @@
 											} else if ('data' in parsedResponse) {
 												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
-												if (isPossibleLinesCheck == false) { // Тосты о скрытых линиях выводятся только при реальном запросе draw, а не проверке поссиблов.
-													let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
-													minDistance = minDistance == -1 ? -Infinity : +minDistance;
-													maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
-												
-													if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && options.method == 'get') {
-														const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
-														const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
+												let { minDistance, maxDistance, hideLastFavRef } = config.drawing;
+												minDistance = minDistance == -1 ? -Infinity : +minDistance;
+												maxDistance = maxDistance == -1 ? Infinity : +maxDistance;
 
-														parsedResponse.data = targetPoint ? [targetPoint] : [];
+												if (isStarMode && starModeTarget && starModeTarget.guid != pointPopup.dataset.guid && /get/i.test(options.method)) {
+													const targetPoint = parsedResponse.data.find(point => point.p == starModeTarget.guid);
+													const hiddenPoints = parsedResponse.data.length - (targetPoint ? 1 : 0);
 
-														if (hiddenPoints > 0) {
-															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+													parsedResponse.data = targetPoint ? [targetPoint] : [];
+
+													if (hiddenPoints > 0 && isPossibleLinesCheck == false) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка, так как вы находитесь в режиме рисования "Звезда".`;
-															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-															toast.showToast();
-														}
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
 													}
+												}
 
-													if (isFinite(minDistance) || isFinite(maxDistance)) {
-														const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
-														const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
+												if (isFinite(minDistance) || isFinite(maxDistance)) {
+													const suitablePoints = parsedResponse.data.filter(point => point.d <= maxDistance && point.d >= minDistance);
+													const hiddenPoints = parsedResponse.data.length - suitablePoints.length;
 
-														if (hiddenPoints > 0) {
-															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+													parsedResponse.data = suitablePoints;
+
+													if (hiddenPoints > 0 && isPossibleLinesCheck == false) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
 																			из списка согласно настройкам ограничения дальности рисования
 																			(${isFinite(minDistance) ? 'мин. ' + minDistance + ' м' : ''}${isFinite(minDistance + maxDistance) ? ', ' : ''}${isFinite(maxDistance) ? 'макс. ' + maxDistance + ' м' : ''}).`;
-															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-															toast.showToast();
-
-															parsedResponse.data = suitablePoints;
-														}
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
 													}
+												}
 
-													if (hideLastFavRef) {
-														let hiddenPoints = 0;
-														parsedResponse.data = parsedResponse.data.filter(point => {
-															const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
-															if (isLastFavRef) {
-																hiddenPoints += 1;
-																return false;
-															} else {
-																return true;
-															}
-														});
-														if (hiddenPoints > 0) {
-															const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
-																			из списка согласно настройке сохранения последних сносок от избранных точек.`;
-															const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
-															toast.showToast();
+												if (hideLastFavRef) {
+													let hiddenPoints = 0;
+
+													parsedResponse.data = parsedResponse.data.filter(point => {
+														const isLastFavRef = point.p in favorites && favorites[point.p].isActive && point.a == 1;
+														if (isLastFavRef) {
+															hiddenPoints += 1;
+															return false;
+														} else {
+															return true;
 														}
+													});
+
+													if (hiddenPoints > 0 && isPossibleLinesCheck == false) {
+														const message = `Точк${hiddenPoints == 1 ? 'а' : 'и'} (${hiddenPoints}) скрыт${hiddenPoints == 1 ? 'а' : 'ы'}
+																			из списка согласно настройке сохранения последних сносок от избранных точек.`;
+														const toast = createToast(message, 'top left', undefined, 'sbgcui_toast-selection');
+														toast.showToast();
 													}
 												}
 
@@ -2240,6 +2240,8 @@
 				const pointOwner = document.querySelector('#i-stat__owner').parentElement;
 				const highlevelCatalyserWarn = document.querySelector('.attack-slider-highlevel');
 				const popupCloseButtons = document.querySelectorAll('.popup-close, #inventory__close');
+				const drawButtonText = drawButton.childNodes[0];
+				const drawButtonTextWrapper = document.createElement('span');
 
 				attackSlider.prepend(highlevelCatalyserWarn);
 
@@ -2280,6 +2282,9 @@
 				pointEnergyValue.id = 'i-stat__energy';
 				pointEnergy.append(pointEnergyLabel, ': ', pointEnergyValue);
 				pointOwner.after(pointEnergy);
+
+				drawButtonTextWrapper.appendChild(drawButtonText);
+				drawButton.appendChild(drawButtonTextWrapper);
 
 				popupCloseButtons.forEach(button => {
 					if (button.closest('.info, .inventory, .leaderboard, .notifs, .profile, .settings')) {
