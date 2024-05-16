@@ -771,6 +771,8 @@
 					const event = new Event('pointRepaired');
 					pointPopup.dispatchEvent(event);
 
+					if (cores.length == 1) { this.team = player.team; }
+
 					drawButton.removeAttribute('sbgcui-possible-lines');
 					if (this.isPossibleLinesRequestNeeded) {
 						this.getPossibleLines().then(possibleLines => {
@@ -1566,12 +1568,12 @@
 											break;
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
-												const { co: cores, e: energy, l: level } = parsedResponse.data;
+												const cores = parsedResponse.data.co;
 												const { coords, guid, title, isCaptured } = lastOpenedPoint;
 												const isFirstCore = cores.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
-												lastOpenedPoint.update(cores, level);
+												lastOpenedPoint.update(cores);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
 												logAction({ type: actionType, coords, point: guid, title });
