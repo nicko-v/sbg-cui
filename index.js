@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.56
+// @version      1.14.57
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.56';
+	const USERSCRIPT_VERSION = '1.14.57';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -737,6 +737,28 @@
 					return pointCores.querySelector('.selected')?.dataset.guid;
 				}
 
+				get isPossibleLinesRequestNeeded() {
+					return this.isEmptySlots == false && this.team == player.team && getDistance(this.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT;
+				}
+
+				async getPossibleLines() {
+					const settings = JSON.parse(localStorage.getItem('settings'));
+					const isExref = settings.exref ?? false;
+					const searchParams = new URLSearchParams([
+						['guid', this.guid],
+						['position[]', this.coords[0]],
+						['position[]', this.coords[1]],
+						['exref', isExref],
+						['sbgcuiPossibleLinesCheck', '']
+					]);
+					const url = '/api/draw?'+ searchParams.toString();
+					const options = { headers, method: 'GET' };
+					const response = await fetch(url, options);
+					const parsedResponse = await response.json();
+					
+					return parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
+				}
+
 				update(cores) {
 					cores.forEach(core => {
 						this.cores[core.g] = {
@@ -748,6 +770,14 @@
 
 					const event = new Event('pointRepaired');
 					pointPopup.dispatchEvent(event);
+
+					drawButton.removeAttribute('sbgcui-possible-lines');
+					if (this.isPossibleLinesRequestNeeded) {
+						this.getPossibleLines().then(possibleLines => {
+							this.possibleLines = possibleLines;
+							drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
+						});
+					}
 				}
 
 				selectCore(type, currentLevel) {
@@ -1046,16 +1076,6 @@
 				const parsedResponse = await response.json();
 
 				return parsedResponse.data;
-			}
-
-			async function getPossibleLines(pointGuid, pointCoords) {
-				const isExref = JSON.parse(localStorage.getItem('settings')).exref ?? false;
-				const url = `/api/draw?guid=${pointGuid}&position[]=${pointCoords[0]}&position[]=${pointCoords[1]}&exref=${isExref}&sbgcuiPossibleLinesCheck`;
-				const options = { headers, method: 'GET' };
-				const response = await fetch(url, options);
-				const parsedResponse = await response.json();
-
-				return parsedResponse.data ?? [];
 			}
 
 			async function getInventory() {
@@ -1537,13 +1557,6 @@
 
 												lastOpenedPoint = new Point(pointData);
 
-												drawButton.removeAttribute('sbgcui-possible-lines');
-												if (lastOpenedPoint.team == player.team && getDistance(lastOpenedPoint.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT) {
-													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
-													});
-												}
-
 												if (inview[guid] == undefined) {
 													if (lastOpenedPoint.coresAmount > 0) { inview[guid] = new InviewPoint(lastOpenedPoint); }
 												} else {
@@ -1560,12 +1573,6 @@
 
 												lastOpenedPoint.update(cores, level);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
-
-												if (lastOpenedPoint.isEmptySlots == false) {
-													getPossibleLines(lastOpenedPoint.guid, lastOpenedPoint.coords).then(lines => {
-														drawButton.setAttribute('sbgcui-possible-lines', lines.length);
-													});
-												}
 
 												logAction({ type: actionType, coords, point: guid, title });
 
@@ -1795,8 +1802,6 @@
 														toast.showToast();
 													}
 												}
-
-												lastOpenedPoint.possibleLines = parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
 
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
