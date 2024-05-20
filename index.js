@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.57
+// @version      1.14.58
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.57';
+	const USERSCRIPT_VERSION = '1.14.58';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -629,7 +629,7 @@
 					this.level = pointData.l;
 					this.team = pointData.te;
 					this.title = pointData.t;
-					this.possibleLines = [];
+					this.possibleLines = undefined;
 					this.lines = {
 						in: pointData.li.i,
 						out: pointData.li.o,
@@ -738,7 +738,12 @@
 				}
 
 				get isPossibleLinesRequestNeeded() {
-					return this.isEmptySlots == false && this.team == player.team && getDistance(this.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT;
+					return (
+						this.possibleLines == undefined &&
+						this.isEmptySlots == false &&
+						this.team == player.team &&
+						getDistance(this.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT
+					);
 				}
 
 				async getPossibleLines() {
