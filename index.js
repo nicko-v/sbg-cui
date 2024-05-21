@@ -640,6 +640,7 @@
 					this.isVisited = pointData.u.v;
 					this.isCaptured = pointData.u.c;
 
+					drawButton.removeAttribute('sbgcui-possible-lines');
 					this.update(pointData.co);
 				}
 
@@ -647,7 +648,7 @@
 					return 6 - Object.keys(this.cores).length;
 				}
 
-				get isEmptySlots() {
+				get hasEmptySlots() {
 					return this.emptySlots > 0;
 				}
 
@@ -740,7 +741,7 @@
 				get isPossibleLinesRequestNeeded() {
 					return (
 						this.possibleLines == undefined &&
-						this.isEmptySlots == false &&
+						this.hasEmptySlots == false &&
 						this.team == player.team &&
 						getDistance(this.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT
 					);
@@ -778,7 +779,6 @@
 
 					if (cores.length == 1) { this.team = player.team; }
 
-					drawButton.removeAttribute('sbgcui-possible-lines');
 					if (this.isPossibleLinesRequestNeeded) {
 						this.getPossibleLines().then(possibleLines => {
 							this.possibleLines = possibleLines;
