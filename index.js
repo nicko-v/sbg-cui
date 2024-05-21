@@ -777,7 +777,7 @@
 					const event = new Event('pointRepaired');
 					pointPopup.dispatchEvent(event);
 
-					if (cores.length == 1) { this.team = player.team; }
+					if (this.team == 0 && cores.length == 1) { this.team = player.team; }
 
 					if (this.isPossibleLinesRequestNeeded) {
 						this.getPossibleLines().then(possibleLines => {
