@@ -453,12 +453,13 @@ html[lang="ru"] .i-buttons {
 .i-stat {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	grid-template-rows: repeat(3, auto) 1fr repeat(3, auto);
+	grid-template-rows: repeat(4, auto) 1fr repeat(3, auto);
 	gap: 0px 10px;
 	grid-template-areas:
 		"distance lines"
 		"owner regions"
 		"energy reward"
+		"captured captured"
 		"_ _"
 		"buttons buttons"
 		"cores cores"
@@ -1796,6 +1797,9 @@ li[sbgcui-excluded-core]>span {
 .sbgcui_discharge_timeout {
 	color: var(--text);
 	display: block;
+	grid-area: captured;
+	opacity: 0.5;
+	text-align: center;
 }
 
 .sbgcui_navbutton,

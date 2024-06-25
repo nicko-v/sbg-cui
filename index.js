@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.58
+// @version      1.14.59
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.58';
+	const USERSCRIPT_VERSION = '1.14.59';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -629,6 +629,7 @@
 					this.level = pointData.l;
 					this.team = pointData.te;
 					this.title = pointData.t;
+					this.owner = pointData.o;
 					this.possibleLines = undefined;
 					this.lines = {
 						in: pointData.li.i,
@@ -642,6 +643,8 @@
 
 					drawButton.removeAttribute('sbgcui-possible-lines');
 					this.update(pointData.co);
+
+					if (this.owner == player.name) { this.getCaptureDate(); }
 				}
 
 				get emptySlots() {
@@ -688,36 +691,6 @@
 					return percent_format.format(this.energy);
 				}
 
-				get mostChargedCatalyserEnergy() {
-					let energy = Math.max(...Object.values(this.cores).map(e => e.energy / CORES_ENERGY[e.level] * 100));
-					return isFinite(energy) ? energy : null;
-				}
-
-				get dischargeTimeout() {
-					const mostChargedCatalyserEnergy = this.mostChargedCatalyserEnergy;
-					const rtf = new Intl.RelativeTimeFormat(i18next.language, { style: 'short' });
-
-					if (mostChargedCatalyserEnergy == null) { return ''; }
-
-					let timeout = mostChargedCatalyserEnergy / 0.6 * 60 * 60 * 1000; // Время до разрядки, мс.
-					let dh1 = [24 * 60 * 60 * 1000, 60 * 60 * 1000];
-					let dh2 = ['day', 'hour'];
-					let result = '';
-
-					dh1.forEach((e, i) => {
-						const amount = Math.trunc(timeout / e);
-						const parts = rtf.formatToParts(amount, dh2[i]);
-						const formatted = `${parts[1].value}${parts[2].value}`;
-
-						if (!amount) { return; }
-
-						result += `${result.length ? ', ' : ''}${formatted}`;
-						timeout -= amount * e;
-					});
-
-					return result;
-				}
-
 				get coresAmount() {
 					return Object.keys(this.cores).length;
 				}
@@ -757,12 +730,30 @@
 						['exref', isExref],
 						['sbgcuiPossibleLinesCheck', '']
 					]);
-					const url = '/api/draw?'+ searchParams.toString();
+					const url = '/api/draw?' + searchParams.toString();
 					const options = { headers, method: 'GET' };
 					const response = await fetch(url, options);
 					const parsedResponse = await response.json();
-					
+
 					return parsedResponse.data.map(point => ({ guid: point.p, title: point.t, distance: point.d }));
+				}
+
+				getCaptureDate() {
+					const logsStore = database.transaction('logs', 'readonly').objectStore('logs');
+					const getAllCapturesRequest = logsStore.index('action_type').getAll('capture');
+
+					getAllCapturesRequest.addEventListener('success', event => {
+						const allCaptureRecords = event.target.result;
+						const pointCaptures = allCaptureRecords.filter(record => record.point == this.guid);
+						const latestCapture = pointCaptures[pointCaptures.length - 1];
+
+						if (pointCaptures.length == 0) { return; }
+
+						const eventDetails = { guid: this.guid, date: new Date(latestCapture.timestamp) };
+						const customEvent = new CustomEvent('pointCaptureDateFound', { detail: eventDetails });
+
+						window.dispatchEvent(customEvent);
+					});
 				}
 
 				update(cores) {
@@ -777,7 +768,10 @@
 					const event = new Event('pointRepaired');
 					pointPopup.dispatchEvent(event);
 
-					if (this.team == 0 && cores.length == 1) { this.team = player.team; }
+					if (this.team == 0 && cores.length == 1) {
+						this.team = player.team;
+						window.dispatchEvent(new Event('pointCaptured'));
+					}
 
 					if (this.isPossibleLinesRequestNeeded) {
 						this.getPossibleLines().then(possibleLines => {
@@ -2320,6 +2314,7 @@
 					'sbgcui.distance': 'Расстояние',
 					'sbgcui.clearTilesCache': 'Очистить кэш',
 					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{amount}} тайлов от {{baselayers}} подложек. Всего {{size}} МБ занято.',
+					'sbgcui.captured': 'Захвачена: {{date}} ({{uptime}} дн.)',
 				});
 				i18next.addResources('en', 'main', {
 					'notifs.text': 'neutralized by $1$',
@@ -2336,6 +2331,7 @@
 					'sbgcui.distance': 'Distance',
 					'sbgcui.clearTilesCache': 'Clear cache',
 					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{amount}} tiles from {{baselayers}} baselayers. Total {{size}} MB used.',
+					'sbgcui.captured': 'Captured: {{date}} ({{uptime}} d.)',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
@@ -3486,14 +3482,14 @@
 
 					if (isInMeasurementMode) {
 						performance.mark(perfMarkB);
-						console.log(`SBG CUI: Загрузка и сортировка рефов закончены: ${new Date().toLocaleTimeString()}`);
+						console.log(`SBG CUI: Загрузка и сортировка сносок закончены: ${new Date().toLocaleTimeString()}`);
 
 						let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
 						let duration = +(measure.duration / 1000).toFixed(1);
 						let uniqueRefsAmount = inventoryContent.childNodes.length;
 						let toast;
 
-						const message = `Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных рефов: ${uniqueRefsAmount}.`;
+						const message = `Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных сносок: ${uniqueRefsAmount}.`;
 						toast = createToast(message, undefined, -1, 'sbgcui_toast-selection');
 						toast.showToast();
 
@@ -3587,7 +3583,7 @@
 
 							localStorage.removeItem('refs-cache');
 							performance.mark(perfMarkA);
-							console.log(`SBG CUI: Загрузка и сортировка рефов начаты: ${new Date().toLocaleTimeString()}`);
+							console.log(`SBG CUI: Загрузка и сортировка сносок начаты: ${new Date().toLocaleTimeString()}`);
 						}
 
 						if (isEveryRefCached(refsArr)) {
@@ -3622,7 +3618,7 @@
 						let toast;
 						let message = `Режим измерения производительности. <br><br>
 						Выберите тип сортировки для измерения скорости загрузки данных. <br><br>
-						Кэш рефов будет очищен. <br><br>
+						Кэш сносок будет очищен. <br><br>
 						Для отмены операции закройте инвентарь.`;
 
 						toast = createToast(message, 'bottom center', -1, 'sbgcui_toast-selection');
@@ -4096,12 +4092,12 @@
 							starModeButton.classList.remove('fa-fade');
 							toastMessage = `Включён режим рисования "Звезда". <br /><br />
 										Точка "<span style="color: var(--selection)">${starModeTarget.name}</span>" будет считаться центром звезды. <br /><br />
-										Рефы от прочих точек будут скрыты в списке рисования.`;
+										Сноски от прочих точек будут скрыты в списке рисования.`;
 						} else {
 							pointPopup.addEventListener('pointPopupOpened', onPointPopupOpened, { once: true });
 							toastMessage = `Включён режим рисования "Звезда". <br /><br />
 									Следующая открытая точка будет считаться центром звезды. <br /><br />
-									Рефы от прочих точек будут скрыты в списке рисования.`;
+									Сноски от прочих точек будут скрыты в списке рисования.`;
 						}
 					} else {
 						starModeButton.style.opacity = 0.5;
@@ -4554,23 +4550,33 @@
 				toolbar.addItem(button, 5);
 			}
 
-
-			/* Время до разрядки точки */
+		
+			/* Дата захвата точки */
 			{
-				function updateTimeout() {
-					timeoutSpan.innerText = config.ui.pointDischargeTimeout ? `(~${lastOpenedPoint.dischargeTimeout})` : '';
+				function updateCaptureDate(event) {
+					const { date: captureDate, guid } = event.detail;
+					const formattedCaptureDate = formatter.format(captureDate);
+					const uptimeDays = Math.floor((Date.now() - captureDate) / 1000 / 60 / 60 / 24);
+
+					if (guid != lastOpenedPoint.guid) { return; }
+					if (!config.ui.pointDischargeTimeout) { return; }
+
+					timeoutSpan.innerText = i18next.t('sbgcui.captured', { date: formattedCaptureDate, uptime: uptimeDays });
 				}
 
 				const timeoutSpan = document.createElement('span');
+				const formatterOptions = { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
+				const formatter = new Intl.DateTimeFormat('ru-RU', formatterOptions);
 
 				timeoutSpan.classList.add('sbgcui_discharge_timeout');
-				pointEnergyValue.after(timeoutSpan);
+				document.querySelector('.i-stat').appendChild(timeoutSpan);
 
-				pointPopup.addEventListener('pointPopupOpened', updateTimeout);
-				pointPopup.addEventListener('pointRepaired', updateTimeout);
+				pointPopup.addEventListener('pointPopupOpened', () => { timeoutSpan.innerText = ''; });
+				window.addEventListener('pointCaptureDateFound', updateCaptureDate);
+				window.addEventListener('pointCaptured', updateCaptureDate);
 			}
 
-
+		
 			/* Вращение карты */
 			{
 				let latestTouchPoint = null;
