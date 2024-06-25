@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.60
+// @version      1.14.61
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.60';
+	const USERSCRIPT_VERSION = '1.14.61';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1095,9 +1095,9 @@
 			async function repairPoint(guid) {
 				const url = '/api/repair';
 				const options = {
-					headers: { ...headers, 'content-type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					headers: { ...headers, 'content-type': 'application/json' },
 					method: 'POST',
-					body: `guid=${guid}&position%5B%5D=0.0&position%5B%5D=0.0`
+					body: JSON.stringify({ guid, position: [0.0, 0.0] }),
 				};
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
