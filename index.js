@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.59
+// @version      1.14.60
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -61,7 +61,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.59';
+	const USERSCRIPT_VERSION = '1.14.60';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -673,18 +673,22 @@
 					return playerCores; // { level: amount }
 				}
 
-				get energy() {
-					if (Object.keys(this.cores).length == 0) { return 0; }
+				static calculateTotalEnergy(cores) {
+					if (Object.keys(cores).length == 0) { return 0; }
 
 					let maxPointEnergy = 0;
 					let pointEnergy = 0;
 
-					for (let guid in this.cores) {
-						maxPointEnergy += CORES_ENERGY[this.cores[guid].level];
-						pointEnergy += this.cores[guid].energy;
+					for (let guid in cores) {
+						maxPointEnergy += CORES_ENERGY[cores[guid].level];
+						pointEnergy += cores[guid].energy;
 					}
 
 					return pointEnergy / maxPointEnergy * 100;
+				}
+
+				get energy() {
+					return Point.calculateTotalEnergy(this.cores);
 				}
 
 				get energyFormatted() {
@@ -1609,6 +1613,11 @@
 														delete inview[guid];
 													});
 												}
+
+												parsedResponse.c.forEach(point => {
+													if (point.guid in inview) { inview[point.guid].energy = point.energy * 100; }
+												});
+
 											}
 
 											break;
@@ -1814,8 +1823,14 @@
 											}
 											break;
 										case '/api/repair':
-											if ('data' in parsedResponse && isPointPopupOpened) {
-												lastOpenedPoint.update(parsedResponse.data);
+											if ('data' in parsedResponse) {
+												const guid = JSON.parse(options.body).guid;
+												if (isPointPopupOpened) { lastOpenedPoint.update(parsedResponse.data); }
+												if (guid in inview) {
+													const cores = parsedResponse.data.reduce((acc, curr) => { acc[curr.g] = { energy: curr.e, level: curr.l }; return acc; }, {});
+													const totalEnergy = Point.calculateTotalEnergy(cores);
+													inview[guid].energy = totalEnergy;
+												}
 											}
 											break;
 										case '/api/score':
@@ -4550,7 +4565,7 @@
 				toolbar.addItem(button, 5);
 			}
 
-		
+
 			/* Дата захвата точки */
 			{
 				function updateCaptureDate(event) {
@@ -4571,12 +4586,12 @@
 				timeoutSpan.classList.add('sbgcui_discharge_timeout');
 				document.querySelector('.i-stat').appendChild(timeoutSpan);
 
-				pointPopup.addEventListener('pointPopupOpened', () => { timeoutSpan.innerText = ''; });
+				pointPopup.addEventListener('pointPopupOpened', () => { timeoutSpan.innerText = '~'; });
 				window.addEventListener('pointCaptureDateFound', updateCaptureDate);
 				window.addEventListener('pointCaptured', updateCaptureDate);
 			}
 
-		
+
 			/* Вращение карты */
 			{
 				let latestTouchPoint = null;
