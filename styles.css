@@ -508,7 +508,7 @@ html[lang="ru"] .i-buttons {
 	border-width: 5px;
 }
 
-.i-stat__core-info > span:nth-child(2) {
+.i-stat__core-info>span:nth-child(2) {
 	line-height: 1.1;
 }
 
@@ -2213,6 +2213,120 @@ li[sbgcui-excluded-core]>span {
 	}
 
 	@media screen and (max-height: 600px) {
+		.topleft-container {
+			background: linear-gradient(90deg, var(--sbgcui-branding-color) -100%, rgba(255, 255, 255, 0) 100%);
+			width: max-content;
+		}
+
+		.profile.popup {
+			display: grid;
+			gap: 0px 0px;
+			grid-template-areas:
+				"name compare"
+				"exp compare"
+				"stats stats";
+			grid-template-columns: repeat(2, 50%);
+			grid-template-rows: repeat(3, auto);
+			width: 100%;
+		}
+
+		.pr-header.popup-header {
+			grid-area: name;
+		}
+
+		.pr-xp {
+			grid-area: exp;
+		}
+
+		.pr-stats {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 2px 10px;
+			grid-area: stats;
+			margin-bottom: 0;
+		}
+
+		.pr-stats__section {
+			font-size: 0.8em;
+			width: 32%;
+		}
+
+		.pr-stats__section.persist {
+			margin-bottom: 0;
+			width: 100%;
+		}
+
+		.pr-stats__section-header {
+			margin: 0;
+		}
+
+		.pr-stat__total-xp,
+		.pr-stat__age {
+			border-bottom: 1px var(--border-transp) solid;
+			display: flex;
+			gap: 10px;
+		}
+
+		.pr-stat__age>.pr-stat-val::after {
+			bottom: unset;
+			left: calc(100% + 5px);
+			right: unset;
+			white-space: nowrap;
+		}
+
+		.pr-buttons {
+			bottom: 5px;
+			flex-wrap: wrap;
+			gap: 5px;
+			justify-content: space-between;
+			max-width: 32%;
+			position: fixed;
+			right: 5px;
+		}
+
+		#pr-button__copy {
+			width: 100%;
+		}
+
+		.profile .popup-close {
+			bottom: 5px;
+			margin-bottom: 0;
+			position: fixed;
+		}
+
+		#pr-xp-level-num {
+			font-size: 1.5em;
+		}
+
+		.sbgcui_compare_stats {
+			border: none;
+			flex-wrap: wrap;
+			grid-area: compare;
+			justify-content: end;
+			padding: 0 5px 0 0;
+		}
+
+		.sbgcui_compare_stats-timestamp {
+			margin-right: unset;
+			text-align: end;
+			width: 100%;
+		}
+
+		.sbgcui_toolbar-control {
+			bottom: unset;
+			display: flex;
+			flex-direction: row-reverse;
+			top: 30%;
+		}
+
+		.sbgcui_toolbar-control>button.fa {
+			transform: rotate(90deg);
+		}
+
+		.sbgcui_toolbar {
+			flex-direction: row;
+		}
+
 		.info.popup {
 			height: 100%;
 			overflow: visible;
@@ -2228,7 +2342,7 @@ li[sbgcui-excluded-core]>span {
 		.i-stat {
 			box-sizing: border-box;
 			grid-template-columns: minmax(20vw, 25vw) minmax(300px, auto) minmax(20vw, 25vw);
-			grid-template-rows: repeat(7, auto);
+			grid-template-rows: repeat(8, auto);
 			gap: 0px 10px;
 			grid-template-areas:
 				"distance buttons cores"
@@ -2236,8 +2350,9 @@ li[sbgcui-excluded-core]>span {
 				"regions buttons cores"
 				"owner buttons cores"
 				". buttons cores"
-				"energy slider cores"
-				"reward slider cores";
+				"energy captured cores"
+				"reward slider cores"
+				". slider cores";
 			padding: 0 5px;
 		}
 
