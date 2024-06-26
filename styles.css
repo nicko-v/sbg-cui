@@ -2218,15 +2218,39 @@ li[sbgcui-excluded-core]>span {
 			width: max-content;
 		}
 
+		.inventory.popup {
+			font-size: 0.8em;
+			height: 100%;
+			width: 100%;
+		}
+
+		.inventory__header {
+			margin-bottom: 3px;
+		}
+
+		.inventory__tab {
+			height: auto;
+			padding: 3px 0;
+		}
+
+		.sbgcui_refs-sort-button {
+			bottom: 100px;
+		}
+
+		#inventory__close {
+			bottom: 75px;
+		}
+
 		.profile.popup {
 			display: grid;
+			height: 100%;
 			gap: 0px 0px;
 			grid-template-areas:
 				"name compare"
 				"exp compare"
 				"stats stats";
 			grid-template-columns: repeat(2, 50%);
-			grid-template-rows: repeat(3, auto);
+			grid-template-rows: repeat(3, max-content);
 			width: 100%;
 		}
 
@@ -2241,7 +2265,7 @@ li[sbgcui-excluded-core]>span {
 		.pr-stats {
 			display: flex;
 			flex-wrap: wrap;
-			gap: 2px 10px;
+			gap: 5px 10px;
 			grid-area: stats;
 			margin-bottom: 0;
 		}
@@ -2251,8 +2275,21 @@ li[sbgcui-excluded-core]>span {
 			width: 32%;
 		}
 
+		.pr-stats__section:nth-child(2) {
+			order: 3;
+		}
+
+		.pr-stats__section:nth-child(3) {
+			order: 2;
+		}
+
+		.pr-stats__section:nth-child(4) {
+			order: 4;
+		}
+
 		.pr-stats__section.persist {
 			margin-bottom: 0;
+			order: 1;
 			width: 100%;
 		}
 
