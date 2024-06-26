@@ -508,6 +508,10 @@ html[lang="ru"] .i-buttons {
 	border-width: 5px;
 }
 
+.i-stat__core-info > span:nth-child(2) {
+	line-height: 1.1;
+}
+
 .i-stat__entry {
 	text-overflow: ellipsis;
 	overflow-x: hidden;

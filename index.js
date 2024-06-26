@@ -45,6 +45,7 @@
 	const ACTIONS_REWARDS = { destroy: { region: 125, line: 45, core: 10 } };
 	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
 	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1];
+	const LINES_LIMIT = { out: 30 };
 	const DISCOVERY_COOLDOWN = 90;
 	const HIGHLEVEL_MARKER = 9;
 	const HIT_TOLERANCE = 15;
@@ -647,6 +648,20 @@
 					if (this.owner == player.name) { this.getCaptureDate(); }
 				}
 
+				static calculateTotalEnergy(cores) {
+					if (Object.keys(cores).length == 0) { return 0; }
+
+					let maxPointEnergy = 0;
+					let pointEnergy = 0;
+
+					for (let guid in cores) {
+						maxPointEnergy += CORES_ENERGY[cores[guid].level];
+						pointEnergy += cores[guid].energy;
+					}
+
+					return pointEnergy / maxPointEnergy * 100;
+				}
+
 				get emptySlots() {
 					return 6 - Object.keys(this.cores).length;
 				}
@@ -671,20 +686,6 @@
 					}
 
 					return playerCores; // { level: amount }
-				}
-
-				static calculateTotalEnergy(cores) {
-					if (Object.keys(cores).length == 0) { return 0; }
-
-					let maxPointEnergy = 0;
-					let pointEnergy = 0;
-
-					for (let guid in cores) {
-						maxPointEnergy += CORES_ENERGY[cores[guid].level];
-						pointEnergy += cores[guid].energy;
-					}
-
-					return pointEnergy / maxPointEnergy * 100;
 				}
 
 				get energy() {
@@ -715,10 +716,15 @@
 					return pointCores.querySelector('.selected')?.dataset.guid;
 				}
 
+				get isOutgoingLinesLimitReached() {
+					return this.lines.out >= LINES_LIMIT.out;
+				}
+
 				get isPossibleLinesRequestNeeded() {
 					return (
 						this.possibleLines == undefined &&
 						this.hasEmptySlots == false &&
+						this.isOutgoingLinesLimitReached == false &&
 						this.team == player.team &&
 						getDistance(this.coords) <= POSSIBLE_LINES_DISTANCE_LIMIT
 					);
@@ -774,7 +780,10 @@
 
 					if (this.team == 0 && cores.length == 1) {
 						this.team = player.team;
-						window.dispatchEvent(new Event('pointCaptured'));
+						
+						const eventDetails = { guid: this.guid, date: new Date() };
+						const customEvent = new CustomEvent('pointCaptured', { detail: eventDetails });
+						window.dispatchEvent(customEvent);
 					}
 
 					if (this.isPossibleLinesRequestNeeded) {
