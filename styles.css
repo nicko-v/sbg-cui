@@ -1031,6 +1031,7 @@ html[lang="ru"] .i-buttons {
 	display: none;
 	font-size: 0.7em;
 	height: 2em;
+	opacity: 0.8;
 	width: 100%;
 }
 
