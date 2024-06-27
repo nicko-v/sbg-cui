@@ -34,7 +34,8 @@ body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container {
 	opacity: 0;
 }
 
-.layers-config {
+.layers-config.popup {
+	overflow-y: auto;
 	width: 75vw;
 }
 
@@ -1024,7 +1025,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_destroy_notifs-closeall {
-	background-color: var(--background-transp);
+	background-color: var(--accent);
 	border: 1px solid var(--border-transp);
 	border-radius: 5px;
 	display: none;
@@ -1060,12 +1061,15 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_destroy_notif_toast>.toast-close {
-	color: var(--text);
+	background-color: var(--background);
+	border-radius: 5px;
+	color: var(--accent);
 	font-size: 1.3em;
 	opacity: 0.7;
 	padding: 0 3px;
 	position: absolute;
 	right: 0;
+	text-shadow: 0px 0px 5px var(--accent);
 	top: 0;
 }
 
@@ -1259,8 +1263,9 @@ html[lang="ru"] .i-buttons {
 }
 
 .sbgcui_settings-buttons_wrp>button {
-	width: 35%;
 	margin: 0 auto;
+	min-width: max-content;
+	width: 35%;
 }
 
 .sbgcui_settings-version {
@@ -2194,6 +2199,14 @@ li[sbgcui-excluded-core]>span {
 		transform: translateY(0);
 	}
 
+	.layers-config.popup {
+		max-width: max-content;
+	}
+
+	.layers-config__buttons {
+		gap: 10px;
+	}
+
 	.sbgcui_attack-menu-rotate::after {
 		transform: rotate(-135deg);
 	}
@@ -2207,6 +2220,19 @@ li[sbgcui-excluded-core]>span {
 	}
 
 	@media screen and (max-height: 440px) {
+		#attack-menu {
+			width: 5em;
+			height: 5em;
+		}
+
+		.inventory.popup,
+		.layers-config.popup,
+		.leaderboard.popup,
+		.notifs.popup,
+		.settings.popup {
+			font-size: 0.9em;
+		}
+
 		.sbgcui_cluster-center:has(> :nth-child(8))>.sbgcui_cluster-iconWrapper:nth-child(2n) {
 			height: calc(50vh + 20px);
 		}
@@ -2218,8 +2244,31 @@ li[sbgcui-excluded-core]>span {
 			width: max-content;
 		}
 
+		.leaderboard.popup,
+		.score.popup,
+		.settings.popup {
+			height: 100%;
+		}
+
+		.score.popup {
+			width: 50%;
+		}
+
+		.score__table>tbody {
+			height: 50vh;
+		}
+
+		.notifs .popup-close,
+		.settings .popup-close,
+		.leaderboard .popup-close {
+			position: fixed;
+		}
+
+		.leaderboard .popup-close {
+			bottom: 1.2em;
+		}
+
 		.inventory.popup {
-			font-size: 0.8em;
 			height: 100%;
 			width: 100%;
 		}
