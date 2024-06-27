@@ -3393,7 +3393,7 @@
 					let guid = event.target.closest('.inventory__item').dataset.ref;
 
 					if (!guid) { return; }
-					if (confirm('Открыть карточку точки? Либо нажмите "Отмена" для перехода к месту на карте.')) { window.location.href = `/app/?point=${guid}`; }
+					if (confirm('Открыть карточку точки? Либо нажмите "Отмена" для перехода к месту на карте.')) { window.showInfo(guid); }
 				});
 			}
 
