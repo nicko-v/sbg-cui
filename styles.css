@@ -2403,7 +2403,8 @@ li[sbgcui-excluded-core]>span {
 			bottom: unset;
 			display: flex;
 			flex-direction: row-reverse;
-			top: 30%;
+			top: 50%;
+			transform: translateY(-50%);
 		}
 
 		.sbgcui_toolbar-control>button.fa {
