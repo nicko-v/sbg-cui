@@ -518,6 +518,8 @@
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
 									}`;
+				case `$('body').empty()`:
+					return 'movePlayer([0,0]); undefined?';
 				case `const attack_slider`: // Line ~409
 					return `window.attack_slider`;
 				case `const deploy_slider`: // Line ~427
@@ -568,6 +570,7 @@
 			`((new ol\\.Feature\\({(?=\\s+?geometry: new ol\\.geom\\.Point\\(mpos\\))))`,
 			`(constrainResolution: true)`,
 			`(movePlayer\\(\\[coords\\.longitude, coords\\.latitude\\]\\))`,
+			`(\\$\\('body'\\)\\.empty\\(\\))`,
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
@@ -589,7 +592,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 26;
+		const replacesShouldBe = 29;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -4501,10 +4504,7 @@
 						geometry: new ol.geom.Point([0, 0])
 					});
 
-					popup.addEventListener('click', () => {
-						popup.classList.add('sbgcui_hidden');
-						setTimeout(() => { popup.style.zIndex = 0; }, 100);
-					});
+					popup.addEventListener('click', () => { popup.classList.add('sbgcui_hidden'); });
 					document.body.appendChild(popup);
 
 					zeroPointFeature.setId('sbgcui_zeroPoint');
@@ -4526,8 +4526,7 @@
 						});
 
 						if (features.includes(zeroPointFeature)) {
-							popup.classList.remove('sbgcui_hidden');
-							setTimeout(() => { popup.style.zIndex = 9; }, 100);
+							setTimeout(() => popup.classList.remove('sbgcui_hidden'), 100);
 						}
 					});
 					customPointsSource.addFeature(zeroPointFeature);
