@@ -524,6 +524,22 @@ html[lang="ru"] .i-buttons {
 	display: block;
 }
 
+.leaderboard__list>tr>td:nth-child(2) {
+	align-items: center;
+	display: flex;
+	gap: 5px;
+}
+
+.level-pill {
+	margin-left: 0;
+	order: 1;
+	padding: 1px 4px;
+}
+
+.profile-link {
+	order: 2;
+}
+
 .settings .popup-close,
 .info .popup-close,
 .leaderboard .popup-close,
