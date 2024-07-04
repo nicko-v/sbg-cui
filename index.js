@@ -1926,13 +1926,13 @@
 										case '/api/leaderboard':
 											if (!('d' in parsedResponse)) { break; }
 
-											const teams = parsedResponse.d.reduce((total, entry) => {
+											const contributions = parsedResponse.d.reduce((total, entry) => {
 												total[entry.t] = total[entry.t] ?? 0;
-												total[entry.t] += 1;
+												total[entry.t] += entry.s;
 												return total;
 											}, []);
-											const topTeam = teams.findIndex(entry => entry == Math.max(...teams.flat()));
-											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topTeam})`);
+											const topContributor = contributions.findIndex(entry => entry == Math.max(...contributions.flat()));
+											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topContributor})`);
 
 											break;
 										default:
