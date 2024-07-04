@@ -1045,6 +1045,7 @@
 			let isProfilePopupOpened = !profilePopup.classList.contains('hidden');
 			let isAttackSliderOpened = !attackSlider.classList.contains('hidden');
 			let isDrawSliderOpened = !drawSlider.classList.contains('hidden');
+			let isleaderboardPopupOpened = !leaderboardPopup.classList.contains('hidden');
 			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
 			let isClusterOverlayOpened = false;
@@ -2022,6 +2023,7 @@
 					isInventoryPopupOpened ||
 					isPointPopupOpened ||
 					isProfilePopupOpened ||
+					isleaderboardPopupOpened ||
 					isSettingsMenuOpened ||
 					isRefsViewerOpened
 				);
@@ -2157,6 +2159,22 @@
 					if (event) { records[0].target.dispatchEvent(event); }
 				});
 				pointPopupObserver.observe(pointPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
+
+
+				let leaderboardPopupObserver = new MutationObserver(records => {
+					let event;
+
+					if (records[0].target.classList.contains('hidden')) {
+						event = new Event('leaderboardPopupClosed');
+						isleaderboardPopupOpened = false;
+					} else if (records[0].oldValue?.includes('hidden')) {
+						event = new Event('leaderboardPopupOpened');
+						isleaderboardPopupOpened = true;
+					}
+
+					if (event) { records[0].target.dispatchEvent(event); }
+				});
+				leaderboardPopupObserver.observe(leaderboardPopup, { attributes: true, attributeOldValue: true, attributeFilter: ['class'] });
 
 
 				let profilePopupObserver = new MutationObserver(records => {
