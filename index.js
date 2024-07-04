@@ -2423,6 +2423,12 @@
 					'items.catalyser-short': '{{level}}',
 					'items.core-short': '{{level}}',
 				});
+				['cm', 'm', 'km', 'sqm', 'sqkm'].forEach(unit => {
+					const key = `units.${unit}`;
+					let value = i18next.getResource(i18next.resolvedLanguage, 'main', key);
+					value = value.replace(/(maximumFractionDigits:\s)(\d)/, '$1$2; minimumFractionDigits: $2');
+					i18next.addResource(i18next.resolvedLanguage, 'main', key, value);
+				});
 
 				window.attack_slider.options = {
 					speed: 200,

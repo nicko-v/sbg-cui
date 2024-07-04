@@ -524,6 +524,12 @@ html[lang="ru"] .i-buttons {
 	display: block;
 }
 
+.leaderboard__list td:nth-child(3) {
+	font-family: monospace;
+	font-size: larger;
+	word-spacing: -0.3ch;
+}
+
 .leaderboard__list>tr>td:nth-child(2) {
 	align-items: center;
 	display: flex;
