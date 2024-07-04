@@ -528,7 +528,7 @@ html[lang="ru"] .i-buttons {
 }
 
 .leaderboard  {
-	background: radial-gradient(circle, var(--background-transp) 80%, var(--sbgcui-top-team, var(--background)) 100%);
+	background: linear-gradient(180deg, var(--sbgcui-top-team, var(--background)) -100%, var(--background-transp) 50%);
 	border-color: var(--sbgcui-top-team);
 }
 
@@ -552,6 +552,10 @@ html[lang="ru"] .i-buttons {
 
 .profile-link {
 	order: 2;
+}
+
+:root:not([data-theme="light"]) .profile-link {
+	text-shadow: 0 0 5px black;
 }
 
 .settings .popup-close,
