@@ -30,7 +30,10 @@ body {
 
 body:has(.sbgcui_point-popup-bg:not(.hidden)) .ol-overlaycontainer-stopevent,
 body:has(.sbgcui_point-popup-bg:not(.hidden))>.topleft-container,
-body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container {
+body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container,
+body:has(.leaderboard.popup:not(.hidden)) .ol-overlaycontainer-stopevent,
+body:has(.leaderboard.popup:not(.hidden))>.topleft-container,
+body:has(.leaderboard.popup:not(.hidden))>.bottom-container {
 	opacity: 0;
 }
 
@@ -522,6 +525,11 @@ html[lang="ru"] .i-buttons {
 #i-stat__energy>span {
 	color: var(--text-disabled);
 	display: block;
+}
+
+.leaderboard  {
+	background: radial-gradient(circle, var(--background-transp) 80%, var(--sbgcui-top-team, var(--background)) 100%);
+	border-color: var(--sbgcui-top-team);
 }
 
 .leaderboard__list td:nth-child(3) {

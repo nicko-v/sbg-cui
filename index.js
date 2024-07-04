@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.62
+// @version      1.14.63
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.62';
+	const USERSCRIPT_VERSION = '1.14.63';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 
 
@@ -1016,6 +1016,7 @@
 			const inventoryContent = document.querySelector('.inventory__content');
 			const inventoryPopup = document.querySelector('.inventory.popup');
 			const invTotalSpan = document.querySelector('#self-info__inv');
+			const leaderboardPopup = document.querySelector('.leaderboard.popup');
 			const notifsButton = document.querySelector('#notifs-menu');
 			const pointCores = document.querySelector('.i-stat__cores');
 			const pointImage = document.querySelector('#i-image');
@@ -1892,6 +1893,7 @@
 											if ('name' in parsedResponse) {
 												regDateSpan.style.setProperty('--sbgcui-reg-date', calcPlayingTime(parsedResponse.created_at));
 											}
+
 											break;
 										case '/api/repair':
 											if ('data' in parsedResponse) {
@@ -1918,6 +1920,18 @@
 												pointsStatTds.forEach((td, i) => { td.style.gridArea = `p${pointsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 												regionsStatTds.forEach((td, i) => { td.style.gridArea = `r${regionsPlaces[i == 0 ? 'r' : i == 1 ? 'g' : 'b']}`; });
 											}
+
+											break;
+										case '/api/leaderboard':
+											if (!('d' in parsedResponse)) { break; }
+
+											const teams = parsedResponse.d.reduce((total, entry) => {
+												total[entry.t] = total[entry.t] ?? 0;
+												total[entry.t] += 1;
+												return total;
+											}, []);
+											const topTeam = teams.findIndex(entry => entry == Math.max(...teams.flat()));
+											leaderboardPopup.style.setProperty('--sbgcui-top-team', `var(--team-${topTeam})`);
 
 											break;
 										default:
