@@ -554,7 +554,7 @@ html[lang="ru"] .i-buttons {
 	order: 2;
 }
 
-:root:not([data-theme="light"]) .profile-link {
+:root([data-theme="dark"]) .profile-link {
 	text-shadow: 0 0 5px black;
 }
 
