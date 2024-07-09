@@ -2450,6 +2450,7 @@ li[sbgcui-excluded-core]>span {
 		}
 
 		.info.popup {
+			background: radial-gradient(circle, rgba(0, 0, 0, 0.3) 65%, var(--border) 100%);
 			height: 100%;
 			overflow: visible;
 			width: 100%;
