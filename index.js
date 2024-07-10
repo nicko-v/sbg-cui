@@ -1990,9 +1990,13 @@
 				}
 			}
 
-			function clearTilesCache() {
+			function clearTilesCache(event) {
 				const transaction = database.transaction('tiles', 'readwrite');
 				const tilesStore = transaction.objectStore('tiles');
+				const clearButton = event.target;
+
+				clearButton.disabled = true;
+				clearButton.innerText = i18next.t('sbgcui.calculatingTilesCache');
 
 				tilesStore.getAll().addEventListener('success', event => {
 					const baselayers = new Set();
@@ -2012,6 +2016,9 @@
 					const size = +(storeCapacity.size / 1024 / 1024).toFixed(1);
 					const message = i18next.t('sbgcui.clearTilesCacheConfirm', { amount, size, baselayers: baselayers.size });
 					confirm(message) && tilesStore.clear();
+
+					clearButton.disabled = false;
+					clearButton.innerText = i18next.t('sbgcui.clearTilesCache');
 				});
 			}
 
@@ -2432,6 +2439,7 @@
 					'sbgcui.distance': 'Расстояние',
 					'sbgcui.clearTilesCache': 'Очистить кэш',
 					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{amount}} тайлов от {{baselayers}} подложек. Всего {{size}} МБ занято.',
+					'sbgcui.calculatingTilesCache': 'Подсчёт...',
 					'sbgcui.captured': 'Захвачена: {{date}} ({{uptime}} дн.)',
 				});
 				i18next.addResources('en', 'main', {
@@ -2449,6 +2457,7 @@
 					'sbgcui.distance': 'Distance',
 					'sbgcui.clearTilesCache': 'Clear cache',
 					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{amount}} tiles from {{baselayers}} baselayers. Total {{size}} MB used.',
+					'sbgcui.calculatingTilesCache': 'Calculating...',
 					'sbgcui.captured': 'Captured: {{date}} ({{uptime}} d.)',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
