@@ -1537,7 +1537,6 @@
 						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
 						circle.setRadius(toOLMeters(radius));
 						circle.setOpacity(opacity);
-						circle.setRotation(Math.PI * 2 * (1 - elapsedRatio));
 						circle.setStroke(stroke);
 						highlighterFeature.changed();
 
