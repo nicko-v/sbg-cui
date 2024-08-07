@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.63
+// @version      1.14.64
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,8 +62,9 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.63';
+	const USERSCRIPT_VERSION = '1.14.64';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
+	const BLAST_ANIMATION_DURATION = 800;
 
 
 	const config = {}, state = {}, favorites = {};
@@ -518,7 +519,7 @@
 										manageControls();
           					$('#i-stat__distance').text(distanceToString(getDistance(point_state.info.c)));
 									}`;
-				case `$('body').empty()`:
+				case `$('body').empty()`: // Line ~363
 					return 'movePlayer([0,0]); undefined?';
 				case `const attack_slider`: // Line ~409
 					return `window.attack_slider`;
@@ -530,6 +531,8 @@
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
 					return `${match}return;`;
+				case `explodeRange(item.l)`: // Line ~1005
+					return `window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[item.l].range, color: '#FF0000', width: 5 + item.l / 2 })`;
 				case `$('[name="baselayer"]').on('change', e`: // Line ~1108
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
@@ -576,6 +579,7 @@
 			`(const draw_slider)`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
 			`(function initCompass\\(\\) {)`,
@@ -592,7 +596,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 29;
+		const replacesShouldBe = 30;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -1522,26 +1526,26 @@
 				view.setZoom(17);
 			}
 
-			function highlightPoint(point, coords = [], once) {
+			function highlightFeature(feature, coords = [], options) {
 				function animate(event) {
 					const frameState = event.frameState;
 					const elapsed = frameState.time - start;
 
-					if (elapsed < duration) {
+					if (elapsed < options.duration) {
 						const vectorContext = ol.render.getVectorContext(event);
-						const elapsedRatio = elapsed / duration;
+						const elapsedRatio = elapsed / options.duration;
 
-						const radius = ol.easing.easeOut(elapsedRatio) * 20;
+						const radius = ol.easing.easeOut(elapsedRatio) * (toOLMeters(options.radius) / resolution);
 						const opacity = ol.easing.easeOut(1 - elapsedRatio);
 
-						stroke.setWidth(strokeWidth * (1 - elapsedRatio));
-						circle.setRadius(toOLMeters(radius));
+						stroke.setWidth(options.width * (1 - elapsedRatio));
+						circle.setRadius(radius);
 						circle.setOpacity(opacity);
 						circle.setStroke(stroke);
 						highlighterFeature.changed();
 
 						vectorContext.drawGeometry(geometry);
-					} else if (once == true) {
+					} else if (options.once == true) {
 						stopAnimation();
 						return;
 					} else {
@@ -1556,20 +1560,27 @@
 					customPointsSource.removeFeature(highlighterFeature);
 				}
 
+				options = {
+					once: false,
+					radius: 20,
+					duration: 1500,
+					color: '#CCBB00',
+					width: 5,
+					...options
+				};
+
 				let start = Date.now();
-				const olCoords = point != undefined ? point.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
-				const duration = 1500;
-				const strokeWidth = 5;
+				const olCoords = feature != undefined ? feature.getGeometry().getCoordinates() : ol.proj.fromLonLat(coords);
+				const resolution = view.getResolution();
 				const geometry = new ol.geom.Point(olCoords);
 				const highlighterFeature = new ol.Feature({ geometry });
-				const stroke = new ol.style.Stroke({ color: [204, 187, 0], width: strokeWidth });
+				const stroke = new ol.style.Stroke({ color: options.color, width: options.width });
 				const circle = new ol.style.Circle({ opacity: 1, radius: 0, stroke });
 				const highlighterStyle = new ol.style.Style({ image: circle });
 				const listenerKey = customPointsLayer.on('postrender', animate);
 
 				highlighterFeature.set('type', 'highlighter');
 				highlighterFeature.setStyle(highlighterStyle);
-				customPointsSource.forEachFeature(feature => { if (feature.get('type') == 'highlighter') { customPointsSource.removeFeature(feature); } });
 				customPointsSource.addFeature(highlighterFeature);
 
 				map.once('click', stopAnimation);
@@ -2482,6 +2493,8 @@
 					speed: 200,
 					//perPage: 2,
 				};
+				
+				window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
 
@@ -4055,7 +4068,7 @@
 						originalOnClick(mapClickEvent);
 						*/
 						window.showInfo(chosenFeature.getId());
-						highlightPoint(chosenFeature, undefined, true);
+						highlightFeature(chosenFeature, undefined, { once: true });
 					}, overlayTransitionsTime);
 				}
 
@@ -4082,7 +4095,7 @@
 
 						if (feature != undefined) {
 							feature.set('sbgcui_chosenFeature', true, true);
-							highlightPoint(feature, undefined, true);
+							highlightFeature(feature, undefined, { once: true });
 						}
 
 						originalOnClick(mapClickEvent);
@@ -4376,7 +4389,7 @@
 					*/
 					pointPopup.classList.add('hidden');
 					window.showInfo(nextPoint.getId());
-					highlightPoint(nextPoint, undefined, true);
+					highlightFeature(nextPoint, undefined, { once: true });
 				}
 
 				function toggleArrowVisibility() {
@@ -4804,7 +4817,7 @@
 				const jumpToButton = document.createElement('button');
 
 				jumpToButton.classList.add('fa', 'fa-solid-map-location-dot', 'sbgcui_button_reset', 'sbgcui_jumpToButton');
-				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightPoint(undefined, lastOpenedPoint.coords, false); });
+				jumpToButton.addEventListener('click', () => { jumpTo(lastOpenedPoint.coords); highlightFeature(undefined, lastOpenedPoint.coords); });
 				pointPopup.appendChild(jumpToButton);
 
 				try {
@@ -5541,7 +5554,7 @@
 							};
 							if (onClick == 'jumpto') {
 								toast.options.close = true;
-								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightPoint(undefined, coords, false); };
+								toast.options.onClick = () => { toast.hideToast(); jumpTo(coords); highlightFeature(undefined, coords); };
 							}
 							destroyNotifsToasts.add(toast);
 
