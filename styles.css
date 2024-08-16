@@ -2190,6 +2190,7 @@ li[sbgcui-excluded-core]>span {
 	color: var(--text);
 	font-size: 40px;
 	height: 1em;
+	padding: 1px;
 	position: absolute;
 	right: 5px;
 	width: 1em;
