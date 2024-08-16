@@ -2185,6 +2185,16 @@ li[sbgcui-excluded-core]>span {
 	color: var(--selection);
 }
 
+.sbgcui_playerSearchButton {
+	bottom: 5px;
+	color: var(--text);
+	font-size: 40px;
+	height: 1em;
+	position: absolute;
+	right: 5px;
+	width: 1em;
+}
+
 
 @keyframes move-left-fade-out {
 	from {

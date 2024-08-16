@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.64
+// @version      1.14.65
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.64';
+	const USERSCRIPT_VERSION = '1.14.65';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -560,7 +560,7 @@
 				case `if (type == 'osm') {`: // Line ~2166
 					return `if (type.startsWith('stadia')) { source=new ol.source.StadiaMaps({ layer:'stamen_'+type.split('_')[1] })} else if (type == 'osm') {`;
 				case `class Bitfield`: // Line ~2306
-					return `window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
+					return `window.openProfile = openProfile; window.requestEntities = requestEntities; window.showInfo = showInfo; window.Bitfield = class Bitfield`;
 				default:
 					replacesMade -= 1;
 					return match;
@@ -5640,6 +5640,22 @@
 				wrapper.classList.add('sbgcui_inventory__ma-shortcuts');
 
 				manageAmountButtons.before(wrapper);
+			}
+
+
+			/* Поиск игрока */
+			{
+				const searchButton = document.createElement('button');
+
+				function clickHandler() {
+					const nickname = prompt('Введите имя игрока (чувствительно к регистру): ');
+					if (nickname != null) { window.openProfile(nickname); }
+				}
+
+				searchButton.classList.add('fa', 'fa-solid-magnifying-glass', 'sbgcui_button_reset', 'sbgcui_playerSearchButton');
+				searchButton.addEventListener('click', clickHandler);
+
+				leaderboardPopup.appendChild(searchButton);
 			}
 		} catch (error) {
 			console.log('SBG CUI: Ошибка в main.', error);
