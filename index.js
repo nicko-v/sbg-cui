@@ -3404,14 +3404,22 @@
 
 
 					function fillFavsList() {
+						if (Object.keys(favorites).length == 0) { return; }
+
 						let favs = [];
+						// Из объекта с избранным удаляются неактивные записи (убрана звёздочка), значения сортируются по алфавиту, все данные кроме гуидов удаляются.
+						// Результат - массив гуидов, отсортированный по названиям соответствующих им точек.
+						// В конце функции список будет снова отсортирован (после того, как будут запрошены данные о каждой точке) по оставшимся дискаверам/кулдауну.
+						// Конечный результат - алфавитный список, в котором наверху находятся точки с активным кулдауном.
+						const activeFavoritesGuidsByName =
+							Object.entries(favorites)
+								.filter(entry => entry[1].isActive)
+								.sort((a, b) => a[1].name.localeCompare(b[1].name))
+								.map(entry => entry[0]);
 
 						favsListContent.innerHTML = '';
 
-						if (Object.keys(favorites).length == 0) { return; }
-
-						for (let guid in favorites) {
-							if (favorites[guid].isActive) {
+						activeFavoritesGuidsByName.forEach(guid => {
 								let li = document.createElement('li');
 								let pointLink = document.createElement('span');
 								let pointName = document.createElement('span');
@@ -3471,8 +3479,7 @@
 										pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
 										pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
 									});
-							}
-						}
+						});
 
 						favs.sort((a, b) => {
 							a = a.childNodes[1].sbgcuiCooldown || a.childNodes[1].discoveriesLeft;
