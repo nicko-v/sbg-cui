@@ -1474,20 +1474,24 @@ input[type="range"][name="notifications_duration"]::after {
 }
 
 .sbgcui_favs-header {
-	text-align: center;
-	margin: 0;
-	padding: 10px 0;
-	position: sticky;
-	top: 0;
 	background-color: var(--background);
+	padding-bottom: 10px;
+	position: sticky;
+	text-align: center;
+	top: 0;
+	z-index: 1;
 }
 
-.sbgcui_favs-descr {
+.sbgcui_favs-header-title {
+	margin: 0;
+	padding: 10px 0;
+}
+
+.sbgcui_favs-header-subtitle {
 	color: var(--text-disabled);
 	font-weight: normal;
 	margin: 0;
 	padding: 0;
-	text-align: center;
 }
 
 .sbgcui_favs-content {

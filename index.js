@@ -3396,8 +3396,9 @@
 				{
 					let star = document.createElement('button');
 					let favsList = document.createElement('div');
-					let favsListHeader = document.createElement('h3');
-					let favsListDescription = document.createElement('h6');
+					let favsListHeader = document.createElement('header');
+					let favsListHeaderTitle = document.createElement('h3');
+					let favsListHeaderSubtitle = document.createElement('h6');
 					let favsListContent = document.createElement('ul');
 					let isFavsListOpened = false;
 
@@ -3485,13 +3486,15 @@
 
 					favsList.classList.add('sbgcui_favs', 'sbgcui_hidden');
 					favsListHeader.classList.add('sbgcui_favs-header');
-					favsListDescription.classList.add('sbgcui_favs-descr');
+					favsListHeaderTitle.classList.add('sbgcui_favs-header-title');
+					favsListHeaderSubtitle.classList.add('sbgcui_favs-header-subtitle');
 					favsListContent.classList.add('sbgcui_favs-content');
 
-					favsListHeader.innerText = 'Избранные точки';
-					favsListDescription.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
+					favsListHeaderTitle.innerText = 'Избранные точки';
+					favsListHeaderSubtitle.innerText = 'Быстрый доступ к важным точкам, уведомления об их остывании и защита от автоудаления сносок.';
 
-					favsList.append(favsListHeader, favsListDescription, favsListContent);
+					favsListHeader.append(favsListHeaderTitle, favsListHeaderSubtitle);
+					favsList.append(favsListHeader, favsListContent);
 
 					star.classList.add('fa', 'fa-solid-star', 'sbgcui_favs_star');
 					star.addEventListener('click', () => {
