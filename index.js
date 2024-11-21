@@ -537,6 +537,8 @@
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
 					return `${match}, hourCycle: 'h23', second: '2-digit'`;
+				case `view.setCenter(ol.proj.fromLonLat(entry.c))`: // Line ~1257
+					return `${match}; window.sbgcuiHighlightFeature(undefined, entry.c);`;
 				case `function initCompass() {`: // Line ~1280
 					return DeviceOrientationEvent ? `${match}return;` : match;
 				case `testuser`: // Line ~1314
@@ -578,10 +580,11 @@
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
-			`(if \\(\\$\\('\\.attack-slider-wrp'\\).hasClass\\('hidden'\\)\\) {)`,
+			`(if \\(\\$\\('\\.attack-slider-wrp'\\)\\.hasClass\\('hidden'\\)\\) {)`,
 			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
+			`(view\\.setCenter\\(ol\\.proj\\.fromLonLat\\(entry\\.c\\)\\))`,
 			`(function initCompass\\(\\) {)`,
 			`(testuser)`,
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
@@ -589,14 +592,14 @@
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
-			`(z: view.getZoom\\(\\))`,
+			`(z: view\\.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 30;
+		const replacesShouldBe = 31;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -1069,6 +1072,8 @@
 
 
 			isStarMode = isStarMode && starModeTarget != null;
+
+			window.sbgcuiHighlightFeature = highlightFeature;
 
 
 			async function getSelfData() {
