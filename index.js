@@ -2499,7 +2499,7 @@
 					speed: 200,
 					//perPage: 2,
 				};
-				
+
 				window.highlightFeature = highlightFeature;
 
 				viewportMeta.setAttribute('content', viewportMeta.getAttribute('content') + ', shrink-to-fit=no');
@@ -3426,65 +3426,65 @@
 						favsListContent.innerHTML = '';
 
 						activeFavoritesGuidsByName.forEach(guid => {
-								let li = document.createElement('li');
-								let pointLink = document.createElement('span');
-								let pointName = document.createElement('span');
-								let deleteButton = document.createElement('button');
-								let pointData = document.createElement('div');
+							let li = document.createElement('li');
+							let pointLink = document.createElement('span');
+							let pointName = document.createElement('span');
+							let deleteButton = document.createElement('button');
+							let pointData = document.createElement('div');
 
-								pointName.innerText = favorites[guid].name;
-								pointLink.appendChild(pointName);
-								pointLink.addEventListener('click', () => { window.showInfo(guid); });
+							pointName.innerText = favorites[guid].name;
+							pointLink.appendChild(pointName);
+							pointLink.addEventListener('click', () => { window.showInfo(guid); });
 
-								deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
-								deleteButton.addEventListener('click', _ => {
-									favorites[guid].isActive = 0;
-									favorites.save();
-									li.removeAttribute('sbgcui_active', '');
-									li.classList.add('sbgcui_hidden');
+							deleteButton.classList.add('sbgcui_button_reset', 'sbgcui_favs-li-delete', 'fa', 'fa-solid-circle-xmark');
+							deleteButton.addEventListener('click', _ => {
+								favorites[guid].isActive = 0;
+								favorites.save();
+								li.removeAttribute('sbgcui_active', '');
+								li.classList.add('sbgcui_hidden');
+							});
+
+							pointData.classList.add('sbgcui_favs-li-data');
+
+							li.classList.add('sbgcui_favs-li');
+							li.setAttribute('sbgcui_active', '');
+
+							let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
+							let discoveriesLeft = favorites[guid].discoveriesLeft;
+
+							if (hasActiveCooldown) {
+								pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+								pointLink.sbgcuiCooldown = favorites[guid].cooldown;
+
+								let intervalID = setInterval(() => {
+									if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
+										pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
+									} else {
+										clearInterval(intervalID);
+									}
+								}, 1000);
+							} else if (discoveriesLeft) {
+								pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
+								pointLink.discoveriesLeft = discoveriesLeft;
+							}
+
+							li.append(deleteButton, pointLink, pointData);
+							favs.push(li);
+
+							getPointData(guid)
+								.then(data => {
+									if (!data) { return; }
+
+									const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
+									const energy = Math.round(data.e);
+									const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
+									const isAllied = team == player.team;
+									const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
+
+									pointName.innerText = `[${level}] ${title}`;
+									pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
+									pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
 								});
-
-								pointData.classList.add('sbgcui_favs-li-data');
-
-								li.classList.add('sbgcui_favs-li');
-								li.setAttribute('sbgcui_active', '');
-
-								let hasActiveCooldown = favorites[guid].isActive && favorites[guid].cooldown;
-								let discoveriesLeft = favorites[guid].discoveriesLeft;
-
-								if (hasActiveCooldown) {
-									pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-									pointLink.sbgcuiCooldown = favorites[guid].cooldown;
-
-									let intervalID = setInterval(() => {
-										if (isFavsListOpened && favorites[guid].isActive && favorites[guid].cooldown) {
-											pointLink.setAttribute('sbgcui_cooldown', favorites[guid].timer);
-										} else {
-											clearInterval(intervalID);
-										}
-									}, 1000);
-								} else if (discoveriesLeft) {
-									pointLink.setAttribute('sbgcui_discoveries', discoveriesLeft);
-									pointLink.discoveriesLeft = discoveriesLeft;
-								}
-
-								li.append(deleteButton, pointLink, pointData);
-								favs.push(li);
-
-								getPointData(guid)
-									.then(data => {
-										if (!data) { return; }
-
-										const { co: cores, g: guid, l: level, li: lines, t: title, te: team } = data;
-										const energy = Math.round(data.e);
-										const inventoryCache = JSON.parse(localStorage.getItem('inventory-cache'));
-										const isAllied = team == player.team;
-										const refs = inventoryCache.find(item => item.l == guid)?.a ?? 0;
-
-										pointName.innerText = `[${level}] ${title}`;
-										pointLink.style.color = isAllied ? 'var(--sbgcui-branding-color)' : `var(--team-${team})`;
-										pointData.innerHTML = `${energy}% @ ${cores}<br>${lines.i}↓ ${lines.o}↑ / ${i18next.t('sbgcui.refsShort')}: ${refs}`;
-									});
 						});
 
 						favs.sort((a, b) => {
@@ -5090,6 +5090,12 @@
 								feature.setProperties({ amount, mapCoords, pointGuid, title });
 
 								pointsWithRefsSource.addFeature(feature);
+
+								getPointData(pointGuid).then(data => {
+									// Приводим к числу, т.к. у пустой точки команда null вместо 0,
+									// и при обновлении значения с начального undefined на null, OL не обновляет фичу.
+									feature.set('team', +data.te);
+								});
 							});
 
 							map.on('click', mapClickHandler);
@@ -5107,19 +5113,21 @@
 					name: 'sbgcui_points_with_refs',
 					source: pointsWithRefsSource,
 					style: (feature, resolution) => {
-						const { amount, isSelected, mapCoords, title } = feature.getProperties();
+						const { amount, isSelected, mapCoords, team, title } = feature.getProperties();
+						const fillColor = () => isSelected ? '#BB7100' : (team == undefined ? '#11111180' : team == 0 ? '#66666680' : window.TeamColors[team].fill);
+						const strokeColor = () => team == undefined ? '#66666680' : team == 0 ? '#CCCCCC80' : window.TeamColors[team].stroke;
 						const zoom = view.getZoom();
 						const markerSize = zoom >= 16 ? 20 : 20 * resolution / 2.5;
 						const markerStyle = new ol.style.Style({
 							geometry: new ol.geom.Circle(mapCoords, isSelected ? markerSize * 1.4 : markerSize),
-							fill: new ol.style.Fill({ color: isSelected ? '#BB7100' : '#CCC' }),
-							stroke: new ol.style.Stroke({ color: window.TeamColors[3].stroke, width: 3 }),
+							fill: new ol.style.Fill({ color: fillColor() }),
+							stroke: new ol.style.Stroke({ color: strokeColor(), width: isSelected ? 4 : 3 }),
 							zIndex: isSelected ? 3 : 1,
 						});
 						const amountStyle = new ol.style.Style({
 							text: new ol.style.Text({
 								fill: new ol.style.Fill({ color: '#000' }),
-								font: `${zoom >= 15 ? 16 : 12}px Manrope`,
+								font: `${zoom >= 15 ? 14 : 12}px Manrope`,
 								stroke: new ol.style.Stroke({ color: '#FFF', width: 3 }),
 								text: zoom >= 15 ? String(amount) : null,
 							}),
