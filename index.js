@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.65
+// @version      1.14.66
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.65';
+	const USERSCRIPT_VERSION = '1.14.66';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -1017,6 +1017,7 @@
 			const catalysersList = document.querySelector('#catalysers-list');
 			const coresList = document.querySelector('#cores-list');
 			const refsList = document.querySelector('#refs-list');
+			const refsAmount = document.querySelector('#i-ref');
 			const discoverButton = document.querySelector('#discover');
 			const inventoryButton = document.querySelector('#ops');
 			const invCloseButton = document.querySelector('#inventory__close');
@@ -1753,6 +1754,10 @@
 												parsedResponse.loot.forEach(item => { item.a -= deletedItems[item.t]?.[item.g]?.amount ?? 0; });
 												parsedResponse.loot = parsedResponse.loot.filter(item => item.a > 0);
 
+												// Чтобы помигать счётчиком на карточке точки.
+												if (parsedResponse.loot.find(item => item.t == 3)) { window.dispatchEvent(new Event('refAquired')); }
+												
+
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
 											}
@@ -2372,6 +2377,14 @@
 				portrait.addEventListener('change', () => {
 					portrait.matches ? view.setTopPadding() : view.removePadding();
 					view.setCenter(playerFeature.getGeometry().getCoordinates());
+				});
+
+				window.addEventListener('refAquired', () => {
+					refsAmount.classList.add('sbgcui_heartBeat');
+				});
+
+				pointPopup.addEventListener('pointPopupClosed', () => {
+					refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 			}
 
