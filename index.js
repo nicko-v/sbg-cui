@@ -2321,7 +2321,7 @@
 					return false;
 				});
 
-				document.querySelector('.inventory__tab[data-tab="3"]').addEventListener('click', event => {
+				document.querySelector('.inventory__tab[data-tab="3"]').addEventListener('click', () => {
 					let counter = document.querySelector('.inventory__tab[data-tab="3"] > .inventory__tab-counter');
 					let refsAmount = JSON.parse(localStorage.getItem('inventory-cache')).reduce((acc, item) => item.t == 3 ? acc + item.a : acc, 0);
 					let uniqueRefsAmount = inventoryContent.childNodes.length;
@@ -2381,6 +2381,10 @@
 
 				window.addEventListener('refAquired', () => {
 					refsAmount.classList.add('sbgcui_heartBeat');
+				});
+
+				refsAmount.addEventListener('animationend', () => {
+					refsAmount.classList.remove('sbgcui_heartBeat');
 				});
 
 				pointPopup.addEventListener('pointPopupClosed', () => {
