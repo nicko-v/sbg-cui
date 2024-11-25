@@ -846,6 +846,7 @@
 				constructor(pointData) { // Чистый ответ сервера или объект Point.
 					this.cores = pointData.co ?? pointData.coresAmount;
 					this.energy = pointData.e ?? pointData.energy;
+					this.guid = pointData.g ?? pointData.guid;
 					this.level = pointData.l ?? pointData.level;
 					this.lines = {
 						in: pointData.li?.i ?? pointData.lines.in,
@@ -857,12 +858,14 @@
 				update(pointData) {
 					this.cores = pointData.co ?? pointData.coresAmount ?? this.cores;
 					this.energy = pointData.e ?? pointData.energy ?? this.energy;
+					this.guid = pointData.g ?? pointData.guid ?? this.guid;
 					this.level = pointData.l ?? pointData.level ?? this.level;
 					this.lines = {
 						in: pointData.li?.i ?? pointData.lines?.in ?? this.lines.in,
-						in: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
+						out: pointData.li?.o ?? pointData.lines?.out ?? this.lines.out,
 					};
 					this.timestamp = Date.now();
+					pointsSource.getFeatureById(this.guid)?.changed();
 				}
 
 				get linesAmount() {
@@ -1083,6 +1086,7 @@
 			let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
 			const uniques = { c: new Set(), v: new Set() };
 			const inview = {};
+			const pointsSource = map.getLayers().getArray().find(layer => layer.get('name') == 'points').getSource();
 
 			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
@@ -1870,6 +1874,7 @@
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
 
 												lastOpenedPoint.updateDrawings(to, regions.length);
+												inview[from]?.update({ lines: { out: inview[from].lines.out + 1 } });
 											} else if ('data' in parsedResponse) {
 												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
@@ -1944,7 +1949,7 @@
 												if (guid in inview) {
 													const cores = parsedResponse.data.reduce((acc, curr) => { acc[curr.g] = { energy: curr.e, level: curr.l }; return acc; }, {});
 													const totalEnergy = Point.calculateTotalEnergy(cores);
-													inview[guid].energy = totalEnergy;
+													inview[guid]?.update({ energy: totalEnergy });
 												}
 											}
 											break;
