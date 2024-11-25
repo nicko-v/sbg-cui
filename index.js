@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.66
+// @version      1.14.67
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.66';
+	const USERSCRIPT_VERSION = '1.14.67';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -527,6 +527,8 @@
 					return `window.deploy_slider`;
 				case `const draw_slider`: // Line ~442
 					return `window.draw_slider`;
+				case `closePopup($('.info'))`: // Line ~674
+					return `$('.info').addClass('hidden');`;
 				case `if (new_val < 1) new_val = 1`: // Line ~795
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
@@ -549,6 +551,8 @@
 					return `${match} if (guid !== $('.info').attr('data-guid')) { return; }`;
 				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
+				case `function closeDrawSlider() {`: // Line ~1558
+					return `${match} $('.info').removeClass('hidden');`;
 				case `makeEntry(e, data)`: // Line ~1658
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `view.calculateExtent(map.getSize()`: // Line ~1872, 1873
@@ -579,6 +583,7 @@
 			`(const attack_slider)`,
 			`(const deploy_slider)`,
 			`(const draw_slider)`,
+			`(closePopup\\(\\$\\('\\.info'\\)\\))`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\)\\.hasClass\\('hidden'\\)\\) {)`,
 			`(explodeRange\\(item\\.l\\))`,
@@ -590,6 +595,7 @@
 			`(timers\\.info_controls = setInterval\\(\\(\\) => {)`,
 			`(function update\\(\\) {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
+			`(function closeDrawSlider\\(\\) {)`,
 			`(makeEntry\\(e, data\\)(?!\\s{))`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view\\.getZoom\\(\\))`,
@@ -599,7 +605,7 @@
 			`(class Bitfield)`,
 		].join('|'), 'g');
 
-		const replacesShouldBe = 31;
+		const replacesShouldBe = 33;
 		let replacesMade = 0;
 
 		fetch('/app/script.js')
@@ -653,7 +659,7 @@
 					this.isCaptured = pointData.u.c;
 
 					drawButton.removeAttribute('sbgcui-possible-lines');
-					this.update(pointData.co);
+					this.updateCores(pointData.co);
 
 					if (this.owner == player.name) { this.getCaptureDate(); }
 				}
@@ -776,7 +782,7 @@
 					});
 				}
 
-				update(cores) {
+				updateCores(cores) {
 					cores.forEach(core => {
 						this.cores[core.g] = {
 							energy: core.e,
@@ -802,6 +808,16 @@
 							drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
 						});
 					}
+				}
+
+				updateDrawings(endPointGuid, regionsCreated) {
+					this.lines.out += 1;
+					this.regionsAmount += regionsCreated;
+					this.possibleLines = this.possibleLines.filter(line => line.guid != endPointGuid);
+					drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
+					linesOutSpan.innerText = this.lines.out;
+					regionsAmountSpan.innerText = this.regionsAmount;
+					pointPopup.dispatchEvent(new Event('lineDrawn'));
 				}
 
 				selectCore(type, currentLevel) {
@@ -1011,34 +1027,36 @@
 			const attackButton = document.querySelector('#attack-menu');
 			const attackSlider = document.querySelector('.attack-slider-wrp');
 			const blContainer = document.querySelector('.bottom-container');
-			const drawButton = document.querySelector('#draw');
-			const drawSlider = document.querySelector('.draw-slider-wrp');
-			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const catalysersList = document.querySelector('#catalysers-list');
 			const coresList = document.querySelector('#cores-list');
-			const refsList = document.querySelector('#refs-list');
-			const refsAmount = document.querySelector('#i-ref');
+			const deploySlider = document.querySelector('.deploy-slider-wrp');
 			const discoverButton = document.querySelector('#discover');
-			const inventoryButton = document.querySelector('#ops');
+			const drawButton = document.querySelector('#draw');
+			const drawSlider = document.querySelector('.draw-slider-wrp');
 			const invCloseButton = document.querySelector('#inventory__close');
+			const inventoryButton = document.querySelector('#ops');
 			const inventoryContent = document.querySelector('.inventory__content');
 			const inventoryPopup = document.querySelector('.inventory.popup');
 			const invTotalSpan = document.querySelector('#self-info__inv');
 			const leaderboardPopup = document.querySelector('.leaderboard.popup');
 			const notifsButton = document.querySelector('#notifs-menu');
+			const linesOutSpan = document.querySelector('#i-stat__line-out');
 			const pointCores = document.querySelector('.i-stat__cores');
+			const pointEnergyValue = document.createElement('span');
 			const pointImage = document.querySelector('#i-image');
 			const pointImageBox = document.querySelector('.i-image-box');
-			const pointEnergyValue = document.createElement('span');
 			const pointLevelSpan = document.querySelector('#i-level');
 			const pointOwnerSpan = document.querySelector('#i-stat__owner');
-			const pointTitleSpan = document.querySelector('#i-title');
 			const pointPopup = document.querySelector('.info.popup');
 			const pointPopupCloseButton = document.querySelector('.info.popup > .popup-close');
+			const pointTitleSpan = document.querySelector('#i-title');
 			const profileNameSpan = document.querySelector('#pr-name');
 			const profilePopup = document.querySelector('.profile.popup');
 			const profilePopupCloseButton = document.querySelector('.profile.popup > .popup-close');
+			const refsAmount = document.querySelector('#i-ref');
+			const refsList = document.querySelector('#refs-list');
 			const regDateSpan = document.querySelector('.pr-stat__age > .pr-stat-val');
+			const regionsAmountSpan = document.querySelector('#i-stat__region');
 			const selfExpSpan = document.querySelector('#self-info__exp');
 			const selfLvlSpan = document.querySelector('#self-info__explv');
 			const selfNameSpan = document.querySelector('#self-info__name');
@@ -1666,7 +1684,7 @@
 												const isFirstCore = cores.length == 1;
 												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
-												lastOpenedPoint.update(cores);
+												lastOpenedPoint.updateCores(cores);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
 												logAction({ type: actionType, coords, point: guid, title });
@@ -1679,7 +1697,7 @@
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 												const { coords, guid: point, title } = lastOpenedPoint;
 
-												lastOpenedPoint.update([parsedResponse.c], parsedResponse.l);
+												lastOpenedPoint.updateCores([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
 
 												logAction({ type: 'upgrade', coords, point, title });
@@ -1756,7 +1774,7 @@
 
 												// Чтобы помигать счётчиком на карточке точки.
 												if (parsedResponse.loot.find(item => item.t == 3)) { window.dispatchEvent(new Event('refAquired')); }
-												
+
 
 												const modifiedResponse = createResponse(parsedResponse, response);
 												resolve(modifiedResponse);
@@ -1850,6 +1868,8 @@
 												const distance = lastOpenedPoint.possibleLines.find(line => line.guid == to)?.distance;
 
 												logAction({ type: 'draw', from, to, fromTitle, toTitle, distance, regions });
+
+												lastOpenedPoint.updateDrawings(to, regions.length);
 											} else if ('data' in parsedResponse) {
 												const isPossibleLinesCheck = url.searchParams.get('sbgcuiPossibleLinesCheck') != null;
 
@@ -1920,7 +1940,7 @@
 										case '/api/repair':
 											if ('data' in parsedResponse) {
 												const guid = JSON.parse(options.body).guid;
-												if (isPointPopupOpened) { lastOpenedPoint.update(parsedResponse.data); }
+												if (isPointPopupOpened) { lastOpenedPoint.updateCores(parsedResponse.data); }
 												if (guid in inview) {
 													const cores = parsedResponse.data.reduce((acc, curr) => { acc[curr.g] = { energy: curr.e, level: curr.l }; return acc; }, {});
 													const totalEnergy = Point.calculateTotalEnergy(cores);
@@ -4639,7 +4659,7 @@
 
 			/* Показ опыта за снос */
 			{
-				function openHandler() {
+				function updateReward() {
 					destroyRewardDiv.innerText = `${rewardText}: ${formatter.format(lastOpenedPoint.destroyReward)} ${i18next.t('units.pts-xp')}`;
 				}
 
@@ -4653,7 +4673,9 @@
 
 				pointStat.insertBefore(destroyRewardDiv, pointControls);
 
-				pointPopup.addEventListener('pointPopupOpened', openHandler);
+				pointPopup.addEventListener('pointPopupOpened', updateReward);
+				pointPopup.addEventListener('pointRepaired', updateReward);
+				pointPopup.addEventListener('lineDrawn', updateReward);
 			}
 
 
