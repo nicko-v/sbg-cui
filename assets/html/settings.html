@@ -357,6 +357,14 @@
       Настройки, касающиеся рисования линий. Значение "-1" в текстовом поле отключает ограничение.
     </h6>
     <section class="sbgcui_settings-subsection">
+      <div class="sbgcui_settings-dropdown_wrapper">
+        <h5 class="sbgcui_settings-dropdown-title">Возврат на экран точки после рисования:</h5>
+        <select name="drawing_returnToPointInfo">
+          <option value="off">Нет</option>
+          <option value="always">Всегда</option>
+          <option value="discoverable">Точка досягаема и не исследована</option>
+        </select>
+      </div>
       <div class="sbgcui_settings-textfield_wrapper">
         <h5 class="sbgcui_settings-textfield-title">Скрывать сноски ближе, чем (м):</h5>
         <input name="drawing_minDistance" type="number" min="-1">
