@@ -4428,7 +4428,7 @@
 						layerFilter: layer => layer.get('name') == 'points',
 					});
 
-					const pointsInRange = pointsHit.filter(isPointInRange);
+					const pointsInRange = pointsHit.filter(point => isPointInRange(point));
 
 					return pointsInRange;
 				}
