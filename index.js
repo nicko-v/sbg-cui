@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.67
+// @version      1.14.68
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -62,7 +62,7 @@
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.67';
+	const USERSCRIPT_VERSION = '1.14.68';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -81,7 +81,7 @@
 
 
 	let database;
-	const openRequest = indexedDB.open('CUI', 8);
+	const openRequest = indexedDB.open('CUI', 9);
 
 	openRequest.addEventListener('upgradeneeded', event => {
 		function initializeDB() {
@@ -170,6 +170,18 @@
 					stateStore.delete('baselayer');
 					tilesStore.clear();
 				},
+				9: () => {
+					const configStore = event.target.transaction.objectStore('config');
+					const request = configStore.get('drawing');
+
+					request.addEventListener('success', event => {
+						const drawing = event.target.result;
+
+						drawing.returnToPointInfo = 'discoverable';
+
+						configStore.put(drawing, 'drawing');
+					});
+				},
 			};
 
 			for (let v in updateToVersion) {
@@ -227,6 +239,7 @@
 				outerBottomColor: '#28C4F4',
 			},
 			drawing: {
+				returnToPointInfo: 'discoverable',
 				minDistance: -1,
 				maxDistance: -1,
 				hideLastFavRef: 0,
@@ -552,7 +565,7 @@
 				case `delete cooldowns[guid]`: // Line ~1532
 					return `${match}; manageControls();`;
 				case `function closeDrawSlider() {`: // Line ~1558
-					return `${match} $('.info').removeClass('hidden');`;
+					return `${match} window.closePopupDecorator(closePopup);`;
 				case `makeEntry(e, data)`: // Line ~1658
 					return `window.makeEntryDec(e, data, makeEntry)`;
 				case `view.calculateExtent(map.getSize()`: // Line ~1872, 1873
@@ -1096,6 +1109,7 @@
 
 			isStarMode = isStarMode && starModeTarget != null;
 
+			window.closePopupDecorator = closePopupDecorator;
 			window.sbgcuiHighlightFeature = highlightFeature;
 
 
@@ -1510,6 +1524,11 @@
 			function getDistance(to, from = playerFeature.getGeometry().getCoordinates()) {
 				const line = new ol.geom.LineString([from, ol.proj.fromLonLat(to)]);
 				return ol.sphere.getLength(line);
+			}
+
+			function isPointInRange(feature) {
+				const pointCoords = ol.proj.toLonLat(feature.getGeometry().getCoordinates());
+				return getDistance(pointCoords) < PLAYER_RANGE;
 			}
 
 			function calcPlayingTime(regDateString) {
@@ -2033,6 +2052,31 @@
 					};
 
 					return toastify(options);
+				}
+			}
+
+			function closePopupDecorator(closePopup) {
+				switch (config.drawing.returnToPointInfo) {
+					case 'off':
+						closePopup($(pointPopup)); // Оригинальная функция работает с объектом JQ.
+						break;
+					case 'always':
+						pointPopup.classList.remove('hidden');
+						break;
+					case 'discoverable':
+						const guid = lastOpenedPoint.guid;
+						const point = pointsSource.getFeatureById(guid);
+						const cooldown = JSON.parse(localStorage.getItem('cooldowns'))[guid]?.t || 0;
+						const isInRange = isPointInRange(point);
+						const isDiscoverable = new Date(cooldown) - Date.now() <= 0;
+
+						if (isInRange && isDiscoverable) {
+							pointPopup.classList.remove('hidden');
+						} else {
+							closePopup($(pointPopup));
+						}
+
+						break;
 				}
 			}
 
@@ -4372,11 +4416,6 @@
 					const cooldown = JSON.parse(localStorage.getItem('cooldowns'))?.[guid];
 
 					return cooldown?.t == undefined || (cooldown.t <= now && cooldown.c > 0);
-				}
-
-				function isPointInRange(point) {
-					const pointCoords = ol.proj.toLonLat(point.getGeometry().getCoordinates());
-					return getDistance(pointCoords) < PLAYER_RANGE;
 				}
 
 				function getPointsInRange() {
