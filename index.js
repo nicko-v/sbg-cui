@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.70
+// @version      1.14.71
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -55,14 +55,14 @@
 	const INVIEW_POINTS_DATA_TTL = 7000;
 	const INVIEW_POINTS_LIMIT = 100;
 	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
-	const LATEST_KNOWN_VERSION = '0.4.2-4';
+	const LATEST_KNOWN_VERSION = '0.4.3';
 	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
 	const MAX_DISPLAYED_CLUSTER = 8;
 	const MIN_FREE_SPACE = 100;
 	const PLAYER_RANGE = 45;
 	const TILE_CACHE_SIZE = 2048;
 	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.70';
+	const USERSCRIPT_VERSION = '1.14.71';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const BLAST_ANIMATION_DURATION = 800;
 
@@ -1095,7 +1095,7 @@
 
 			let lastOpenedPoint = {};
 			let discoverModifier;
-			let latestNotifId;
+			let latestNotifTime;
 			let { excludedCores, isMainToolbarOpened, isRotationLocked, isStarMode, lastUsedCatalyser, starModeTarget, versionWarns } = state;
 			const uniques = { c: new Set(), v: new Set() };
 			const inview = {};
@@ -5635,15 +5635,15 @@
 					if (status == 'off') { return; }
 					if (status == 'fav' && Object.keys(favorites).length == 0) { return; }
 
-					notifsCount = await getNotifs(latestNotifId);
+					notifsCount = await getNotifs(latestNotifTime);
 
 					if (notifsCount > 0) {
 						notifs = await getNotifs();
 
-						latestNotifId = notifs[0].id;
+						latestNotifTime = notifs[0].ti;
 
 						notifs.slice(0, notifsCount).reverse().forEach(notif => {
-							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle, id } = notif;
+							const { g: guid, na: attackerName, ta: attackerTeam, ti: attackDate, c: coords, t: pointTitle } = notif;
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' };
 							const attackTime = new Date(attackDate).toLocaleString(i18next.language, format);
 
@@ -5653,9 +5653,10 @@
 							const toast = createToast(toastNode, 'bottom left', duration, 'sbgcui_destroy_notif_toast', false);
 							toast.options.selector = destroyNotifsContainer;
 							toast.options.callback = () => {
-								const latestNotif = +localStorage.getItem('latest-notif');
-								if (id > latestNotif) { localStorage.setItem('latest-notif', id); }
-								if (id == notifs[0].id) { notifsButton.removeAttribute('data-count'); }
+								const latestNotifTimestamp = +new Date(localStorage.getItem('latest-notif'));
+								const currentNotifTimestamp = +new Date(attackDate);
+								if (currentNotifTimestamp > latestNotifTimestamp) { localStorage.setItem('latest-notif', attackDate); }
+								if (attackDate == notifs[0].ti) { notifsButton.removeAttribute('data-count'); }
 								destroyNotifsToasts.delete(toast);
 							};
 							if (onClick == 'jumpto') {
@@ -5713,7 +5714,7 @@
 				let interval = config.notifications.interval;
 				let notifsCount = 0;
 				let notifs = await getNotifs();
-				latestNotifId = notifs[0]?.id ?? 0;
+				latestNotifTime = notifs[0]?.ti ?? (new Date(0)).toISOString();
 
 				let intervalId = setInterval(checkAndShow, interval);
 				window.addEventListener('configUpdated', updateInterval);
