@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.71
+// @version      1.14.72
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -12,7 +12,7 @@
 // @iconURL      https://nicko-v.github.io/sbg-cui/assets/img/tm_script_logo.png
 // ==/UserScript==
 
-(function () {
+(async function () {
 	'use strict';
 
 	if (window.location.pathname.startsWith('/login')) { return; }
@@ -42,29 +42,14 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const ACTIONS_REWARDS = { destroy: { region: 125 * 2, line: 45 * 2, core: 10 * 2 } };
-	const CORES_ENERGY = [0, 500, 750, 1000, 1500, 2000, 2500, 3500, 4000, 5250, 6500];
-	const CORES_LIMITS = [0, 6, 6, 4, 4, 3, 3, 2, 2, 2, 2];
-	const LINES_LIMIT = { out: 45 };
-	const DISCOVERY_COOLDOWN = 45;
-	const HIGHLEVEL_MARKER = 9;
-	const HIT_TOLERANCE = 15;
+	const USERSCRIPT_VERSION = '1.14.72';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
-	const INVENTORY_LIMIT = 3000;
-	const INVIEW_MARKERS_MAX_ZOOM = 16;
-	const INVIEW_POINTS_DATA_TTL = 7000;
-	const INVIEW_POINTS_LIMIT = 100;
-	const ITEMS_TYPES = ['', 'cores', 'catalysers', 'references', 'brooms'];
-	const LATEST_KNOWN_VERSION = '0.4.3';
-	const LEVEL_TARGETS = [1500, 5000, 12500, 25000, 60000, 125000, 350000, 675000, 1000000, Infinity];
-	const MAX_DISPLAYED_CLUSTER = 8;
-	const MIN_FREE_SPACE = 100;
-	const PLAYER_RANGE = 45;
-	const TILE_CACHE_SIZE = 2048;
-	const POSSIBLE_LINES_DISTANCE_LIMIT = 500;
-	const USERSCRIPT_VERSION = '1.14.71';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
-	const BLAST_ANIMATION_DURATION = 800;
+	const {
+		ACTIONS_REWARDS, CORES_ENERGY, CORES_LIMITS, LINES_LIMIT, DISCOVERY_COOLDOWN, HIGHLEVEL_MARKER, HIT_TOLERANCE, INVENTORY_LIMIT,
+		INVIEW_MARKERS_MAX_ZOOM, INVIEW_POINTS_DATA_TTL, INVIEW_POINTS_LIMIT, ITEMS_TYPES, LATEST_KNOWN_VERSION, LEVEL_TARGETS,
+		MAX_DISPLAYED_CLUSTER, MIN_FREE_SPACE, PLAYER_RANGE, TILE_CACHE_SIZE, POSSIBLE_LINES_DISTANCE_LIMIT, BLAST_ANIMATION_DURATION
+	} = await fetch(`${HOME_DIR}/const.json`).then(res => res.json()).catch(error => { window.alert(`Ошибка при получении ${HOME_DIR}/const.json.\n\n${error.message}`); });
 
 
 	const config = {}, state = {}, favorites = {};
