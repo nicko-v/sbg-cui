@@ -35,6 +35,7 @@
 		"MinifyAll.minifyOnSaveToNewFile": true,
 		"MinifyAll.openMinifiedDocument": false,
 		"MinifyAll.disableHtml": true,
+		"MinifyAll.disableJson": true,
 		"workbench.editor.tabActionLocation": "left"
 	}
 }
