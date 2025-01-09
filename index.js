@@ -641,7 +641,6 @@
 				constructor(pointData) {
 					this.coords = pointData.c;
 					this.guid = pointData.g;
-					this.level = pointData.l;
 					this.team = pointData.te;
 					this.title = pointData.t;
 					this.owner = pointData.o;
@@ -712,6 +711,12 @@
 
 				get coresAmount() {
 					return Object.keys(this.cores).length;
+				}
+
+				get level() {
+					const coresTotalLevels = Object.values(this.cores).reduce((acc, core) => acc + core.level, 0);
+					const emptySlotsTotalLevels = (6 - this.coresAmount);
+					return Math.trunc((coresTotalLevels + emptySlotsTotalLevels) / 6);
 				}
 
 				get linesAmount() {
@@ -1688,14 +1693,15 @@
 										case '/api/deploy':
 											if ('data' in parsedResponse) { // Есди деплой, то массив объектов с ядрами.
 												const cores = parsedResponse.data.co;
-												const { coords, guid, title, isCaptured } = lastOpenedPoint;
-												const isFirstCore = cores.length == 1;
-												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
 
 												lastOpenedPoint.updateCores(cores);
 												lastOpenedPoint.selectCore(config.autoSelect.deploy);
 
-												logAction({ type: actionType, coords, point: guid, title });
+												const { coords, guid, level, title, isCaptured } = lastOpenedPoint;
+												const isFirstCore = cores.length == 1;
+												const actionType = isFirstCore ? (isCaptured ? 'capture' : 'uniqcap') : 'deploy';
+
+												logAction({ type: actionType, coords, level, point: guid, title });
 
 												if (inview[guid] == undefined) {
 													inview[guid] = new InviewPoint(lastOpenedPoint);
@@ -1703,12 +1709,12 @@
 													inview[guid].update(lastOpenedPoint);
 												}
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
-												const { coords, guid: point, title } = lastOpenedPoint;
-
 												lastOpenedPoint.updateCores([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
+												
+												const { coords, level, guid: point, title } = lastOpenedPoint;
 
-												logAction({ type: 'upgrade', coords, point, title });
+												logAction({ type: 'upgrade', coords, level, point, title });
 											}
 											break;
 										case '/api/attack2':
@@ -5408,7 +5414,7 @@
 												const link = document.createElement('a');
 
 												link.innerText = guidsTitles[action.point] || action.point;
-												link.innerText += action.level != undefined ? ` [${action.level}]` : '';
+												link.innerText += action.level != undefined ? ` [${action.type == 'discover' ? '' : '^'}${action.level}]` : '';
 												link.setAttribute('data-guid', action.point);
 
 												entryDescr.appendChild(link);
