@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.72
+// @version      1.14.73
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.72';
+	const USERSCRIPT_VERSION = '1.14.73';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -1730,8 +1730,10 @@
 													const lines = parsedResponse.l.length;
 													const regions = parsedResponse.r.length;
 													const xp = parsedResponse.xp.diff;
+													const oldestLineDays = Math.trunc(Math.max(...parsedResponse.l.map(line => Date.now() - new Date(line.created_at)), 0) / 1000 / 60 / 60 / 24);
+													const oldestRegionDays = Math.trunc(Math.max(...parsedResponse.r.map(region => Date.now() - new Date(region.created_at)), 0) / 1000 / 60 / 60 / 24);
 
-													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, xp });
+													logAction({ type: isBroom ? 'broom' : 'destroy', points: destroyedPoints, lines, regions, oldestLineDays, oldestRegionDays, xp });
 													destroyedPoints.forEach(point => {
 														const guid = point.guid;
 														delete inview[guid];
@@ -2525,6 +2527,8 @@
 					'sbgcui.lines': 'Линии',
 					'sbgcui.region': 'Регион',
 					'sbgcui.regions': 'Регионы',
+					'sbgcui.oldestLineDays': 'Самая старая линия (дн.)',
+					'sbgcui.oldestRegionDays': 'Самый старый регион (дн.)',
 					'sbgcui.refsShort': 'СНК',
 					'sbgcui.max': 'Макс.',
 					'sbgcui.total': 'Всего',
@@ -2543,6 +2547,8 @@
 					'sbgcui.lines': 'Lines',
 					'sbgcui.region': 'Region',
 					'sbgcui.regions': 'Regions',
+					'sbgcui.oldestLineDays': 'Oldest line (days)',
+					'sbgcui.oldestRegionDays': 'Oldest region (days)',
 					'sbgcui.refsShort': 'REF',
 					'sbgcui.max': 'Max',
 					'sbgcui.total': 'Total',
@@ -5501,12 +5507,13 @@
 											}
 											case 'destroy':
 											case 'broom': {
-												const points = action.points;
+												const { points, oldestLineDays, oldestRegionDays, xp } = action;
 												const lines = action.lines instanceof Array ? action.lines.length : action.lines; // Раньше сохранялся массив.
 												const regions = action.regions instanceof Array ? action.regions.length : action.regions;
-												const xp = action.xp;
 												const linesString = `${i18next.t('sbgcui.line' + (lines > 1 ? 's' : ''))}: ${lines}`;
 												const regionsString = `${i18next.t('sbgcui.region' + (regions > 1 ? 's' : ''))}: ${regions}`;
+												const oldestLineDaysString = `${i18next.t('sbgcui.oldestLineDays')}: ${oldestLineDays}`;
+												const oldestRegionDaysString = `${i18next.t('sbgcui.oldestRegionDays')}: ${oldestRegionDays}`;
 
 												entryDescr.innerText = i18next.t('sbgcui.point' + (points.length > 1 ? 's' : '')) + ': ';
 												points.forEach((guid, index) => {
@@ -5518,11 +5525,15 @@
 													entryDescr.appendChild(link);
 													if (index < points.length - 1) { entryDescr.append(', '); }
 												});
+
 												if (lines > 0) {
 													entryDescr.appendChild(document.createElement('br'));
-													entryDescr.append(linesString, (regions > 0) ? `, ${regionsString.toLowerCase()}` : '', (xp != undefined) ? `. XP: ${xp}` : '');
+													entryDescr.append(linesString);
+													if (regions > 0) { entryDescr.append(`, ${regionsString.toLowerCase()}`) }
+													if (xp != undefined) { entryDescr.append(`. XP: ${xp}`); };
+													if (oldestLineDays > 0) { entryDescr.append(document.createElement('br'), oldestLineDaysString); }
+													if (regions > 0 && oldestRegionDays > 0) { entryDescr.append(document.createElement('br'), oldestRegionDaysString); }
 												}
-
 
 												break;
 											}
