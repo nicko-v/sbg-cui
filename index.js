@@ -1080,6 +1080,8 @@
 			let isleaderboardPopupOpened = !leaderboardPopup.classList.contains('hidden');
 			let isSettingsMenuOpened = false;
 			let isRefsViewerOpened = false;
+			let isLogsViewerOpened = false;
+			let isFavsListOpened = false;
 			let isClusterOverlayOpened = false;
 			let isInvClearInProgress = false;
 
@@ -2102,20 +2104,19 @@
 				});
 			}
 
-			function isAnyPopupOrOverlayOpened() {
+			function isAnyOverlayActive() {
+				const isAnyDefaultPopupOpened = Array.from(document.querySelectorAll('.popup')).some(popup => !popup.classList.contains('hidden'));
 				return (
+					isAnyDefaultPopupOpened ||
+					isDrawSliderOpened ||
 					isAttackSliderOpened ||
 					isClusterOverlayOpened ||
-					isDrawSliderOpened ||
-					isInventoryPopupOpened ||
-					isPointPopupOpened ||
-					isProfilePopupOpened ||
-					isleaderboardPopupOpened ||
 					isSettingsMenuOpened ||
+					isFavsListOpened ||
+					isLogsViewerOpened ||
 					isRefsViewerOpened
 				);
 			}
-
 
 			/* Данные о себе и версии игры */
 			{
@@ -2908,6 +2909,7 @@
 					setStoredInputsValues();
 
 					settingsMenu.classList.add('sbgcui_hidden');
+					isSettingsMenuOpened = false;
 				}
 
 				function onColorFilterInput(event) {
@@ -3482,7 +3484,6 @@
 					let favsListHeaderTitle = document.createElement('h3');
 					let favsListHeaderSubtitle = document.createElement('h6');
 					let favsListContent = document.createElement('ul');
-					let isFavsListOpened = false;
 
 
 					function fillFavsList() {
@@ -3595,6 +3596,7 @@
 					document.body.addEventListener('click', event => {
 						if (
 							isFavsListOpened &&
+							!event.target.closest('.info.popup') &&
 							!event.target.closest('.sbgcui_favs') &&
 							!event.target.closest('.sbgcui_favs_star')
 						) {
@@ -4438,7 +4440,7 @@
 				}
 
 				function checkPopupsAndShowPoint() {
-					!isAnyPopupOrOverlayOpened() && showNextPointInRange(true);
+					!isAnyOverlayActive() && showNextPointInRange(true);
 				}
 
 				function showNextPointInRange(isAutoShow) {
@@ -5313,6 +5315,7 @@
 						popup.classList.add('sbgcui_hidden');
 						logContent.innerHTML = '';
 						hideConsole();
+						isLogsViewerOpened = false;
 					}
 
 					function showPopup() {
@@ -5337,6 +5340,7 @@
 
 							popup.classList.remove('sbgcui_hidden');
 						});
+						isLogsViewerOpened = true;
 					}
 
 					function showLog() {
