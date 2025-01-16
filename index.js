@@ -1690,7 +1690,7 @@
 								const clonedResponse = response.clone();
 
 								clonedResponse.json().then(async parsedResponse => {
-									log.res.body = parsedResponse;
+									log.res.body = JSON.parse(JSON.stringify(parsedResponse)); // Клонирование объекта, т.к. далее ответ может быть подменён.
 									networkLog.push(log);
 
 									switch (url.pathname) {
