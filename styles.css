@@ -564,7 +564,7 @@ html[lang="ru"] .i-buttons {
 .notifs .popup-close,
 .profile .popup-close,
 .sbgcui_log-close,
-.sbgcui_log-buttons-console,
+.sbgcui_log-buttons-dev,
 .sbgcui_log-buttons-trash,
 #sbgcui_hide_viewer,
 #sbgcui_batch_remove,
@@ -2066,14 +2066,15 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_log-content,
-.sbgcui_log-console {
+.sbgcui_log-dev {
 	overflow-y: auto;
 	padding-bottom: 65px;
 }
 
 .sbgcui_log-content:empty::before,
 .sbgcui_log-content:empty::after,
-.sbgcui_log-console:empty::before {
+.sbgcui_log-dev-console:empty::before,
+.sbgcui_log-dev-network:empty::before {
 	color: var(--text-disabled);
 	display: block;
 	font-size: 1.3em;
@@ -2090,8 +2091,12 @@ li[sbgcui-excluded-core]>span {
 	content: "Поиск данных...";
 }
 
-.sbgcui_log-console:empty::before {
+.sbgcui_log-dev-console:empty::before {
 	content: "Здесь будут выводиться ошибки и сообщения, отправляемые в консоль.";
+}
+
+.sbgcui_log-dev-network:empty::before {
+	content: "Здесь будут выводиться запросы к серверу.";
 }
 
 .sbgcui_log-content-entry {
@@ -2117,8 +2122,51 @@ li[sbgcui-excluded-core]>span {
 	flex-direction: column;
 }
 
-.sbgcui_log-console .sbgcui_log-content-entry-time {
+.sbgcui_log-dev-console .sbgcui_log-content-entry-time {
 	flex-basis: 25%;
+}
+
+.sbgcui_log-dev-network > details {
+	padding: 5px 0;
+}
+
+.sbgcui_log-dev-network > details > summary {
+	font-family: monospace;
+	font-size: 1.1em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sbgcui_log-dev-network > details > summary[error] {
+	color: red;
+}
+
+.sbgcui_log-dev-network > details > pre {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.sbgcui_log-dev-network > details > pre > span {
+	color: var(--text-disabled);
+	display: block;
+}
+
+.sbgcui_log-dev-tabs {
+	background: var(--background);
+	border-bottom: 1px solid var(--text-disabled);
+	display: flex;
+	flex-direction: row;
+	justify-content: space-around;
+	margin-bottom: 5px;
+	padding-bottom: 5px;
+	position: sticky;
+	top: 0;
+}
+
+.sbgcui_log-dev-tabs > div[active] {
+	color: var(--selection);
+	font-weight: bold;
 }
 
 .sbgcui_log-content-entry-time::after {
@@ -2134,7 +2182,7 @@ li[sbgcui-excluded-core]>span {
 	text-overflow: ellipsis;
 }
 
-.sbgcui_log-console .sbgcui_log-content-entry-description {
+.sbgcui_log-dev-console .sbgcui_log-content-entry-description {
 	flex-basis: calc(75% - 10px);
 	overflow-wrap: break-word;
 }
@@ -2192,11 +2240,11 @@ li[sbgcui-excluded-core]>span {
 }
 
 .sbgcui_log-header:has(input[data-totalEntries="0"])~.sbgcui_log-buttons>.sbgcui_log-buttons-trash,
-.sbgcui_log-console:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-trash {
+.sbgcui_log-dev:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-trash {
 	display: none;
 }
 
-.sbgcui_log-console:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-console {
+.sbgcui_log-dev:not(.sbgcui_hidden)~.sbgcui_log-buttons>.sbgcui_log-buttons-dev {
 	color: var(--selection);
 }
 

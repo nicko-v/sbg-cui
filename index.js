@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.73
+// @version      1.14.74
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.73';
+	const USERSCRIPT_VERSION = '1.14.74';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -1096,6 +1096,7 @@
 			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
 			const headers = { authorization: `Bearer ${localStorage.getItem('auth')}`, 'accept-language': i18next.language };
+			const networkLog = [];
 			let gameVersion;
 
 
@@ -1667,16 +1668,31 @@
 								break;
 						}
 
+						const log = {
+							time: { req: Date.now() },
+							req: { url: url.pathname + url.search, options }
+						};
+
 						fetch(url.pathname + url.search, options)
 							.then(async response => {
+								log.time.res = Date.now();
+								log.res = {
+									status: response.status,
+									statusText: response.statusText
+								};
+
 								if (!url.pathname.match(/^\/api\//)) {
 									resolve(response);
+									networkLog.push(log);
 									return;
 								}
 
-								let clonedResponse = response.clone();
+								const clonedResponse = response.clone();
 
 								clonedResponse.json().then(async parsedResponse => {
+									log.res.body = parsedResponse;
+									networkLog.push(log);
+
 									switch (url.pathname) {
 										case '/api/point':
 											if ('data' in parsedResponse && url.searchParams.get('status') == null) { // Если есть параметр status=1, то инфа о точке запрашивается в сокращённом виде для рефа.
@@ -1713,7 +1729,7 @@
 											} else if ('c' in parsedResponse) { // Если апгрейд, то один объект с ядром.
 												lastOpenedPoint.updateCores([parsedResponse.c], parsedResponse.l);
 												lastOpenedPoint.selectCore(config.autoSelect.upgrade, parsedResponse.c.l);
-												
+
 												const { coords, level, guid: point, title } = lastOpenedPoint;
 
 												logAction({ type: 'upgrade', coords, level, point, title });
@@ -2001,11 +2017,17 @@
 									}
 								}).catch(error => {
 									console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
+									log.error = error;
+									networkLog.push(log);
 								}).finally(() => {
 									resolve(response);
 								});
 							})
-							.catch(error => { reject(error); });
+							.catch(error => {
+								log.error = error;
+								networkLog.push(log);
+								reject(error);
+							});
 					});
 				}
 			}
@@ -5261,7 +5283,7 @@
 			}
 
 
-			/* Показ логов */
+			/* Логи и консоль */
 			{
 				try {
 					function clearStorage() {
@@ -5283,7 +5305,27 @@
 						};
 					}
 
-					function showConsole() {
+					function showDevLogs() {
+						[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
+						devLogs.classList.remove('sbgcui_hidden');
+						showConsoleLog();
+					}
+
+					function hideDevLogs() {
+						consoleContent.innerHTML = '';
+						networkContent.innerHTML = '';
+						[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
+						devLogs.classList.add('sbgcui_hidden');
+					}
+
+					function showConsoleLog() {
+						consoleTab.setAttribute('active', '');
+						networkTab.removeAttribute('active');
+						networkContent.classList.add('sbgcui_hidden');
+						consoleContent.classList.remove('sbgcui_hidden');
+						consoleContent.innerHTML = '';
+						networkContent.innerHTML = '';
+
 						logsNerrors.forEach(data => {
 							const entry = document.createElement('p');
 							const entryTime = document.createElement('span');
@@ -5299,28 +5341,83 @@
 							entryDescr.innerHTML = data.messages.join('<br>');
 
 							entry.append(entryTime, entryDescr);
-							cnslContent.prepend(entry);
+							consoleContent.prepend(entry);
 						});
-
-						[header, tagsWrapper, logContent].forEach(element => element.classList.add('sbgcui_hidden'));
-						cnslContent.classList.remove('sbgcui_hidden');
 					}
 
-					function hideConsole() {
-						cnslContent.innerHTML = '';
-						[header, tagsWrapper, logContent].forEach(element => element.classList.remove('sbgcui_hidden'));
-						cnslContent.classList.add('sbgcui_hidden');
+					function showNetworkLog() {
+						function replacer(key, value) {
+							if (key == 'authorization') { return 'hidden'; }
+	
+							// Для красоты вывода, иначе при сериализации всего объекта
+							// уже сериализированное тело запроса будет заэскейплено.
+							if (typeof value == 'string') {
+								try {
+									const parsed = JSON.parse(value);
+									return parsed;
+								} catch(error) {
+									return value;
+								}
+							}
+	
+							return value;
+						}
+
+						networkTab.setAttribute('active', '');
+						consoleTab.removeAttribute('active');
+						consoleContent.classList.add('sbgcui_hidden');
+						networkContent.classList.remove('sbgcui_hidden');
+						consoleContent.innerHTML = '';
+						networkContent.innerHTML = '';
+
+						networkLog.forEach(data => {
+							const details = document.createElement('details');
+							const summary = document.createElement('summary');
+							const reqPre = document.createElement('pre');
+							const resPre = document.createElement('pre');
+							const errPre = document.createElement('pre');
+							const reqHeaderSpan = document.createElement('span');
+							const resHeaderSpan = document.createElement('span');
+							const errHeaderSpan = document.createElement('span');
+							const resTimeStatusSpan = document.createElement('span');
+							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23' };
+							const responseTime = data.time.res - data.time.req;
+
+							summary.innerText = `[${new Date(data.time.req).toLocaleString(i18next.language, format).replace(/,|\./, ':')}] [${data.res?.status ?? '???'}] ${data.req.url}`;
+							reqHeaderSpan.innerText = 'REQUEST:';
+							reqPre.append(reqHeaderSpan, JSON.stringify(data.req, replacer, 2));
+							if (data.res != undefined) {
+								resHeaderSpan.innerText = 'RESPONSE:';
+								resTimeStatusSpan.innerText = `${responseTime} ms [${data.res.status}] ${data.res.statusText}`;
+								resPre.append(resHeaderSpan, resTimeStatusSpan);
+								if (data.res.body) { resPre.append(JSON.stringify(data.res.body, replacer, 2)); }
+							}
+							if (data.error != undefined) {
+								errHeaderSpan.innerText = `ERROR:`;
+								errPre.append(errHeaderSpan, JSON.stringify(data.error, Object.getOwnPropertyNames(data.error), 2));
+							}
+
+							if (
+								data.res == undefined ||
+								data.error != undefined ||
+								data.res.status != 200 ||
+								data.res.body?.error != undefined
+							) { summary.setAttribute('error', ''); }
+
+							details.append(summary, reqPre, resPre, errPre);
+							networkContent.prepend(details);
+						});
 					}
 
-					function toggleConsole() {
-						const isConsoleHidden = cnslContent.classList.contains('sbgcui_hidden');
-						isConsoleHidden ? showConsole() : hideConsole();
+					function toggleDevLogs() {
+						const isDevLogsHidden = devLogs.classList.contains('sbgcui_hidden');
+						isDevLogsHidden ? showDevLogs() : hideDevLogs();
 					}
 
 					function hidePopup() {
 						popup.classList.add('sbgcui_hidden');
 						logContent.innerHTML = '';
-						hideConsole();
+						hideDevLogs();
 						isLogsViewerOpened = false;
 					}
 
@@ -5585,11 +5682,21 @@
 						stateStore.put(state.hiddenLogs, 'hiddenLogs');
 					}
 
+					function copyLogToClipboard(event) {
+						if (event.target.closest('pre') == null) { return; }
+						const log = event.target.closest('details')?.innerText?.replace(/^(\[.+\])(.+?)(\n)/, '$1$3');
+						window.navigator.clipboard.writeText(log).then(() => { showToast('Выбранный лог скопирован в буфер обмена.'); });
+					}
+
 					const popup = await getHTMLasset('log');
 					const closeButton = popup.querySelector('.sbgcui_log-close');
 					const clearButton = popup.querySelector('.sbgcui_log-buttons-trash');
-					const cnslButton = popup.querySelector('.sbgcui_log-buttons-console');
-					const cnslContent = popup.querySelector('.sbgcui_log-console');
+					const devButton = popup.querySelector('.sbgcui_log-buttons-dev');
+					const devLogs = popup.querySelector('.sbgcui_log-dev');
+					const consoleContent = popup.querySelector('.sbgcui_log-dev-console');
+					const networkContent = popup.querySelector('.sbgcui_log-dev-network');
+					const consoleTab = popup.querySelector('.sbgcui_log-dev-tabs-console');
+					const networkTab = popup.querySelector('.sbgcui_log-dev-tabs-network');
 					const datePicker = popup.querySelector('input[type="date"]');
 					const header = popup.querySelector('.sbgcui_log-header');
 					const jumpToButton = document.querySelector('.info > .sbgcui_jumpToButton');
@@ -5608,12 +5715,15 @@
 					toolbarButton.addEventListener('click', showPopup);
 					closeButton.addEventListener('click', hidePopup);
 					clearButton.addEventListener('click', clearStorage);
-					cnslButton.addEventListener('click', toggleConsole);
+					devButton.addEventListener('click', toggleDevLogs);
+					consoleTab.addEventListener('click', showConsoleLog);
+					networkTab.addEventListener('click', showNetworkLog);
 					jumpToButton.addEventListener('click', hidePopup);
 					tagsWrapper.addEventListener('click', toggleTag);
 					logContent.addEventListener('click', showPointInfo);
 					datePicker.addEventListener('keydown', event => { event.preventDefault(); });
 					datePicker.addEventListener('change', showLog);
+					networkContent.addEventListener('click', copyLogToClipboard);
 
 					toolbar.addItem(toolbarButton, 6);
 
