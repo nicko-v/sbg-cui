@@ -2142,6 +2142,10 @@ li[sbgcui-excluded-core]>span {
 	color: red;
 }
 
+.sbgcui_log-dev-network > details > summary[api-error] {
+	color: gold;
+}
+
 .sbgcui_log-dev-network > details > pre {
 	white-space: pre-wrap;
 	word-break: break-word;

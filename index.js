@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.74
+// @version      1.14.75
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.74';
+	const USERSCRIPT_VERSION = '1.14.75';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -1025,6 +1025,105 @@
 				}
 			}
 
+			class RequestLog {
+				constructor(url, options, storedData) {
+					if (storedData != undefined) { Object.assign(this, storedData); return; }
+
+					this.time = { request: Date.now(), response: undefined };
+					this.request = { url, options };
+					this.status = undefined;
+					this.statusText = undefined;
+					this.response = undefined;
+					this.error = undefined;
+				}
+
+				static preCachedLogs = [];
+
+				static replacer(key, value) {
+					if (key == 'authorization') { return 'hidden'; }
+
+					// Для красоты вывода, иначе при сериализации всего объекта
+					// уже сериализированное тело запроса будет заэскейплено.
+					if (typeof value == 'string') {
+						try {
+							const parsed = JSON.parse(value);
+							return parsed;
+						} catch (error) {
+							return value;
+						}
+					}
+
+					return value;
+				}
+
+				static get fullLog() {
+					let cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
+					cachedLogs = cachedLogs.map(log => new RequestLog(undefined, undefined, log));
+					cachedLogs.push(...RequestLog.preCachedLogs);
+					return cachedLogs;
+				}
+
+				save() {
+					if (RequestLog.preCachedLogs.length >= 100) {
+						const cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
+						cachedLogs.push(...RequestLog.preCachedLogs);
+						sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
+						RequestLog.preCachedLogs = [this];
+					} else {
+						RequestLog.preCachedLogs.push(this);
+					}
+				}
+
+				setResponse(response) {
+					this.time.response = Date.now();
+					// Клонирование объекта, т.к. ответ может быть подменён.
+					this.response = JSON.parse(JSON.stringify(response));
+				}
+
+				setStatus(code, text) {
+					this.status = code;
+					this.statusText = text;
+				}
+
+				setError(error) {
+					if (this.status != undefined && this.time.response == undefined) {
+						this.time.response = Date.now();
+					}
+
+					switch (typeof error) {
+						case 'object':
+							this.error = { name: error.name, message: error.message };
+							break;
+						case 'string':
+							this.error = { message: error };
+							break;
+					}
+				}
+
+				get isApiError() {
+					return this.response?.error != undefined;
+				}
+
+				get formattedRequest() {
+					return JSON.stringify(this.request, RequestLog.replacer, 2);
+				}
+
+				get formattedResponse() {
+					return JSON.stringify(this.response, RequestLog.replacer, 2);
+				}
+
+				get formattedError() {
+					let message = '';
+					if (this.error.name) { message += `[${this.error.name}] `; }
+					if (this.error.message) { message += `${this.error.message}`; }
+					return message;
+				}
+
+				get responseTime() {
+					return this.time.response - this.time.request;
+				}
+			}
+
 
 			window.fetch = fetchDecorator(window.fetch);
 			window.Toastify = toastifyDecorator(window.Toastify);
@@ -1096,7 +1195,6 @@
 			const percent_format = new Intl.NumberFormat(i18next.language, { maximumFractionDigits: 1 });
 
 			const headers = { authorization: `Bearer ${localStorage.getItem('auth')}`, 'accept-language': i18next.language };
-			const networkLog = [];
 			let gameVersion;
 
 
@@ -1668,30 +1766,26 @@
 								break;
 						}
 
-						const log = {
-							time: { req: Date.now() },
-							req: { url: url.pathname + url.search, options }
-						};
+						const log = new RequestLog(url.pathname + url.search, options);
 
 						fetch(url.pathname + url.search, options)
 							.then(async response => {
-								log.time.res = Date.now();
-								log.res = {
-									status: response.status,
-									statusText: response.statusText
-								};
+								log.setStatus(response.status, response.statusText);
 
 								if (!url.pathname.match(/^\/api\//)) {
 									resolve(response);
-									networkLog.push(log);
+									// Ответы сохраняются только от API, содержимое прочих не важно,
+									// но сам факт запроса и ответа должен быть в логе.
+									log.setResponse('--- data not stored ---');
+									log.save();
 									return;
 								}
 
 								const clonedResponse = response.clone();
 
 								clonedResponse.json().then(async parsedResponse => {
-									log.res.body = JSON.parse(JSON.stringify(parsedResponse)); // Клонирование объекта, т.к. далее ответ может быть подменён.
-									networkLog.push(log);
+									log.setResponse(parsedResponse);
+									log.save();
 
 									switch (url.pathname) {
 										case '/api/point':
@@ -2017,15 +2111,15 @@
 									}
 								}).catch(error => {
 									console.log('SBG CUI: Ошибка при обработке ответа сервера.', error);
-									log.error = error;
-									networkLog.push(log);
+									log.setError(error);
+									log.save();
 								}).finally(() => {
 									resolve(response);
 								});
 							})
 							.catch(error => {
-								log.error = error;
-								networkLog.push(log);
+								log.setError(error);
+								log.save();
 								reject(error);
 							});
 					});
@@ -5285,6 +5379,7 @@
 
 			/* Логи и консоль */
 			{
+				sessionStorage.removeItem('sbgcui_network-log');
 				try {
 					function clearStorage() {
 						const date = datePicker.getAttribute('min');
@@ -5346,23 +5441,6 @@
 					}
 
 					function showNetworkLog() {
-						function replacer(key, value) {
-							if (key == 'authorization') { return 'hidden'; }
-	
-							// Для красоты вывода, иначе при сериализации всего объекта
-							// уже сериализированное тело запроса будет заэскейплено.
-							if (typeof value == 'string') {
-								try {
-									const parsed = JSON.parse(value);
-									return parsed;
-								} catch(error) {
-									return value;
-								}
-							}
-	
-							return value;
-						}
-
 						networkTab.setAttribute('active', '');
 						consoleTab.removeAttribute('active');
 						consoleContent.classList.add('sbgcui_hidden');
@@ -5370,7 +5448,7 @@
 						consoleContent.innerHTML = '';
 						networkContent.innerHTML = '';
 
-						networkLog.forEach(data => {
+						RequestLog.fullLog.forEach(log => {
 							const details = document.createElement('details');
 							const summary = document.createElement('summary');
 							const reqPre = document.createElement('pre');
@@ -5381,28 +5459,22 @@
 							const errHeaderSpan = document.createElement('span');
 							const resTimeStatusSpan = document.createElement('span');
 							const format = { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hourCycle: 'h23' };
-							const responseTime = data.time.res - data.time.req;
 
-							summary.innerText = `[${new Date(data.time.req).toLocaleString(i18next.language, format).replace(/,|\./, ':')}] [${data.res?.status ?? '???'}] ${data.req.url}`;
+							summary.innerText = `[${new Date(log.time.request).toLocaleString(i18next.language, format).replace(/,|\./, ':')}] [${log.status ?? '???'}] ${log.request.url}`;
 							reqHeaderSpan.innerText = 'REQUEST:';
-							reqPre.append(reqHeaderSpan, JSON.stringify(data.req, replacer, 2));
-							if (data.res != undefined) {
+							reqPre.append(reqHeaderSpan, log.formattedRequest);
+							if (log.status != undefined) {
 								resHeaderSpan.innerText = 'RESPONSE:';
-								resTimeStatusSpan.innerText = `${responseTime} ms [${data.res.status}] ${data.res.statusText}`;
-								resPre.append(resHeaderSpan, resTimeStatusSpan);
-								if (data.res.body) { resPre.append(JSON.stringify(data.res.body, replacer, 2)); }
+								resTimeStatusSpan.innerText = `${log.responseTime} ms [${log.status}] ${log.statusText}`;
+								resPre.append(resHeaderSpan, resTimeStatusSpan, (log.response == undefined ? '' : log.formattedResponse));
 							}
-							if (data.error != undefined) {
+							if (log.error != undefined) {
 								errHeaderSpan.innerText = `ERROR:`;
-								errPre.append(errHeaderSpan, JSON.stringify(data.error, Object.getOwnPropertyNames(data.error), 2));
+								errPre.append(errHeaderSpan, log.formattedError);
 							}
 
-							if (
-								data.res == undefined ||
-								data.error != undefined ||
-								data.res.status != 200 ||
-								data.res.body?.error != undefined
-							) { summary.setAttribute('error', ''); }
+							if (log.response == undefined || log.error != undefined || log.status >= 400) { summary.setAttribute('error', ''); }
+							if (log.isApiError) { summary.setAttribute('api-error', ''); }
 
 							details.append(summary, reqPre, resPre, errPre);
 							networkContent.prepend(details);
@@ -5446,7 +5518,7 @@
 						isLogsViewerOpened = true;
 					}
 
-					function showLog() {
+					function showActionsLog() {
 						const upperBound = new Date(datePicker.value).setHours(0, 0, 0, 0);
 						const lowerBound = new Date(datePicker.value).setHours(23, 59, 59, 999);
 						const keyRange = IDBKeyRange.bound(upperBound, lowerBound);
@@ -5722,7 +5794,7 @@
 					tagsWrapper.addEventListener('click', toggleTag);
 					logContent.addEventListener('click', showPointInfo);
 					datePicker.addEventListener('keydown', event => { event.preventDefault(); });
-					datePicker.addEventListener('change', showLog);
+					datePicker.addEventListener('change', showActionsLog);
 					networkContent.addEventListener('click', copyLogToClipboard);
 
 					toolbar.addItem(toolbarButton, 6);
