@@ -1065,10 +1065,17 @@
 
 				save() {
 					if (RequestLog.preCachedLogs.length >= 100) {
-						const cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
+						let cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
 						cachedLogs.push(...RequestLog.preCachedLogs);
-						sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
 						RequestLog.preCachedLogs = [this];
+						try {
+							sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
+						} catch (error) {
+							// Хранилище вмещает около 2-3к логов в Сафари. В десктопном Хроме ограничение выше.
+							// Приходится удалять самые старые записи чтобы не было переполнения и ошибки.
+							cachedLogs = cachedLogs.slice(300);
+							sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
+						}
 					} else {
 						RequestLog.preCachedLogs.push(this);
 					}
