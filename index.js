@@ -1038,6 +1038,7 @@
 				}
 
 				static preCachedLogs = [];
+				static storageName = 'sbgcui_network-log';
 
 				static replacer(key, value) {
 					if (key == 'authorization') { return 'hidden'; }
@@ -1057,27 +1058,41 @@
 				}
 
 				static get fullLog() {
-					let cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
+					let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
 					cachedLogs = cachedLogs.map(log => new RequestLog(undefined, undefined, log));
 					cachedLogs.push(...RequestLog.preCachedLogs);
 					return cachedLogs;
 				}
 
 				save() {
+					RequestLog.preCachedLogs.push(this);
 					if (RequestLog.preCachedLogs.length >= 100) {
-						let cachedLogs = JSON.parse(sessionStorage.getItem('sbgcui_network-log')) ?? [];
+						let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
 						cachedLogs.push(...RequestLog.preCachedLogs);
-						RequestLog.preCachedLogs = [this];
+						let json = JSON.stringify(cachedLogs);
+
+						RequestLog.preCachedLogs = [];
+
 						try {
-							sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
+							sessionStorage.setItem(RequestLog.storageName, json);
 						} catch (error) {
-							// Хранилище вмещает около 2-3к логов в Сафари. В десктопном Хроме ограничение выше.
+							// Максимальная длина всех строк, которые хранятся в SessionStorage, - 5242880 (имена ключей SS тоже учитываются).
+							// В зависимости от запроса, логи имеют разный размер, но ориентировочно это 1800-5000 логов.
 							// Приходится удалять самые старые записи чтобы не было переполнения и ошибки.
-							cachedLogs = cachedLogs.slice(300);
-							sessionStorage.setItem('sbgcui_network-log', JSON.stringify(cachedLogs));
+							const storageLength = 5242880;
+							const restKeys = Object.keys(sessionStorage).filter(key => key != RequestLog.storageName);
+							const restKeysLength = restKeys.reduce((acc, key) => acc + sessionStorage.getItem(key).length, 0) + restKeys.join('').length;
+							const availableLength = storageLength - restKeysLength - RequestLog.storageName.length;
+
+							if (availableLength <= 2) { return; } // 2 - длина сериализированного пустого массива [].
+							
+							while (availableLength - json.length < 0) {
+								cachedLogs = cachedLogs.slice(Math.min(300, Math.ceil(cachedLogs.length / 2)));
+								json = JSON.stringify(cachedLogs);
+							}
+							
+							sessionStorage.setItem(RequestLog.storageName, json);
 						}
-					} else {
-						RequestLog.preCachedLogs.push(this);
 					}
 				}
 
@@ -5386,7 +5401,7 @@
 
 			/* Логи и консоль */
 			{
-				sessionStorage.removeItem('sbgcui_network-log');
+				sessionStorage.removeItem(RequestLog.storageName);
 				try {
 					function clearStorage() {
 						const date = datePicker.getAttribute('min');
