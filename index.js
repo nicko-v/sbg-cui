@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.75
+// @version      1.14.76
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.75';
+	const USERSCRIPT_VERSION = '1.14.76';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -206,6 +206,7 @@
 			},
 			ui: {
 				doubleClickZoom: 0,
+				restoreRotation: 1,
 				pointBgImage: 1,
 				pointBtnsRtl: 0,
 				pointBgImageBlur: 1,
@@ -1067,31 +1068,13 @@
 				save() {
 					RequestLog.preCachedLogs.push(this);
 					if (RequestLog.preCachedLogs.length >= 100) {
-						let cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
-						cachedLogs.push(...RequestLog.preCachedLogs);
-						let json = JSON.stringify(cachedLogs);
-
-						RequestLog.preCachedLogs = [];
+						const cachedLogs = JSON.parse(sessionStorage.getItem(RequestLog.storageName)) ?? [];
 
 						try {
-							sessionStorage.setItem(RequestLog.storageName, json);
+							sessionStorage.setItem(RequestLog.storageName, JSON.stringify([...cachedLogs, ...RequestLog.preCachedLogs]));
+							RequestLog.preCachedLogs = [];
 						} catch (error) {
-							// Максимальная длина всех строк, которые хранятся в SessionStorage, - 5242880 (имена ключей SS тоже учитываются).
-							// В зависимости от запроса, логи имеют разный размер, но ориентировочно это 1800-5000 логов.
-							// Приходится удалять самые старые записи чтобы не было переполнения и ошибки.
-							const storageLength = 5242880;
-							const restKeys = Object.keys(sessionStorage).filter(key => key != RequestLog.storageName);
-							const restKeysLength = restKeys.reduce((acc, key) => acc + sessionStorage.getItem(key).length, 0) + restKeys.join('').length;
-							const availableLength = storageLength - restKeysLength - RequestLog.storageName.length;
-
-							if (availableLength <= 2) { return; } // 2 - длина сериализированного пустого массива [].
-							
-							while (availableLength - json.length < 0) {
-								cachedLogs = cachedLogs.slice(Math.min(300, Math.ceil(cachedLogs.length / 2)));
-								json = JSON.stringify(cachedLogs);
-							}
-							
-							sessionStorage.setItem(RequestLog.storageName, json);
+							sessionStorage.removeItem(RequestLog.storageName);
 						}
 					}
 				}
@@ -2813,6 +2796,8 @@
 					zIndex: 9
 				});
 				map.addLayer(customPointsLayer);
+
+				view.setRotation(config.ui.restoreRotation ? (state.viewRotation ?? 0) : 0);
 			}
 
 
@@ -5019,6 +5004,7 @@
 				function touchEndHandler() {
 					if (touches.length != 0) { window.requestEntities(); }
 					latestTouchPoint = null;
+					database.transaction('state', 'readwrite').objectStore('state').put(view.getRotation(), 'viewRotation');
 				}
 
 				function rotationChangeHandler() {
