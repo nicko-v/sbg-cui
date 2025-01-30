@@ -5002,7 +5002,8 @@
 				}
 
 				function touchEndHandler() {
-					if (touches.length != 0) { window.requestEntities(); }
+					if (touches.length == 0) { return; } else { window.requestEntities(); }
+					touches = [];
 					latestTouchPoint = null;
 					database.transaction('state', 'readwrite').objectStore('state').put(view.getRotation(), 'viewRotation');
 				}
