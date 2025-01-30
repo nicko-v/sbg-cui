@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.76
+// @version      1.14.77
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.76';
+	const USERSCRIPT_VERSION = '1.14.77';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -1309,8 +1309,9 @@
 					if (!isEnoughSpace || isForceClear) {
 						const isDeleteAll = allied == 0 && hostile == 0;
 						const isDeleteNone = allied == -1 && hostile == -1;
+						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
-						if (!(isDeleteAll || isDeleteNone)) {
+						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
 							const refs = inventory.filter(e => e.t == 3);
 
 							pointsData = await Promise.all(refs.map(ref => getPointData(ref.l)));
