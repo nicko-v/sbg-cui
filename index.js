@@ -1302,7 +1302,7 @@
 					const isFilteredLoot = loot.some(item => item.isFiltered);
 					const { allied, hostile } = maxAmountInBag.references;
 					const deletedAmounts = {};
-					let pointsData = [], pointsTeams = {}, invTotal = Infinity, message = '';
+					let pointsTeams = {}, invTotal = Infinity, message = '';
 
 					if (isEnoughSpace && !isForceClear && !isFilteredLoot) { return []; }
 
@@ -1312,9 +1312,26 @@
 						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
 						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
+							const pointsData = [];
 							const refs = inventory.filter(e => e.t == 3);
+							let guids = refs.map(ref => ref.l);
 
-							pointsData = await Promise.all(refs.map(ref => getPointData(ref.l)));
+							while (guids.length > 0) {
+								const results = await Promise.allSettled(guids.map(guid => getPointData(guid)));
+								const rejectedGuids = [];
+
+								results.forEach((result, index) => {
+									result.status == 'fulfilled' ? pointsData.push(result.value) : rejectedGuids.push(guids[index]);
+								});
+
+								if (guids.length == rejectedGuids.length) { // На случай потери сети или серверных ошибок.
+									pointsData.length = 0;
+									break;
+								} else {
+									guids = rejectedGuids;
+								}
+							}
+
 							pointsTeams = Object.fromEntries(pointsData.map(point => [point.g, point.te]));
 						}
 
