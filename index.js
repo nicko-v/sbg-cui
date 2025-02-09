@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.77
+// @version      1.14.78
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.77';
+	const USERSCRIPT_VERSION = '1.14.78';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -645,6 +645,7 @@
 					this.team = pointData.te;
 					this.title = pointData.t;
 					this.owner = pointData.o;
+					this.guard = pointData.gu;
 					this.possibleLines = undefined;
 					this.lines = {
 						in: pointData.li.i,
@@ -776,10 +777,10 @@
 						const allCaptureRecords = event.target.result;
 						const pointCaptures = allCaptureRecords.filter(record => record.point == this.guid);
 						const latestCapture = pointCaptures[pointCaptures.length - 1];
+						const captureDate = pointCaptures.length > 0 ? new Date(latestCapture.timestamp) : null;
+						const guardDays = pointCaptures.length == 0 ? this.guard : null;
 
-						if (pointCaptures.length == 0) { return; }
-
-						const eventDetails = { guid: this.guid, date: new Date(latestCapture.timestamp) };
+						const eventDetails = { guid: this.guid, captureDate, guardDays };
 						const customEvent = new CustomEvent('pointCaptureDateFound', { detail: eventDetails });
 
 						window.dispatchEvent(customEvent);
@@ -2676,7 +2677,8 @@
 					'sbgcui.clearTilesCache': 'Очистить кэш',
 					'sbgcui.clearTilesCacheConfirm': 'Очистить кэш тайлов карты? \n{{amount}} тайлов от {{baselayers}} подложек. Всего {{size}} МБ занято.',
 					'sbgcui.calculatingTilesCache': 'Подсчёт...',
-					'sbgcui.captured': 'Захвачена: {{date}} ({{uptime}} дн.)',
+					'sbgcui.captured': 'Захвачена: {{date}} ({{guard}} дн.)',
+					'sbgcui.guard': 'Захвачена: {{guard}} дн. назад',
 				});
 				i18next.addResources('en', 'main', {
 					'notifs.text': 'neutralized by $1$',
@@ -2696,7 +2698,8 @@
 					'sbgcui.clearTilesCache': 'Clear cache',
 					'sbgcui.clearTilesCacheConfirm': 'Clear map tiles cache? \n{{amount}} tiles from {{baselayers}} baselayers. Total {{size}} MB used.',
 					'sbgcui.calculatingTilesCache': 'Calculating...',
-					'sbgcui.captured': 'Captured: {{date}} ({{uptime}} d.)',
+					'sbgcui.captured': 'Captured: {{date}} ({{guard}} d.)',
+					'sbgcui.guard': 'Captured: {{guard}} d. ago',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
@@ -3823,7 +3826,7 @@
 							return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
 						case 'distance':
 							regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
-							let dist = ref.querySelector('.inventory__item-descr').lastChild.textContent;
+							let dist = ref.querySelector('.inventory__item-descr').textContent.split('; ').find(e => e.match(/distance|расстояние/i));
 							let [_, value, units] = dist.match(regex);
 
 							value = value.replace(thousandSeparator, '').replace(decimalSeparator, '.');
@@ -3832,6 +3835,10 @@
 						case 'amount':
 							regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
 							return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+						case 'guard':
+							regex = new RegExp(/[0-9]+/);
+							const guard = ref.querySelector('.inventory__item-descr').textContent.split('; ').find(e => e.match(/guard|гард/i));
+							return guard != undefined ? +guard.match(regex) : 0;
 					}
 				}
 
@@ -3865,6 +3872,8 @@
 								} else {
 									return (aTeam == player.team) ? -1 : (bTeam == player.team) ? 1 : (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
 								}
+							case 'guard':
+								return bParam - aParam;
 							default:
 								return aParam - bParam;
 						}
@@ -3937,6 +3946,7 @@
 					['По заряду', 'energy'],
 					['По дистанции', 'distance'],
 					['По количеству', 'amount'],
+					['По гарду', 'guard'],
 				].forEach(e => {
 					let option = document.createElement('option');
 
@@ -4941,14 +4951,18 @@
 			/* Дата захвата точки */
 			{
 				function updateCaptureDate(event) {
-					const { date: captureDate, guid } = event.detail;
-					const formattedCaptureDate = formatter.format(captureDate);
-					const uptimeDays = Math.floor((Date.now() - captureDate) / 1000 / 60 / 60 / 24);
+					const { captureDate, guardDays, guid } = event.detail;
 
 					if (guid != lastOpenedPoint.guid) { return; }
 					if (!config.ui.pointDischargeTimeout) { return; }
 
-					timeoutSpan.innerText = i18next.t('sbgcui.captured', { date: formattedCaptureDate, uptime: uptimeDays });
+					if (captureDate != null) {
+						const formattedCaptureDate = formatter.format(captureDate);
+						const guardDays = Math.floor((Date.now() - captureDate) / 1000 / 60 / 60 / 24);
+						timeoutSpan.innerText = i18next.t('sbgcui.captured', { date: formattedCaptureDate, guard: guardDays });
+					} else {
+						timeoutSpan.innerText = i18next.t('sbgcui.guard', { guard: guardDays });
+					}
 				}
 
 				const timeoutSpan = document.createElement('span');
@@ -4998,13 +5012,13 @@
 				}
 
 				function touchStartHandler(event) {
-					if (isRotationLocked) { return; }
-					if (!isFollow) { return; }
-					if (event.target.nodeName != 'CANVAS') { return; }
-					if (event.targetTouches.length > 1) { return; }
-
-					latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
-					touches = [];
+					if ( event.targetTouches.length > 1 || isFollow == false || event.target.nodeName != 'CANVAS' || isRotationLocked) {
+						latestTouchPoint = null;
+						return;
+					} else {
+						latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
+						touches = [];
+					}					
 				}
 
 				function touchMoveHandler(event) {

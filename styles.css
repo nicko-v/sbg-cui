@@ -527,6 +527,10 @@ html[lang="ru"] .i-buttons {
 	display: block;
 }
 
+#i-stat__guard {
+	display: none;
+}
+
 .leaderboard  {
 	background: linear-gradient(180deg, var(--sbgcui-top-team, var(--background)) -100%, var(--background-transp) 50%);
 	border-color: var(--sbgcui-top-team);

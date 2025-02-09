@@ -1,5 +1,5 @@
 {
-  "LATEST_KNOWN_VERSION": "0.4.3",
+  "LATEST_KNOWN_VERSION": "0.4.4",
   "DISCOVERY_COOLDOWN": 90,
   "ACTIONS_REWARDS": { "destroy": { "core": 10, "line": 45, "region": 125  } },
   "CORES_LIMITS": [0, 6, 6, 4, 4, 3, 3, 2, 2, 1, 1],
