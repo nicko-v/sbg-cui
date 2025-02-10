@@ -776,9 +776,14 @@
 					getAllCapturesRequest.addEventListener('success', event => {
 						const allCaptureRecords = event.target.result;
 						const pointCaptures = allCaptureRecords.filter(record => record.point == this.guid);
-						const latestCapture = pointCaptures[pointCaptures.length - 1];
-						const captureDate = pointCaptures.length > 0 ? new Date(latestCapture.timestamp) : null;
-						const guardDays = pointCaptures.length == 0 ? this.guard : null;
+						const latestCapture = pointCaptures[pointCaptures.length - 1]?.timestamp;
+						const guardDays = this.guard;
+						let captureDate = null;
+
+						if (latestCapture != undefined) {
+							const days = Math.trunc((Date.now() - latestCapture) / 1000 / 60 / 60 / 24);
+							if (days == guardDays) { captureDate = new Date(latestCapture); }
+						}
 
 						const eventDetails = { guid: this.guid, captureDate, guardDays };
 						const customEvent = new CustomEvent('pointCaptureDateFound', { detail: eventDetails });
@@ -802,7 +807,7 @@
 					if (this.team == 0 && cores.length == 1) {
 						this.team = player.team;
 
-						const eventDetails = { guid: this.guid, date: new Date() };
+						const eventDetails = { guid: this.guid, captureDate: new Date(), guardDays: 0 };
 						const customEvent = new CustomEvent('pointCaptured', { detail: eventDetails });
 						window.dispatchEvent(customEvent);
 					}
@@ -5012,13 +5017,13 @@
 				}
 
 				function touchStartHandler(event) {
-					if ( event.targetTouches.length > 1 || isFollow == false || event.target.nodeName != 'CANVAS' || isRotationLocked) {
+					if (event.targetTouches.length > 1 || isFollow == false || event.target.nodeName != 'CANVAS' || isRotationLocked) {
 						latestTouchPoint = null;
 						return;
 					} else {
 						latestTouchPoint = [event.targetTouches[0].clientX, event.targetTouches[0].clientY];
 						touches = [];
-					}					
+					}
 				}
 
 				function touchMoveHandler(event) {
