@@ -2982,6 +2982,10 @@
 									localStorage.setItem('refs-cache', JSON.stringify(refsCache));
 								}
 
+								// Ивент позволяет обновить массив данных точек, который используется для сортировки.
+								const event = new CustomEvent('pointRepaired', { detail: { guid: pointGuid, energy: percentage } });
+								inventoryContent.dispatchEvent(event);
+
 								if (percentage != 100) { recursiveRepair(...arguments); }
 							}
 						})
@@ -3896,6 +3900,11 @@
 					});
 				}
 
+				function onPointRepaired(event) {
+					const { guid, energy } = event.detail;
+					if (guid in pointsData) { pointsData[guid].e = energy; }
+				}
+
 				async function onSelectChange(event) {
 					const refsElements = [...inventoryContent.children];
 					
@@ -4003,6 +4012,7 @@
 				invCloseButton.addEventListener('click', onCloseButtonClick);
 				sortOrderButton.addEventListener('click', onSortOrderButtonClick);
 				inventoryPopup.addEventListener('inventoryPopupOpened', onInventoryPopupOpened);
+				inventoryContent.addEventListener('pointRepaired', onPointRepaired);
 
 				invControls.insertBefore(select, invDelete);
 				invControls.appendChild(sortOrderButton);
