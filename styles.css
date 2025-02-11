@@ -1463,6 +1463,7 @@ input[type="range"][name="notifications_duration"]::after {
 #sbgcui_forceclear {
 	display: block;
 	margin-top: 15px;
+	overflow: hidden;
 	position: relative;
 }
 
