@@ -590,6 +590,7 @@ html[lang="ru"] .i-buttons {
 #inventory__close {
 	bottom: 120px;
 	position: absolute;
+	overflow: hidden;
 	right: 50%;
 	top: initial;
 	transform: translateX(50%);
@@ -663,6 +664,10 @@ html[lang="ru"] .i-buttons {
 .inventory__content::-webkit-scrollbar-thumb {
 	background: var(--text-disabled);
 	-webkit-border-radius: 1ex;
+}
+
+.sbgcui_refs_list-blur {
+	overflow-y: hidden;
 }
 
 .inventory__content[data-tab="3"].sbgcui_refs_list-blur::before {
@@ -1458,6 +1463,29 @@ input[type="range"][name="notifications_duration"]::after {
 #sbgcui_forceclear {
 	display: block;
 	margin-top: 15px;
+	position: relative;
+}
+
+#sbgcui_forceclear::after,
+#inventory__close::after {
+	background-color: var(--progress);
+	content: "";
+	left: 0;
+	opacity: 0.5;
+	position: absolute;
+	transition: width 0.5s ease;
+}
+
+#sbgcui_forceclear::after {
+	height: 100%;
+	top: 0;
+	width: var(--sbgcui-progress, 0);
+}
+
+#inventory__close::after {
+	bottom: 0;
+	height: var(--sbgcui-progress, 0);
+	width: 100%;
 }
 
 .sbgcui_favs {

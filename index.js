@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.78
+// @version      1.14.79
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.78';
+	const USERSCRIPT_VERSION = '1.14.79';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -552,8 +552,8 @@
 					return `${match}; manageControls();`;
 				case `function closeDrawSlider() {`: // Line ~1558
 					return `${match} window.closePopupDecorator(closePopup);`;
-				case `makeEntry(e, data)`: // Line ~1658
-					return `window.makeEntryDec(e, data, makeEntry)`;
+				case `function makeEntry`: // Line ~1678
+					return `}{window.makeEntry = function`;
 				case `view.calculateExtent(map.getSize()`: // Line ~1872, 1873
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
 				case `z: view.getZoom()`: // Line ~1874
@@ -595,7 +595,7 @@
 			`(function update\\(\\) {)`,
 			`(delete cooldowns\\[guid\\](?=\\s+?localStorage\\.setItem))`,
 			`(function closeDrawSlider\\(\\) {)`,
-			`(makeEntry\\(e, data\\)(?!\\s{))`,
+			`(function makeEntry)`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view\\.getZoom\\(\\))`,
 			`(if \\(area < 1\\))`,
@@ -1236,13 +1236,46 @@
 				return parsedResponse;
 			}
 
-			async function getPointData(guid, isCompact = true) {
+			async function getPointData(guid, isCompact = true, signal) {
 				const url = `/api/point?guid=${guid}${isCompact ? '&status=1' : ''}`;
-				const options = { headers, method: 'GET' };
+				const options = { headers, method: 'GET', signal };
 				const response = await fetch(url, options);
 				const parsedResponse = await response.json();
 
 				return parsedResponse.data;
+			}
+
+			async function getMultiplePointsData(guids, signal, progressBarElement) {
+				function handleProgress(result) {
+					donePromises += 1;
+					const progress = Math.floor(donePromises / totalPromises * 100);
+					progressBarElement?.style.setProperty('--sbgcui-progress', `${progress}%`);
+					return result;
+				}
+
+				const data = [];
+				const totalPromises = guids.length;
+				let donePromises = 0;
+
+				while (guids.length > 0) {
+					const promises = guids.map(guid => getPointData(guid, true, signal));
+					const promiseTick = promises.map(promise => promise.then(handleProgress));
+					const results = await Promise.allSettled(promiseTick);
+					const rejectedGuids = [];
+
+					results.forEach((result, index) => {
+						result.status == 'fulfilled' ? data.push(result.value) : rejectedGuids.push(guids[index]);
+					});
+
+					if (guids.length == rejectedGuids.length) { // На случай потери сети или серверных ошибок.
+						data.length = 0;
+						break;
+					} else {
+						guids = rejectedGuids;
+					}
+				}
+
+				return data;
 			}
 
 			async function getInventory() {
@@ -1318,25 +1351,9 @@
 						const isDeleteSome = isDeleteAll == false && isDeleteNone == false;
 
 						if (isForceClear && isDeleteSome) { // Сноски удаляются только принудительно.
-							const pointsData = [];
 							const refs = inventory.filter(e => e.t == 3);
-							let guids = refs.map(ref => ref.l);
-
-							while (guids.length > 0) {
-								const results = await Promise.allSettled(guids.map(guid => getPointData(guid)));
-								const rejectedGuids = [];
-
-								results.forEach((result, index) => {
-									result.status == 'fulfilled' ? pointsData.push(result.value) : rejectedGuids.push(guids[index]);
-								});
-
-								if (guids.length == rejectedGuids.length) { // На случай потери сети или серверных ошибок.
-									pointsData.length = 0;
-									break;
-								} else {
-									guids = rejectedGuids;
-								}
-							}
+							const guids = refs.map(ref => ref.l);
+							const pointsData = await getMultiplePointsData(guids, undefined, forceClearButton);
 
 							pointsTeams = Object.fromEntries(pointsData.map(point => [point.g, point.te]));
 						}
@@ -1440,6 +1457,7 @@
 					console.log('SBG CUI: Ошибка при удалении предметов.', error);
 				} finally {
 					isInvClearInProgress = false;
+					forceClearButton.style.removeProperty('--sbgcui-progress');
 					return toDelete;
 				}
 			}
@@ -2684,6 +2702,14 @@
 					'sbgcui.calculatingTilesCache': 'Подсчёт...',
 					'sbgcui.captured': 'Захвачена: {{date}} ({{guard}} дн.)',
 					'sbgcui.guard': 'Захвачена: {{guard}} дн. назад',
+					'sbgcui.sort-none': 'Сортировать по:',
+					'sbgcui.sort-title': 'Названию',
+					'sbgcui.sort-level': 'Уровню',
+					'sbgcui.sort-team': 'Команде',
+					'sbgcui.sort-energy': 'Заряду',
+					'sbgcui.sort-distance': 'Расстоянию',
+					'sbgcui.sort-amount': 'Количеству',
+					'sbgcui.sort-guard': 'Гарду',
 				});
 				i18next.addResources('en', 'main', {
 					'notifs.text': 'neutralized by $1$',
@@ -2705,6 +2731,14 @@
 					'sbgcui.calculatingTilesCache': 'Calculating...',
 					'sbgcui.captured': 'Captured: {{date}} ({{guard}} d.)',
 					'sbgcui.guard': 'Captured: {{guard}} d. ago',
+					'sbgcui.sort-none': 'Sort by:',
+					'sbgcui.sort-title': 'Title',
+					'sbgcui.sort-level': 'Level',
+					'sbgcui.sort-team': 'Team',
+					'sbgcui.sort-energy': 'Energy',
+					'sbgcui.sort-distance': 'Distance',
+					'sbgcui.sort-amount': 'Amount',
+					'sbgcui.sort-guard': 'Guard',
 				});
 				i18next.addResources(i18next.resolvedLanguage, 'main', {
 					'items.catalyser-short': '{{level}}',
@@ -2910,16 +2944,18 @@
 
 			/* Зарядка из инвентаря */
 			{
-				function makeEntryDec(e, data, makeEntry) {
-					if (data.te == player.team) {
-						e.style.setProperty('--sbgcui-energy', `${data.e}%`);
-						if (data.e < 100) {
-							e.style.setProperty('--sbgcui-display-r-button', 'flex');
-							e.setAttribute('sbgcui-repairable', '');
+				function makeEntryDecorator(originalMakeEntry) {
+					return function (e, data) {
+						if (data.te == player.team) {
+							e.style.setProperty('--sbgcui-energy', `${data.e}%`);
+							if (data.e < 100) {
+								e.style.setProperty('--sbgcui-display-r-button', 'flex');
+								e.setAttribute('sbgcui-repairable', '');
+							}
 						}
-					}
 
-					return makeEntry(e, data);
+						return originalMakeEntry(e, data);
+					};
 				}
 
 				function recursiveRepair(pointGuid, refEntry) {
@@ -2977,7 +3013,7 @@
 					refEntry.style.setProperty('--sbgcui-display-r-button', 'none');
 				}
 
-				window.makeEntryDec = makeEntryDec;
+				window.makeEntry = makeEntryDecorator(window.makeEntry);
 
 				inventoryContent.addEventListener('click', event => {
 					if (!event.currentTarget.matches('.inventory__content[data-tab="3"]')) { return; }
@@ -3244,7 +3280,7 @@
 					var brandingInput = settingsMenu.querySelector('input[name="mapFilters_brandingColor"]');
 					const closeButton = settingsMenu.querySelector('#sbgcui_settings-close');
 					const colorFiltersInputs = settingsMenu.querySelectorAll('input[data-role="colorfilter"]');
-					const forceClearButton = settingsMenu.querySelector('#sbgcui_forceclear');
+					var forceClearButton = settingsMenu.querySelector('#sbgcui_forceclear');
 					const highlevelMarkersOptions = settingsMenu.querySelectorAll('option[value="highlevel"]');
 					var innerMarkerSelect = settingsMenu.querySelector('select[name="pointHighlighting_inner"]');
 					const mapTintingInput = settingsMenu.querySelector('#tinting_map');
@@ -3804,156 +3840,157 @@
 
 			/* Сортировка рефов */
 			{
-				function isEveryRefLoaded(refsArr) {
-					return refsArr.every(e => e.classList.contains('loaded'));
-				}
+				function compare(a, b) {
+					const aData = pointsData[a.dataset.ref];
+					const bData = pointsData[b.dataset.ref];
 
-				function isEveryRefCached(refsArr) {
-					let cache = JSON.parse(localStorage.getItem('refs-cache')) || {};
-
-					return refsArr.every(e => cache[e.dataset.ref]?.t > Date.now());
-				}
-
-				function getSortParam(ref, param) {
-					let regex;
-
-					switch (param) {
-						case 'name':
-							regex = new RegExp(/\(x[0-9]{1,}\)\s(?:"|«)?([\s\S]+)/i);
-							return ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+					switch (sortParam) {
+						case 'title':
+							return aData.title.localeCompare(bData.title);
 						case 'level':
-							regex = new RegExp(/level-([0-9]{1,2})/);
-							return +ref.querySelector('.inventory__item-descr > span').style.color.match(regex)?.[1] || 0;
+							return aData.l - bData.l;
 						case 'team':
-							regex = new RegExp(/team-([1-3])/);
-							return +ref.querySelector('.inventory__item-title').style.color.match(regex)?.[1] || 0;
+							if (aData.te == bData.te) {
+								return aData.title.localeCompare(bData.title);
+							} else {
+								return (aData.te == player.team) ? -1 : (bData.te == player.team) ? 1 : aData.te - bData.te;
+							}
 						case 'energy':
-							return +ref.querySelector('.inventory__item-descr').childNodes[4].nodeValue.replace(',', '.');
+							if (aData.te == bData.te) {
+								return (aData.e == bData.e) ? aData.title.localeCompare(bData.title) : aData.e - bData.e;
+							} else {
+								return (aData.te == player.team) ? -1 : (bData.te == player.team) ? 1 : (aData.te == bData.te) ? aData.title.localeCompare(bData.title) : aData.e - bData.e;
+							}
 						case 'distance':
-							regex = new RegExp(`([0-9]+?(?:${thousandSeparator}[0-9]+)?(?:\\${decimalSeparator}[0-9]+)?)\\s(cm|m|km|см|м|км)`, 'i');
-							let dist = ref.querySelector('.inventory__item-descr').textContent.split('; ').find(e => e.match(/distance|расстояние/i));
-							let [_, value, units] = dist.match(regex);
-
-							value = value.replace(thousandSeparator, '').replace(decimalSeparator, '.');
-
-							return parseFloat(value) / ((['cm', 'см'].includes(units)) ? 100000 : (['m', 'м'].includes(units)) ? 1000 : 1);
+							return aData.distance - bData.distance;
 						case 'amount':
-							regex = new RegExp(/^\(x([0-9]{1,})\)\s/i);
-							return +ref.querySelector('.inventory__item-title').innerText.match(regex)[1];
+							return aData.amount - bData.amount;
 						case 'guard':
-							regex = new RegExp(/[0-9]+/);
-							const guard = ref.querySelector('.inventory__item-descr').textContent.split('; ').find(e => e.match(/guard|гард/i));
-							return guard != undefined ? +guard.match(regex) : 0;
+							return bData.gu - aData.gu;
 					}
 				}
 
-				function compareNames(a, b) {
-					let aName = getSortParam(a, 'name');
-					let bName = getSortParam(b, 'name');
-
-					return aName.localeCompare(bName);
+				function onDataFetchingAbort() {
+					select.removeAttribute('disabled');
+					inventoryContent.classList.remove('sbgcui_refs_list-blur');
 				}
 
-				function sortRefsBy(array, param) {
-					array.sort((a, b) => {
-						let aParam = getSortParam(a, param);
-						let bParam = getSortParam(b, param);
+				function onCloseButtonClick() {
+					abortController.abort();
+					select.value = 'none';
+					select.removeAttribute('disabled');
+					inventoryContent.classList.remove('sbgcui_refs_list-blur');
+					invCloseButton.style.removeProperty('--sbgcui-progress');
 
-						switch (param) {
-							case 'name':
-								return aParam.localeCompare(bParam);
-							case 'team':
-								if (aParam == bParam) {
-									return compareNames(a, b);
-								} else {
-									return (aParam == player.team) ? -1 : (bParam == player.team) ? 1 : aParam - bParam;
-								}
-							case 'energy':
-								let aTeam = getSortParam(a, 'team');
-								let bTeam = getSortParam(b, 'team');
+					inventory = [];
+					pointsData = {};
+					isCompleteData = false;
+				}
 
-								if (aTeam == bTeam) {
-									return (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
-								} else {
-									return (aTeam == player.team) ? -1 : (bTeam == player.team) ? 1 : (aParam == bParam) ? compareNames(a, b) : aParam - bParam;
-								}
-							case 'guard':
-								return bParam - aParam;
-							default:
-								return aParam - bParam;
+				function onInventoryPopupOpened() {
+					inventory = JSON.parse(localStorage.getItem('inventory-cache'));
+					inventory.forEach(item => {
+						if (item.t == 3) {
+							pointsData[item.l] = { amount: item.a, title: item.ti, c: item.c, };
 						}
 					});
 				}
 
-				function onRefsListLoaded() {
-					sortRefsBy(refsArr, sortParam);
-					inventoryContent.replaceChildren(...refsArr);
+				async function onSelectChange(event) {
+					const refsElements = [...inventoryContent.children];
+					
+					inventoryContent.scrollTop = 0;
+					sortParam = event.target.value;
+
+					switch (sortParam) {
+						case 'none':
+							return;
+						case 'distance':
+							for (let guid in pointsData) { pointsData[guid].distance = getDistance(pointsData[guid].c); }
+							break;
+						case 'level':
+						case 'team':
+						case 'energy':
+						case 'guard':
+							if (isCompleteData) { break; }
+
+							abortController = new AbortController();
+							abortController.signal.addEventListener('abort', onDataFetchingAbort);
+
+							select.setAttribute('disabled', '');
+							inventoryContent.classList.add('sbgcui_refs_list-blur');
+
+							try {
+								const guids = Object.keys(pointsData);
+								const responseData = await getMultiplePointsData(guids, abortController.signal, invCloseButton);
+
+								if (abortController.signal.aborted) { return; }
+
+								isCompleteData = true;
+								responseData.forEach(point => { Object.assign(pointsData[point.g], point); });
+							} catch (error) {
+								select.value = 'none';
+								showToast(`Ошибка при получении данных точки. <br>${error.message}`, undefined, undefined, 'error-toast');
+								console.log('SBG CUI: Ошибка при получении данных точки.', error);
+							} finally {
+								invCloseButton.style.removeProperty('--sbgcui-progress');
+							}
+
+							break;
+					}
+
+					if (isCompleteData) { refsElements.forEach(element => { window.makeEntry(element, pointsData[element.dataset.ref]); }); }
+
+					refsElements.sort(compare);
+					inventoryContent.replaceChildren(...refsElements);
 					select.removeAttribute('disabled');
 					inventoryContent.classList.remove('sbgcui_refs_list-blur');
-
-					if (isInMeasurementMode) {
-						performance.mark(perfMarkB);
-						console.log(`SBG CUI: Загрузка и сортировка сносок закончены: ${new Date().toLocaleTimeString()}`);
-
-						let measure = performance.measure(perfMeasure, perfMarkA, perfMarkB);
-						let duration = +(measure.duration / 1000).toFixed(1);
-						let uniqueRefsAmount = inventoryContent.childNodes.length;
-						let toast;
-
-						const message = `Загрузка и сортировка заняли ${duration} сек. <br><br>Уникальных сносок: ${uniqueRefsAmount}.`;
-						toast = createToast(message, undefined, -1, 'sbgcui_toast-selection');
-						toast.showToast();
-
-						clearMeasurements();
-					}
+					
+					// Когда сортируем по параметрам, не требующим запроса данных точек (название, кол-во, расстояние),
+					// надо заставить основной код подгрузить инфу о точках самостоятельно, дёрнув страницу.
+					const scrollEvent = new Event('scroll');
+					Object.defineProperty(scrollEvent, 'target', { value: { scrollTop: -1, clientHeight: inventoryContent.clientHeight } });
+					inventoryContent.dispatchEvent(scrollEvent);
 				}
 
-				function onRefsTabClose(event) {
-					if (!event.isTrusted) { return; }
+				function onSortOrderButtonClick() {
+					inventoryContent.classList.toggle('sbgcui_refs-reverse');
+					inventoryContent.scrollTop = -inventoryContent.scrollHeight;
+				}
 
-					clearInterval(intervalID);
-					inventoryContent.removeEventListener('refsListLoaded', onRefsListLoaded);
-
+				function onTabClick() {
+					abortController.abort();
 					select.value = 'none';
 					select.removeAttribute('disabled');
-
 					inventoryContent.classList.remove('sbgcui_refs_list-blur');
+					invCloseButton.style.removeProperty('--sbgcui-progress');
 				}
 
-				function clearMeasurements() {
-					isInMeasurementMode = false;
-					performance.clearMarks(perfMarkA);
-					performance.clearMarks(perfMarkB);
-					performance.clearMeasures(perfMeasure);
-					invCloseButton.removeAttribute('sbgcui_measurement_mode');
-				}
-
-				let invControls = document.querySelector('.inventory__controls');
-				let invDelete = document.querySelector('#inventory-delete');
-				let select = document.createElement('select');
-				let sortOrderButton = document.createElement('button');
-				let perfMarkA = 'sbgcui_refs_sort_begin';
-				let perfMarkB = 'sbgcui_refs_sort_end';
-				let perfMeasure = 'sbgcui_refs_sort_measure';
-				let isInMeasurementMode = false;
-				let intervalID;
-				let refsArr;
-				let sortParam;
+				const invControls = document.querySelector('.inventory__controls');
+				const invDelete = document.querySelector('#inventory-delete');
+				const invTabs = document.querySelector('.inventory__tabs');
+				const select = document.createElement('select');
+				const sortOrderButton = document.createElement('button');
+				let abortController = new AbortController();
+				let sortParam = 'none';
+				let inventory = [];
+				let pointsData = {};
+				let isCompleteData = false; // true: при сбросе сортировки (нажатие на вкладку) данные о точках не запрашиваются повторно, а берутся из памяти.
 
 				sortOrderButton.classList.add('fa', 'fa-solid-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
 				select.classList.add('sbgcui_refs-sort-select');
 
 				[
-					['Сортировка', 'none'],
-					['По названию', 'name'],
-					['По уровню', 'level'],
-					['По команде', 'team'],
-					['По заряду', 'energy'],
-					['По дистанции', 'distance'],
-					['По количеству', 'amount'],
-					['По гарду', 'guard'],
+					[i18next.t('sbgcui.sort-none'), 'none'],
+					[i18next.t('sbgcui.sort-title'), 'title'],
+					[i18next.t('sbgcui.sort-level'), 'level'],
+					[i18next.t('sbgcui.sort-team'), 'team'],
+					[i18next.t('sbgcui.sort-energy'), 'energy'],
+					[i18next.t('sbgcui.sort-distance'), 'distance'],
+					[i18next.t('sbgcui.sort-amount'), 'amount'],
+					[i18next.t('sbgcui.sort-guard'), 'guard'],
 				].forEach(e => {
-					let option = document.createElement('option');
+					const option = document.createElement('option');
 
 					option.innerText = e[0];
 					option.value = e[1];
@@ -3961,95 +3998,11 @@
 					select.appendChild(option);
 				});
 
-				select.addEventListener('change', event => {
-					let scrollEvent = new Event('scroll');
-
-					Object.defineProperty(scrollEvent, 'target', {
-						value: {
-							scrollTop: 0,
-							clientHeight: inventoryContent.clientHeight,
-						}
-					});
-
-					refsArr = Array.from(inventoryContent.children);
-					sortParam = event.target.value;
-
-					if (sortParam == 'none') { return; }
-
-					inventoryContent.scrollTop = 0;
-					inventoryContent.classList.remove('sbgcui_refs-reverse');
-					select.setAttribute('disabled', '');
-
-					if ((sortParam.match(/name|amount/) || isEveryRefLoaded(refsArr)) && !isInMeasurementMode) {
-						sortRefsBy(refsArr, sortParam);
-						inventoryContent.replaceChildren(...refsArr);
-						select.removeAttribute('disabled');
-					} else {
-						let scrollStep = inventoryContent.offsetHeight * 0.9;
-
-						inventoryContent.classList.add('sbgcui_refs_list-blur');
-
-						if (isInMeasurementMode) {
-							// Если все рефы уже подгружены, надо сбросить их – для этого обновляем вкладку:
-							if (isEveryRefLoaded(refsArr)) { document.querySelector('.inventory__tab[data-tab="3"]')?.click(); }
-
-							localStorage.removeItem('refs-cache');
-							performance.mark(perfMarkA);
-							console.log(`SBG CUI: Загрузка и сортировка сносок начаты: ${new Date().toLocaleTimeString()}`);
-						}
-
-						if (isEveryRefCached(refsArr)) {
-							for (let i = 0; i <= inventoryContent.scrollHeight; i += inventoryContent.offsetHeight / 2) {
-								scrollEvent.target.scrollTop = i;
-								inventoryContent.dispatchEvent(scrollEvent);
-							}
-						} else {
-							intervalID = setInterval(() => {
-								if (scrollEvent.target.scrollTop <= inventoryContent.scrollHeight) {
-									scrollEvent.target.scrollTop += scrollStep;
-									inventoryContent.dispatchEvent(scrollEvent);
-								} else {
-									clearInterval(intervalID);
-									scrollEvent.target.scrollTop = inventoryContent.scrollHeight;
-									inventoryContent.dispatchEvent(scrollEvent);
-								}
-							}, 10);
-						}
-
-						inventoryContent.addEventListener('refsListLoaded', onRefsListLoaded, { once: true });
-					}
-				});
-
-				document.querySelector('.inventory__tabs').addEventListener('click', onRefsTabClose);
-				invCloseButton.addEventListener('click', onRefsTabClose);
-				inventoryPopup.addEventListener('inventoryPopupOpened', clearMeasurements);
-				invCloseButton.addEventListener('touchstart', () => {
-					let touchStartDate = Date.now();
-
-					let timeoutID = setTimeout(() => {
-						let toast;
-						let message = `Режим измерения производительности. <br><br>
-						Выберите тип сортировки для измерения скорости загрузки данных. <br><br>
-						Кэш сносок будет очищен. <br><br>
-						Для отмены операции закройте инвентарь.`;
-
-						toast = createToast(message, 'bottom center', -1, 'sbgcui_toast-selection');
-						toast.showToast();
-
-						isInMeasurementMode = true;
-						invCloseButton.setAttribute('sbgcui_measurement_mode', '');
-					}, 2000);
-
-					invCloseButton.addEventListener('touchend', () => {
-						let touchDuration = Date.now() - touchStartDate;
-						if (touchDuration < 1000) { clearTimeout(timeoutID); } else { return; }
-					}, { once: true });
-				});
-
-				sortOrderButton.addEventListener('click', () => {
-					inventoryContent.classList.toggle('sbgcui_refs-reverse');
-					inventoryContent.scrollTop = -inventoryContent.scrollHeight;
-				});
+				select.addEventListener('change', onSelectChange);
+				invTabs.addEventListener('click', onTabClick);
+				invCloseButton.addEventListener('click', onCloseButtonClick);
+				sortOrderButton.addEventListener('click', onSortOrderButtonClick);
+				inventoryPopup.addEventListener('inventoryPopupOpened', onInventoryPopupOpened);
 
 				invControls.insertBefore(select, invDelete);
 				invControls.appendChild(sortOrderButton);
