@@ -2672,7 +2672,7 @@
 				pointEnergy.append(pointEnergyLabel, ': ', pointEnergyValue);
 				pointOwner.after(pointEnergy);
 
-				drawButtonTextWrapper.appendChild(drawButtonText);
+				drawButtonTextWrapper.append(drawButtonText);
 				drawButton.appendChild(drawButtonTextWrapper);
 
 				popupCloseButtons.forEach(button => {
