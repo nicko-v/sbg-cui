@@ -1474,18 +1474,19 @@ input[type="range"][name="notifications_duration"]::after {
 	left: 0;
 	opacity: 0.5;
 	position: absolute;
-	transition: width 0.5s ease;
 }
 
 #sbgcui_forceclear::after {
 	height: 100%;
 	top: 0;
-	width: var(--sbgcui-progress, 0);
+	transition: width 0.5s ease;
+	width: var(--sbgcui-progress);
 }
 
 #inventory__close::after {
 	bottom: 0;
-	height: var(--sbgcui-progress, 0);
+	height: var(--sbgcui-progress);
+	transition: height 0.5s ease;
 	width: 100%;
 }
 
