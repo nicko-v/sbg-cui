@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.79
+// @version      1.14.80
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -42,7 +42,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.79';
+	const USERSCRIPT_VERSION = '1.14.80';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -3908,7 +3908,6 @@
 				async function onSelectChange(event) {
 					const refsElements = [...inventoryContent.children];
 					
-					inventoryContent.scrollTop = 0;
 					sortParam = event.target.value;
 
 					switch (sortParam) {
@@ -3953,6 +3952,7 @@
 					refsElements.sort(compare);
 					inventoryContent.replaceChildren(...refsElements);
 					select.removeAttribute('disabled');
+					inventoryContent.scrollTop = isReverseOrder ? -inventoryContent.scrollHeight : 0;
 					inventoryContent.classList.remove('sbgcui_refs_list-blur');
 					
 					// Когда сортируем по параметрам, не требующим запроса данных точек (название, кол-во, расстояние),
@@ -3963,8 +3963,16 @@
 				}
 
 				function onSortOrderButtonClick() {
-					inventoryContent.classList.toggle('sbgcui_refs-reverse');
-					inventoryContent.scrollTop = -inventoryContent.scrollHeight;
+					isReverseOrder = !isReverseOrder;
+					if (isReverseOrder) {
+						inventoryContent.classList.add('sbgcui_refs-reverse');
+						sortOrderButton.classList.replace('fa-solid-arrow-down-a-z', 'fa-solid-arrow-down-z-a');
+						inventoryContent.scrollTop = -inventoryContent.scrollHeight;
+					} else {
+						inventoryContent.classList.remove('sbgcui_refs-reverse');
+						sortOrderButton.classList.replace('fa-solid-arrow-down-z-a', 'fa-solid-arrow-down-a-z');
+						inventoryContent.scrollTop = 0;
+					}
 				}
 
 				function onTabClick() {
@@ -3984,9 +3992,10 @@
 				let sortParam = 'none';
 				let inventory = [];
 				let pointsData = {};
+				let isReverseOrder = false;
 				let isCompleteData = false; // true: при сбросе сортировки (нажатие на вкладку) данные о точках не запрашиваются повторно, а берутся из памяти.
 
-				sortOrderButton.classList.add('fa', 'fa-solid-sort', 'sbgcui_button_reset', 'sbgcui_refs-sort-button');
+				sortOrderButton.classList.add('fa', 'fa-solid-arrow-down-a-z', 'sbgcui_refs-sort-button');
 				select.classList.add('sbgcui_refs-sort-select');
 
 				[

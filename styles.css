@@ -1644,20 +1644,18 @@ input[type="range"][name="notifications_duration"]::after {
 }
 
 .sbgcui_refs-sort-button {
-	position: absolute;
-	bottom: 140px;
-	right: 30px;
-	font-size: 1em;
-	width: 50px;
-	height: 50px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	border-radius: 50%;
-	box-shadow: 0 0 5px var(--shadow);
-	backdrop-filter: blur(5px);
-	-webkit-backdrop-filter: blur(5px);
+	order: 3;
 	padding: 7px;
+	width: 50px;
+}
+
+.inventory__controls > button {
+	border-width: 0;
+}
+
+.inventory__controls > select {
+	border-width: 1px;
+	-webkit-border-radius: 0;
 }
 
 .inventory__content:not([data-tab="3"])+.inventory__controls>.sbgcui_refs-sort-button {
@@ -1673,7 +1671,7 @@ input[type="range"][name="notifications_duration"]::after {
 }
 
 .sbgcui_show_viewer {
-	order: 3;
+	order: 4;
 }
 
 .sbgcui_xpdiff-wrapper {
