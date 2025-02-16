@@ -14,6 +14,14 @@
   --fa-url: url("../svg/solid/angles-left.svg");
 }
 
+.fa-solid-arrow-down-a-z {
+  --fa-url: url("../svg/solid/arrow-down-a-z.svg");
+}
+
+.fa-solid-arrow-down-z-a {
+  --fa-url: url("../svg/solid/arrow-down-z-a.svg");
+}
+
 .fa-solid-arrow-down-short-wide {
   --fa-url: url("../svg/solid/arrow-down-short-wide.svg");
 }
