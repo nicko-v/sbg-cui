@@ -3076,8 +3076,8 @@
 						brandingInput.value = hex326(player.teamColor);
 						html.style.setProperty('--sbgcui-branding-color', player.teamColor);
 					} else {
-						brandingInput.value = mapFilters.brandingColor;
-						html.style.setProperty('--sbgcui-branding-color', mapFilters.brandingColor);
+						brandingInput.value = config.mapFilters.brandingColor;
+						html.style.setProperty('--sbgcui-branding-color', config.mapFilters.brandingColor);
 					}
 				}
 
