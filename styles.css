@@ -531,10 +531,6 @@ html[lang="ru"] .i-buttons {
 	display: none;
 }
 
-.info.popup {
-	background: radial-gradient(circle, rgba(0, 0, 0, 0.3) 65%, var(--border) 100%);
-}
-
 .leaderboard {
 	background: linear-gradient(180deg, var(--sbgcui-top-team, var(--background)) -100%, var(--background-transp) 50%);
 	border-color: var(--sbgcui-top-team);
@@ -1156,6 +1152,10 @@ html[lang="ru"] .i-buttons {
 
 .sbgcui_no_bg_image {
 	background-image: none !important;
+}
+
+.sbgcui_point-popup-bg {
+	background: radial-gradient(circle, rgba(0, 0, 0, 0.3) 65%, var(--border) 100%);
 }
 
 .sbgcui_point-popup-bg::after {
