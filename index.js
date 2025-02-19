@@ -816,6 +816,7 @@
 						this.getPossibleLines().then(possibleLines => {
 							this.possibleLines = possibleLines;
 							drawButton.setAttribute('sbgcui-possible-lines', this.possibleLines.length);
+							window.draw_slider.options.pagination = this.possibleLines.length <= 20;
 						});
 					}
 				}
