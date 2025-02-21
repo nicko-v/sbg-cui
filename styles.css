@@ -31,6 +31,7 @@ body {
 body:has(.sbgcui_point-popup-bg:not(.hidden)) .ol-overlaycontainer-stopevent,
 body:has(.sbgcui_point-popup-bg:not(.hidden))>.topleft-container,
 body:has(.sbgcui_point-popup-bg:not(.hidden))>.bottom-container,
+body:has(.sbgcui_point-popup-bg:not(.hidden))>.sbgcui_favs,
 body:has(.leaderboard.popup:not(.hidden)) .ol-overlaycontainer-stopevent,
 body:has(.leaderboard.popup:not(.hidden))>.topleft-container,
 body:has(.leaderboard.popup:not(.hidden))>.bottom-container {
