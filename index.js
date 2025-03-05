@@ -2957,6 +2957,10 @@
 								e.style.setProperty('--sbgcui-display-r-button', 'flex');
 								e.setAttribute('sbgcui-repairable', '');
 							}
+						} else {
+							e.style.removeProperty('--sbgcui-energy');
+							e.style.removeProperty('--sbgcui-display-r-button', 'flex');
+							e.removeAttribute('sbgcui-repairable');
 						}
 
 						return originalMakeEntry(e, data);
