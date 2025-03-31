@@ -43,7 +43,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.80';
+	const USERSCRIPT_VERSION = '1.14.81';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
