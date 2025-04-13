@@ -533,8 +533,6 @@
 					return `if (new_val < 1) new_val = max`;
 				case `if ($('.attack-slider-wrp').hasClass('hidden')) {`: // Line ~908
 					return `${match}return;`;
-				case `explodeRange(item.l)`: // Line ~1005
-					return `window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[item.l].range, color: '#FF0000', width: 5 + item.l / 2 })`;
 				case `$('[name="baselayer"]').on('change', e`: // Line ~1108
 					return `$('.layers-config__list').on('change', '[name="baselayer"]', e`;
 				case `hour: '2-digit'`: // Line ~1244
@@ -559,6 +557,8 @@
 					return `view.calculateExtent([map.getSize()[0], map.getSize()[1] + ${VIEW_PADDING}]`;
 				case `z: view.getZoom()`: // Line ~1874
 					return `z: Math.floor(view.getZoom())`;
+				case `function explodeRange(prop) {`: // Line ~1967
+					return `${match} window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: prop.range, color: '#FF0000', width: 5 + prop.lv / 2 }); return;`;
 				case `if (area < 1)`: // Line ~1972
 					return `if (area < 0)`;
 				case `makeItemTitle(item)`: // Line ~2018
@@ -599,6 +599,7 @@
 			`(function makeEntry)`,
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view\\.getZoom\\(\\))`,
+			`(function explodeRange\\(prop\\) {)`,
 			`(if \\(area < 1\\))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
@@ -4178,7 +4179,8 @@
 					const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 					const item = cache.find(e => e.g == activeSlide.dataset.guid);
 					const level = item.l;
-					const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
+					//const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
+					const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? 1000 : 0;
 
 					playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 					playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
