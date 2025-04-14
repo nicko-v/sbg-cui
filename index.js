@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SBG CUI
 // @namespace    https://sbg-game.ru/app/
-// @version      1.14.81
+// @version      1.14.82
 // @downloadURL  https://nicko-v.github.io/sbg-cui/index.min.js
 // @updateURL    https://nicko-v.github.io/sbg-cui/index.min.js
 // @description  SBG Custom UI
@@ -43,7 +43,7 @@
 	window.onerror = (event, source, line, column, error) => { pushMessage([error.message, `Line: ${line}, column: ${column}`]); };
 
 
-	const USERSCRIPT_VERSION = '1.14.81';
+	const USERSCRIPT_VERSION = '1.14.82';
 	const HOME_DIR = 'https://nicko-v.github.io/sbg-cui';
 	const VIEW_PADDING = (window.innerHeight / 2) * 0.7;
 	const {
@@ -559,6 +559,8 @@
 					return `z: Math.floor(view.getZoom())`;
 				case `function explodeRange(prop) {`: // Line ~1967
 					return `${match} window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: prop.range, color: '#FF0000', width: 5 + prop.lv / 2 }); return;`;
+				case `function explodeRange(level) {`: // Line ~1967
+					return `${match} window.highlightFeature(player_feature, undefined, { once: true, duration: ${BLAST_ANIMATION_DURATION}, radius: Catalysers[level].range, color: '#FF0000', width: 5 + level / 2 }); return;`;
 				case `if (area < 1)`: // Line ~1972
 					return `if (area < 0)`;
 				case `makeItemTitle(item)`: // Line ~2018
@@ -586,7 +588,6 @@
 			`(closePopup\\(\\$\\('\\.info'\\)\\))`,
 			`(if \\(new_val < 1\\) new_val = 1)`,
 			`(if \\(\\$\\('\\.attack-slider-wrp'\\)\\.hasClass\\('hidden'\\)\\) {)`,
-			`(explodeRange\\(item\\.l\\))`,
 			`(\\$\\('\\[name="baselayer"\\]'\\)\\.on\\('change', e)`,
 			`(hour: '2-digit')`,
 			`(view\\.setCenter\\(ol\\.proj\\.fromLonLat\\(entry\\.c\\)\\))`,
@@ -600,6 +601,7 @@
 			`(view\\.calculateExtent\\(map\\.getSize\\(\\))`,
 			`(z: view\\.getZoom\\(\\))`,
 			`(function explodeRange\\(prop\\) {)`,
+			`(function explodeRange\\(level\\) {)`,
 			`(if \\(area < 1\\))`,
 			`(makeItemTitle\\(item\\)(?!\\s{))`,
 			`(if \\(type == 'osm'\\) {)`,
