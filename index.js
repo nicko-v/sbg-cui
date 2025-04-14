@@ -4181,8 +4181,7 @@
 					const cache = JSON.parse(localStorage.getItem('inventory-cache')) || [];
 					const item = cache.find(e => e.g == activeSlide.dataset.guid);
 					const level = item.l;
-					//const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
-					const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? 1000 : 0;
+					const range = item.t == 2 ? window.Catalysers[level].range : item.t == 4 ? PLAYER_RANGE : 0;
 
 					playerFeature.getStyle()[3].getGeometry().setRadius(toOLMeters(range));
 					playerFeature.getStyle()[3].getStroke().setColor(`${config.mapFilters.brandingColor}70`);
