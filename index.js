@@ -2316,7 +2316,7 @@
 						total: selfData.x,
 						current: selfData.x - LEVEL_TARGETS.slice(0, selfData.l - 1).reduce((sum, e) => e + sum, 0),
 						goal: LEVEL_TARGETS[selfData.l - 1],
-						get percentage() { return (this.goal == Infinity) ? 100 : this.current / this.goal * 100; },
+						get percentage() { return (this.goal == Infinity) ? 100 : Math.min(this.current / this.goal * 100, 100); }, // На случай повторного добавления уровней больше 10-го.
 						set string(str) { [this.current, this.goal = Infinity] = str.replace(/\s|,/g, '').split('/'); }
 					},
 					auth: localStorage.getItem('auth'),
